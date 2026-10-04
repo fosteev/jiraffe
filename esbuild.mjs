@@ -15,7 +15,7 @@ const host = {
 
 const webview = {
   ...common,
-  entryPoints: ['webview/issue.ts', 'webview/tempo.ts', 'webview/common.css'],
+  entryPoints: ['webview/issue.ts', 'webview/tempo.ts', 'webview/list.ts', 'webview/common.css'],
   outdir: 'dist/webview',
   platform: 'browser',
   format: 'iife',

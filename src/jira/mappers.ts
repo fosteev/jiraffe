@@ -1,4 +1,4 @@
-import type { Attachment, Comment, HistoryEntry, Instance, InstanceKind, IssueDetail, IssueSummary, StatusCategory, UserRef, Worklog } from './types';
+import type { Attachment, Comment, HistoryEntry, Instance, InstanceKind, IssueDetail, IssueSummary, StatusCategory, UserRef, Version, Worklog } from './types';
 
 type Raw = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -147,3 +147,22 @@ export function mapIssueDetail(
     history: mapHistory(kind, raw.changelog),
   };
 }
+
+const versionDate = (v: unknown): string | undefined => {
+  const s = str(v);
+  return s && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : undefined;
+};
+
+export function mapVersion(raw: Raw): Version {
+  const description = str(raw.description);
+  const startDate = versionDate(raw.startDate);
+  const releaseDate = versionDate(raw.releaseDate);
+  const projectId = raw.projectId !== undefined && raw.projectId !== null ? String(raw.projectId) : undefined;
+  return {
+    id: String(raw.id), name: String(raw.name ?? ''), released: raw.released === true, archived: raw.archived === true,
+    overdue: raw.overdue === true,
+    ...(description ? { description } : {}), ...(startDate ? { startDate } : {}), ...(releaseDate ? { releaseDate } : {}),
+    ...(projectId ? { projectId } : {}),
+  };
+}
+

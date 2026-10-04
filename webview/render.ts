@@ -8,10 +8,10 @@ import { ISSUE_TABS, type AttachmentView, type IssueCard, type IssueTab, type Lo
 export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const TAB_LABEL: Record<IssueTab, string> = { desc: 'Описание', att: 'Вложения', com: 'Комментарии', hist: 'История', wl: 'Журнал работ' };
-const STATUS_LABEL = { new: 'Открыта', indeterminate: 'В работе', done: 'Готово' } as const;
+export const STATUS_LABEL = { new: 'Открыта', indeterminate: 'В работе', done: 'Готово' } as const;
 
 const st = 'fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"';
-const IC = {
+export const IC = {
   server: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="4.5" rx="1" ${st}/><rect x="2.5" y="9" width="11" height="4.5" rx="1" ${st}/><circle cx="5" cy="4.75" r=".8" fill="currentColor"/><circle cx="5" cy="11.25" r=".8" fill="currentColor"/></svg>`,
   copy: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.2" ${st}/><path d="M3 10.5V3.8C3 3.3 3.3 3 3.8 3h6.7" ${st}/></svg>`,
   ext: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-6 6M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" ${st}/></svg>`,
@@ -20,6 +20,7 @@ const IC = {
   dl: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.6 7.2L8 10.6l3.4-3.4M3 13.5h10" ${st}/></svg>`,
   file: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.8h5l3.2 3.2v9.2H4zM9 1.8V5h3.2" ${st}/></svg>`,
   x: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" ${st}/></svg>`,
+  tag: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.2V3.2c0-.4.3-.7.7-.7h5l5.3 5.3a.9.9 0 0 1 0 1.2l-4.2 4.2a.9.9 0 0 1-1.2 0z" ${st}/><circle cx="5.6" cy="5.6" r=".9" fill="currentColor"/></svg>`,
   pin: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5l4 4-2 .8-2 2 .3 3-1 1-2.6-2.6-3.6 3.6M6.2 5.8l1.2-1.2z" ${st}/></svg>`,
 };
 
@@ -62,7 +63,7 @@ export function avatar(u: UserRef | undefined, size: 18 | 22 | 28): string {
   if (!u) return `<span class="av s${size}" data-bg="?" title="—">?</span>`;
   return `<span class="av s${size}" data-bg="${esc(u.id)}" title="${esc(u.name)}">${esc(initials(u.name))}</span>`;
 }
-const person = (u: UserRef | undefined): string => (u ? `<span class="who-c">${avatar(u, 18)}${esc(u.name)}</span>` : '<span class="mut">—</span>');
+export const person = (u: UserRef | undefined): string => (u ? `<span class="who-c">${avatar(u, 18)}${esc(u.name)}</span>` : '<span class="mut">—</span>');
 
 export function fmtDateTime(iso: string): string {
   const t = Date.parse(iso);

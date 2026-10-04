@@ -1,15 +1,19 @@
 import { HttpClient, JiraError, type BinaryResult, type HttpOptions } from './http';
-import { epicFieldOf, mapIssueDetail, mapIssueSummary, mapUser, mapWorklog } from './mappers';
-import type { Instance, InstanceKind, IssueDetail, SearchPage, UserRef, Worklog } from './types';
+import { epicFieldOf, mapIssueDetail, mapIssueSummary, mapUser, mapVersion, mapWorklog } from './mappers';
+import type { Instance, InstanceKind, IssueDetail, SearchPage, UserRef, Version, Worklog } from './types';
 
 type Raw = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+const mapNamed = (x: Raw): NamedRef => ({
+  id: String(x.id), name: String(x.name), ...(x.iconUrl ? { iconUrl: String(x.iconUrl) } : {}),
+  ...(typeof x.hierarchyLevel === 'number' ? { hierarchyLevel: x.hierarchyLevel } : {}),
+});
 const asArray = (r: unknown): Raw[] => (Array.isArray(r) ? (r as Raw[]) : []);
 
 export const SUMMARY_FIELDS = ['summary', 'issuetype', 'status', 'priority', 'assignee', 'updated'];
 
 export interface MyselfInfo { id: string; name: string; displayName: string; email?: string }
 export interface ProjectRef { id: string; key: string; name: string }
-export interface NamedRef { id: string; name: string; iconUrl?: string }
+export interface NamedRef { id: string; name: string; iconUrl?: string; hierarchyLevel?: number }
 export interface FilterRef { id: string; name: string; jql: string }
 export interface FieldInfo { id: string; name: string; custom: boolean; schemaCustom?: string }
 export interface PageRequest { startAt?: number; nextPageToken?: string; maxResults?: number }
@@ -29,25 +33,31 @@ export class JiraClient {
 
   /** DC: startAt/total; Cloud: nextPageToken (курсор). */
   async search(jql: string, fields: string[] = SUMMARY_FIELDS, page: PageRequest = {}): Promise<SearchPage> {
+    const r = await this.searchRaw(jql, fields, page);
+    return { issues: r.raw.map((i) => mapIssueSummary(this.instanceId, this.kind, i)), ...(r.total !== undefined ? { total: r.total } : {}), ...(r.next ? { next: r.next } : {}) };
+  }
+
+  /** Тот же поиск, но задачи — как отдала Jira (эпики и релизы читают `fixVersions`, поле Epic Link, `parent`). */
+  async searchRaw(jql: string, fields: string[], page: PageRequest = {}): Promise<{ raw: Raw[]; next?: SearchPage['next']; total?: number }> {
     const maxResults = Math.min(Math.max(Math.trunc(page.maxResults ?? 50), 1), 100); // Cloud режет до 100
     const fieldsParam = fields.join(',');
     if (this.kind === 'cloud') {
       const r = await this.http.getJson<Raw>('/rest/api/2/search/jql', {
         jql, fields: fieldsParam, maxResults, nextPageToken: page.nextPageToken,
       });
-      const issues = (r.issues as Raw[] | undefined ?? []).map((i) => mapIssueSummary(this.instanceId, this.kind, i));
+      const raw = asArray(r?.issues);
       // Защита от зацикливания: пустая страница или тот же курсор — дальше не листаем.
-      const token = typeof r.nextPageToken === 'string' && r.nextPageToken !== page.nextPageToken && !r.isLast && issues.length > 0
+      const token = typeof r.nextPageToken === 'string' && r.nextPageToken !== page.nextPageToken && !r.isLast && raw.length > 0
         ? r.nextPageToken : undefined;
-      return { issues, ...(token ? { next: { nextPageToken: token } } : {}) };
+      return { raw, ...(token ? { next: { nextPageToken: token } } : {}) };
     }
     const startAt = page.startAt ?? 0;
     const r = await this.http.getJson<Raw>('/rest/api/2/search', { jql, fields: fieldsParam, maxResults, startAt });
-    const issues = (r.issues as Raw[] | undefined ?? []).map((i) => mapIssueSummary(this.instanceId, this.kind, i));
+    const raw = asArray(r?.issues);
     const total = typeof r.total === 'number' ? r.total : undefined;
-    const nextStart = startAt + issues.length;
-    const hasMore = issues.length > 0 && (total === undefined || nextStart < total);
-    return { issues, ...(total !== undefined ? { total } : {}), ...(hasMore ? { next: { startAt: nextStart } } : {}) };
+    const nextStart = startAt + raw.length;
+    const hasMore = raw.length > 0 && (total === undefined || nextStart < total);
+    return { raw, ...(total !== undefined ? { total } : {}), ...(hasMore ? { next: { startAt: nextStart } } : {}) };
   }
 
   /** Сырой ответ; для карточки — `issueDetail`. */
@@ -161,6 +171,39 @@ export class JiraClient {
     return this.namedList('/rest/api/2/priority');
   }
 
+  /** Типы задач проекта (`GET /project/{key}`): на Cloud у них есть `hierarchyLevel` (1 — эпик), в том числе у team-managed. */
+  async projectIssueTypes(projectKey: string): Promise<NamedRef[]> {
+    const r = await this.http.getJson<Raw>(`/rest/api/2/project/${encodeURIComponent(projectKey)}`);
+    return asArray(r?.issueTypes).map(mapNamed);
+  }
+
+  /** Ключ проекта по id или ключу (`GET /project/{idOrKey}`). */
+  async projectKey(idOrKey: string): Promise<string | undefined> {
+    const r = await this.http.getJson<Raw>(`/rest/api/2/project/${encodeURIComponent(idOrKey)}`);
+    return typeof r?.key === 'string' && r.key ? r.key : undefined;
+  }
+
+  /** Версии проекта (выпущенные и нет, с датами). Массив целиком, без постраничности. */
+  async versions(projectKey: string): Promise<Version[]> {
+    const r = await this.http.getJson<unknown>(`/rest/api/2/project/${encodeURIComponent(projectKey)}/versions`);
+    return asArray(r).map(mapVersion);
+  }
+
+  async version(id: string): Promise<Version> {
+    return mapVersion(await this.http.getJson<Raw>(`/rest/api/2/version/${encodeURIComponent(id)}`));
+  }
+
+  /** Сколько задач в релизе (`issuesFixedCount` из relatedIssueCounts). */
+  async versionIssueCount(id: string): Promise<number> {
+    const r = await this.http.getJson<Raw>(`/rest/api/2/version/${encodeURIComponent(id)}/relatedIssueCounts`);
+    return typeof r?.issuesFixedCount === 'number' ? r.issuesFixedCount : 0;
+  }
+
+  /** Заголовок эпика для вкладки: название, тип, статус, проект. */
+  async issueHead(key: string): Promise<Raw> {
+    return this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}`, { fields: 'summary,issuetype,status,project' });
+  }
+
   async favouriteFilters(): Promise<FilterRef[]> {
     const r = asArray(await this.http.getJson<unknown>('/rest/api/2/filter/favourite'));
     return r.map((f) => ({ id: String(f.id), name: String(f.name), jql: String(f.jql ?? '') }));
@@ -181,7 +224,7 @@ export class JiraClient {
 
   private async namedList(path: string): Promise<NamedRef[]> {
     const r = asArray(await this.http.getJson<unknown>(path));
-    return r.map((x) => ({ id: String(x.id), name: String(x.name), ...(x.iconUrl ? { iconUrl: String(x.iconUrl) } : {}) }));
+    return r.map(mapNamed);
   }
 }
 
