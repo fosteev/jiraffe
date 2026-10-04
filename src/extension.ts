@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import { registerInstanceCommands } from './commands/instances';
+import { registerFilterCommands } from './commands/filters';
+import { FilterState } from './state/filters';
 import { InstanceStore } from './state/instances';
+import { InstanceMeta } from './state/meta';
+import { FiltersTree } from './views/filtersTree';
+import { IssuesTree } from './views/issuesTree';
 
 class EmptyTree implements vscode.TreeDataProvider<never> {
   getTreeItem(): vscode.TreeItem {
@@ -19,16 +24,25 @@ class TempoViewProvider implements vscode.WebviewViewProvider {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  for (const id of ['jiraffe.issues', 'jiraffe.filters', 'jiraffe.epics', 'jiraffe.releases']) {
+  for (const id of ['jiraffe.epics', 'jiraffe.releases']) {
     context.subscriptions.push(vscode.window.registerTreeDataProvider(id, new EmptyTree()));
   }
   const instances = new InstanceStore(context.globalState, context.secrets);
-  context.subscriptions.push(...registerInstanceCommands(instances));
+  const filters = new FilterState(context.globalState);
+  const meta = new InstanceMeta(instances);
+  const issuesTree = new IssuesTree(instances, filters, meta);
+  const filtersTree = new FiltersTree(instances, filters, meta);
+  const issuesView = vscode.window.createTreeView('jiraffe.issues', { treeDataProvider: issuesTree });
+  issuesTree.attach(issuesView);
   context.subscriptions.push(
+    meta,
+    issuesTree,
+    filtersTree,
+    issuesView,
+    vscode.window.createTreeView('jiraffe.filters', { treeDataProvider: filtersTree }),
+    ...registerInstanceCommands(instances),
+    ...registerFilterCommands(instances, filters, meta, issuesTree, () => filtersTree.refresh()),
     vscode.window.registerWebviewViewProvider('jiraffe.tempo', new TempoViewProvider()),
-    vscode.commands.registerCommand('jiraffe.refresh', () => {
-      void vscode.window.showInformationMessage('Jiraffe: пока нечего обновлять');
-    }),
   );
 }
 

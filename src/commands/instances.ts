@@ -10,8 +10,12 @@ const errText = (e: unknown): string => (e instanceof Error ? e.message : String
 const withProgress = <T>(title: string, task: () => Promise<T>): Thenable<T> =>
   vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title }, task);
 
-async function pickInstance(store: InstanceStore, placeHolder: string): Promise<Instance | undefined> {
+async function pickInstance(store: InstanceStore, placeHolder: string, instanceId?: string): Promise<Instance | undefined> {
   const all = store.list();
+  if (instanceId) {
+    const known = store.get(instanceId);
+    if (known) return known;
+  }
   if (all.length === 0) {
     const act = await vscode.window.showInformationMessage('Jiraffe: нет ни одного инстанса', 'Добавить');
     if (act) await vscode.commands.executeCommand('jiraffe.addInstance');
@@ -117,8 +121,9 @@ export function registerInstanceCommands(store: InstanceStore): vscode.Disposabl
       const ok = await vscode.window.showWarningMessage(`Удалить инстанс «${inst.name}» и его токен?`, { modal: true }, 'Удалить');
       if (ok === 'Удалить') await store.remove(inst.id);
     }),
-    vscode.commands.registerCommand('jiraffe.testConnection', async () => {
-      const inst = await pickInstance(store, 'Проверить подключение к…');
+    vscode.commands.registerCommand('jiraffe.testConnection', async (instanceId?: unknown) => {
+      // из узла ошибки дерева приходит id инстанса; из палитры — ничего (спросим QuickPick'ом)
+      const inst = await pickInstance(store, 'Проверить подключение к…', typeof instanceId === 'string' ? instanceId : undefined);
       if (!inst) return;
       try {
         const me = await (await clientFor(store, inst)).myself();
