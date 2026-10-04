@@ -2,6 +2,7 @@
 import { detectCapabilities } from '../src/jira/capabilities';
 import { createJiraClient } from '../src/jira/client';
 import type { InstanceKind, SearchPage } from '../src/jira/types';
+import { sanitizeDetail } from '../src/jira/sanitize';
 import { buildJql } from '../src/jql';
 
 interface Target { id: string; kind: InstanceKind; urlEnv: string; defUrl: string; tokenEnv: string; expect: { tempo: boolean; epic: string | null } }
@@ -41,9 +42,28 @@ async function jqlChecks(t: Target, c: ReturnType<typeof createJiraClient>): Pro
   return [t.id, String(projects.length), String(types.length), String(prios.length), String(favs.length), mine, `${projKey ?? '—'}: ${proj}`, quick, `${done} (${parts.join('+')})`, jqlMode];
 }
 
+/** Этап 4: карточка задачи (только GET). Берём свежую задачу, предпочитая ту, у которой есть эпик. Ключи не печатаем. */
+async function cardCheck(t: Target, c: ReturnType<typeof createJiraClient>, caps: Awaited<ReturnType<typeof detectCapabilities>>): Promise<string[]> {
+  const inst = { id: t.id, kind: t.kind, caps };
+  const epicJql = t.kind === 'cloud' ? 'parent is not EMPTY' : caps.epicLinkField ? `cf[${caps.epicLinkField.replace('customfield_', '')}] is not EMPTY` : null;
+  let page = epicJql ? await c.search(`${epicJql} ORDER BY updated DESC`, ['summary'], { maxResults: 1 }).catch(() => undefined) : undefined;
+  if (!page?.issues.length) page = await c.search('updated >= -365d ORDER BY updated DESC', ['summary'], { maxResults: 1 });
+  const key = page.issues[0]?.key;
+  if (!key) return [t.id, 'нет задач'];
+  const { issue, worklogs } = await c.issueDetail(key, inst);
+  const s = sanitizeDetail(issue, process.env[t.urlEnv] || t.defUrl);
+  if (/<script|onerror=|onclick=|javascript:/i.test(s.descriptionHtml + s.comments.map((x) => x.bodyHtml).join(''))) throw new Error('санитизация пропустила опасную разметку');
+  if (!issue.summary || !issue.created) throw new Error('пустые summary/created');
+  const spent = issue.timetracking.spentSec ?? 0;
+  const wlSum = worklogs.reduce((a, w) => a + w.timeSpentSec, 0);
+  return [t.id, issue.statusCategory, `${s.descriptionHtml.length}`, String(issue.comments.length), String(issue.history.length), String(worklogs.length), `${spent}/${wlSum}`,
+    String(issue.watchers.length), issue.epic ? (issue.epic.summary ? 'да+название' : 'да') : 'нет', String(issue.fixVersions.length), String(issue.attachments.length)];
+}
+
 async function main(): Promise<void> {
   const rows: string[][] = [['инстанс', 'пользователь', 'tempo', 'epicLinkField', 'задач', 'ожидание']];
   const jqlRows: string[][] = [['инстанс', 'проектов', 'типов', 'приоритетов', 'избр.фильтров', 'на мне', 'проект', 'быстрые+текст', 'готово', 'JQL-режим']];
+  const cardRows: string[][] = [['инстанс', 'категория', 'описание, симв.', 'комментариев', 'история', 'ворклогов', 'спент/сумма', 'наблюдателей', 'эпик', 'релизов', 'вложений']];
   let mismatches = 0;
   for (const t of targets) {
     const token = process.env[t.tokenEnv];
@@ -66,12 +86,18 @@ async function main(): Promise<void> {
         mismatches++;
         jqlRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
       }
+      try {
+        cardRows.push(await cardCheck(t, c, caps));
+      } catch (e) {
+        mismatches++;
+        cardRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
+      }
     } catch (e) {
       mismatches++;
       rows.push([t.id, '—', '—', '—', '—', `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
     }
   }
-  for (const table of [rows, jqlRows]) {
+  for (const table of [rows, jqlRows, cardRows]) {
     const w = table[0].map((_, i) => Math.max(...table.map((r) => (r[i] ?? '').length)));
     for (const r of table) console.log(r.map((c, i) => c.padEnd(w[i])).join('  '));
     console.log('');
