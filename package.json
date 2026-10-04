@@ -1,0 +1,83 @@
+{
+  "name": "jiraffe",
+  "displayName": "Jiraffe",
+  "description": "Jira в VS Code: задачи, фильтры, карточка, журнал работ, эпики и релизы",
+  "version": "0.0.1",
+  "publisher": "jiraffe",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fosteev/jiraffe.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jiraffe",
+          "title": "Jiraffe",
+          "icon": "media/jiraffe.svg"
+        }
+      ]
+    },
+    "views": {
+      "jiraffe": [
+        {
+          "id": "jiraffe.issues",
+          "name": "Задачи"
+        },
+        {
+          "id": "jiraffe.filters",
+          "name": "Фильтры"
+        },
+        {
+          "id": "jiraffe.epics",
+          "name": "Эпики"
+        },
+        {
+          "id": "jiraffe.releases",
+          "name": "Релизы"
+        },
+        {
+          "id": "jiraffe.tempo",
+          "name": "Tempo",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "jiraffe.refresh",
+        "title": "Jiraffe: Обновить",
+        "icon": "$(refresh)"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "lint": "tsc --noEmit && eslint .",
+    "test": "vitest run",
+    "package": "vsce package --no-dependencies",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^3.2.7"
+  }
+}

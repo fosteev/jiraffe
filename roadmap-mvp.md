@@ -1,6 +1,6 @@
 # Jiraffe MVP — расширение VS Code для Jira
 
-> Статус: черновик · 2026-10-04
+> Статус: этап 1 принят 2026-10-04 · следующий — этап 2 (сессия 2)
 > Исполнитель отмечает чекбоксы `- [x]` по ходу работы — только после проверки, не «вроде сделал».
 > Приёмка этапа (Opus, `/plan-review`) меняет баннер этапа и коммитит.
 
@@ -139,20 +139,34 @@ export interface SearchPage { issues: IssueSummary[]; next?: { startAt?: number;
 Пустое, но собирающееся расширение: контейнер в activity bar, пять пустых views, сборка, линт,
 тесты, упаковка в `.vsix`.
 
-- [ ] `package.json`: name `jiraffe`, `engines.vscode ^1.90.0`, `main: dist/extension.js`, скрипты `build`, `watch`, `lint`, `test`, `package` (`vsce package --no-dependencies`), `smoke`
-- [ ] devDeps: `typescript`, `esbuild`, `@types/vscode@1.90`, `@types/node@20`, `vitest`, `eslint`, `typescript-eslint`, `@vscode/vsce`, `tsx`
-- [ ] `tsconfig.json` (strict, ES2022), `esbuild.mjs` с двумя бандлами (host — cjs/node, webview — iife/browser), `vitest.config.ts`, `eslint.config.mjs`
-- [ ] `.gitignore` (`node_modules`, `dist`, `*.vsix`, `.jiraffe`), `.vscodeignore`
-- [ ] `media/jiraffe.svg`; `contributes.viewsContainers.activitybar` `jiraffe` и views `jiraffe.issues`, `jiraffe.filters`, `jiraffe.epics`, `jiraffe.releases`, `jiraffe.tempo` (последний — `type: webview`)
-- [ ] `src/extension.ts`: `activate` регистрирует заглушки провайдеров и команду `jiraffe.refresh`
-- [ ] `src/duration.ts` + `test/duration.test.ts`: `parseDuration` понимает `1ч 30м`, `1h30m`, `90m`, `1.5h`, `2` (часы), `45 мин`; мусор → `null`; `formatDuration(5400) === '1ч 30м'`
-- [ ] `.vscode/launch.json` (Run Extension) и `.vscode/tasks.json` (watch)
+- [x] `package.json`: name `jiraffe`, `engines.vscode ^1.90.0`, `main: dist/extension.js`, скрипты `build`, `watch`, `lint`, `test`, `package` (`vsce package --no-dependencies`), `smoke`
+- [x] devDeps: `typescript`, `esbuild`, `@types/vscode@1.90`, `@types/node@20`, `vitest`, `eslint`, `typescript-eslint`, `@vscode/vsce`, `tsx`
+- [x] `tsconfig.json` (strict, ES2022), `esbuild.mjs` с двумя бандлами (host — cjs/node, webview — iife/browser), `vitest.config.ts`, `eslint.config.mjs`
+- [x] `.gitignore` (`node_modules`, `dist`, `*.vsix`, `.jiraffe`), `.vscodeignore`
+- [x] `media/jiraffe.svg`; `contributes.viewsContainers.activitybar` `jiraffe` и views `jiraffe.issues`, `jiraffe.filters`, `jiraffe.epics`, `jiraffe.releases`, `jiraffe.tempo` (последний — `type: webview`)
+- [x] `src/extension.ts`: `activate` регистрирует заглушки провайдеров и команду `jiraffe.refresh`
+- [x] `src/duration.ts` + `test/duration.test.ts`: `parseDuration` понимает `1ч 30м`, `1h30m`, `90m`, `1.5h`, `2` (часы), `45 мин`; мусор → `null`; `formatDuration(5400) === '1ч 30м'`
+- [x] `.vscode/launch.json` (Run Extension) и `.vscode/tasks.json` (watch)
 
 **Готово, когда:** `npm run build && npm run lint && npm test && npm run package` проходят,
 `jiraffe-0.0.1.vsix` собирается. По F5 в activity bar появляется иконка жирафа и пять разделов
 (проверяет пользователь).
 
 **Сессия:** sonnet, high; первым, остальные этапы от него зависят.
+
+**Решения (2026-10-04, по итогам сессии 1):**
+- Раскладка — как в «Архитектуре»: `package.json`, `tsconfig.json`, `esbuild.mjs`, `eslint.config.mjs`, `vitest.config.ts`, `.gitignore`, `.vscodeignore`, `media/jiraffe.svg` (IC.giraffe из прототипа, `currentColor`), `src/extension.ts`, `src/duration.ts`, `test/duration.test.ts`, `webview/issue.ts` (пустая заглушка, чтобы собирался второй бандл), `scripts/smoke.ts` (заглушка: печатает «не реализован», настоящий smoke — этап 2), `.vscode/{launch,tasks}.json`. Вне списка добавлен только `package-lock.json` (нужен для воспроизводимой установки).
+- `vitest@3`, а не последний 5: vitest 5 требует `@types/node >=22`, а мы зафиксированы на `@types/node@20` (ограничение roadmap). `@types/vscode` запинен как `1.90.0` (без `^`, чтобы не обогнать `engines.vscode`). Из версий остальное — latest (TypeScript 6, ESLint 10, esbuild 0.28, vsce 4).
+- Пакет `@eslint/js` не добавлял (вне списка devDeps): конфиг — `typescript-eslint` `configs.recommended` + `no-unused-vars` с игнором `_args`. `npm run lint` = `tsc --noEmit && eslint .` (типы проверяются тоже).
+- Единый `tsconfig.json` (`lib: ES2022 + DOM`, `types: node, vscode`) на хост и webview; включены `src`, `webview`, `test`, `scripts`, корневые `*.ts`. Если на этапе 4 DOM-типы в хосте начнут мешать, разнести на два tsconfig.
+- `package.json`: `publisher: "jiraffe"` (vsce требует), `private: true`, `license: "UNLICENSED"`, `activationEvents: []` (views активируют расширение сами, VS Code ≥1.74). Команда `jiraffe.refresh` показывает info-сообщение «пока нечего обновлять». Views «Задачи/Фильтры/Эпики/Релизы» — пустые `TreeDataProvider`, `jiraffe.tempo` — `WebviewViewProvider` с текстом «Tempo: скоро». Без `viewsWelcome`: пока нет данных, пустые деревья показывают голое пустое место — приёмка/пользователь решают, нужна ли welcome-подсказка до этапа 2.
+- `parseDuration`: голое число — часы только если это весь ввод (`2`, `0.5`; `1 30` → null); разделители десятых `.` и `,`; регистр не важен; единицы h/hr/hrs/hour(s), m/min(s)/minute(s), ч/час/часа/часов, м/мин/минут(а/ы). Ноль (`0`, `0м`) → `null` (логировать нулевое время бессмысленно) — это поведение, которое может пересмотреть этап 6. *Приёмка:* результат округляется до целых минут (`0.01h` → 60, меньше полуминуты → `null`), потолок 10 000 ч (больше → `null`), после единицы допустима точка (`1 ч. 30 мин.`), добавлено `минуту`. `formatDuration` округляет секунды до минут, `0` → `0м`, целые часы — `2ч` без `0м`.
+- `.vscodeignore` — белый список (`**` + разрешённые). Карты (`*.map`) в `.vsix` не попадают; шаблон `!dist/webview/*.js` и `*.css` — если на этапе 4 в `dist/webview/` появятся другие типы файлов, дописать.
+- `esbuild.mjs`: в обычном режиме minify, в `--watch` — нет; sourcemap всегда. Строка `watching…` в watch-режиме нужна problemMatcher в `.vscode/tasks.json`.
+- `vsce package` предупреждает об отсутствии LICENSE — оставлено (команда зафиксирована в плане без `--skip-license`). *Приёмка:* `repository` добавлен (`https://github.com/fosteev/jiraffe.git`).
+- *Приёмка:* в `.vscode/tasks.json` background-паттерны были `watching`/`watching` — на пересборке esbuild пишет `[watch] build started` / `[watch] build finished`, и задача не отслеживала пересборки. Теперь begin = `\[watch\] build started`, end = `^watching|\[watch\] build finished` (строки проверены на живом `npm run watch`).
+
+**Приёмка (2026-10-04, Opus):** принят. Проверено: `npm run build && npm run lint && npm test && npm run package` — зелёные; 45 тестов duration (29 исполнителя + граничные случаи приёмки); `jiraffe-0.0.1.vsix` (7 файлов: manifest, package.json, readme, dist/extension.js, dist/webview/issue.js, media/jiraffe.svg). **Не проверено:** F5 в Extension Development Host (иконка и пять разделов) и работа `.vscode/tasks.json` watch — пользователь.
 
 ### 2. Инстансы, авторизация и клиент API
 Слой данных без UI-списков: хранение инстансов, авторизация DC и Cloud, HTTP-клиент с ошибками,
@@ -325,6 +339,8 @@ DoD: npm run build && npm run lint && npm test && npm run package — все з�
 Работаем в /Users/fost/Projects/jiraffe. Задача: этап 2 roadmap-mvp.md — хранение инстансов, авторизация DC/Cloud, HttpClient, JiraClient, определение возможностей, команды добавления инстанса, smoke.
 Читай: roadmap-mvp.md (таблица фактов об инстансах, решения, архитектура, этап 2). Рабочие примеры вызовов: ~/.claude/skills/pilot-jira/jira.sh (функция api, Bearer), ~/.claude/skills/troy-jira/jira.sh (Basic, /search/jql, nextPageToken), ~/.claude/skills/tatikoma-jira/jira.sh (context path /jira) — открывать grep'ом нужные функции.
 Точки входа: src/extension.ts (activate из сессии 1), package.json contributes.commands.
+
+По реальному коду (после приёмки этапа 1): в src/extension.ts заглушки EmptyTree (4 дерева) и TempoViewProvider объявлены прямо в файле — не трогать, их заменят этапы 3 и 6; activationEvents пустой (views/команды активируют сами), новые команды — только в contributes.commands. scripts/smoke.ts — заглушка, заменить целиком; запускается через tsx вне VS Code, поэтому src/jira/* и src/state/* (кроме кода, которому нужен vscode API — InstanceStore) не импортируют 'vscode', иначе smoke и vitest упадут. Dev-Node 22 (vsce 4 его требует), но рантайм VS Code 1.90 — Node 20: API выше Node 20 не использовать, @types/node@20 это и ловит в `npm run lint` (там же tsc --noEmit). Один tsconfig на всё (lib ES2022+DOM).
 
 Уже решено: типы — дословно из раздела «Архитектура»; токен в SecretStorage под `jiraffe.token.<id>`; Tempo определяется по GET /rest/tempo-core/1/work-attribute (200 → есть); Epic Link — по /rest/api/2/field, schema.custom == "com.pyxis.greenhopper.jira:gh-epic-link"; сообщения об ошибках — по-русски.
 
