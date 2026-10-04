@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { noticeText } from '../jira/attachments';
+import { localDate } from '../jira/worklog';
+import type { LogWorkPanels, WorklogService } from '../commands/logWork';
 import type { Attachment } from '../jira/types';
 import type { InstanceStore } from '../state/instances';
 import type { InstanceMeta } from '../state/meta';
@@ -8,7 +10,7 @@ import type { AttachmentContext, AttachmentService } from './attachments';
 import { browseUrl, loadCard } from './card';
 import { makeNonce, renderShell } from './html';
 import {
-  ISSUE_TABS, isAttachmentId, isImageId, isIssueKey, isVersionId, MAX_IMAGE_IDS, safeExternalUrl, type HostToView, type IssueCard, type IssueTab, type ViewToHost,
+  ISSUE_TABS, isAttachmentId, isImageId, isIssueKey, isVersionId, MAX_IMAGE_IDS, safeExternalUrl, type HostToView, type IssueCard, type IssueTab, type LogFormView, type ViewToHost,
 } from './protocol';
 
 interface Entry {
@@ -25,12 +27,14 @@ interface Entry {
   /** Номер последней загрузки: устаревший ответ (после смены задачи в preview) отбрасывается. */
   seq: number;
   disposed: boolean;
+  /** Диалог «Залогать время», который ещё не доставлен в webview (вкладка была скрыта и перезагружается). */
+  pendingForm?: { key: string; form: LogFormView };
 }
 
 /** Действия над показанной задачей: принимаются, только если ключ в сообщении совпадает с текущим. */
 const CARD_ACTIONS = new Set<ViewToHost['type']>(['openInBrowser', 'copyKey', 'logWork', 'pin', 'switchTab']);
 /** Вложения и картинки: и instanceId, и key должны совпасть с показанной задачей, карточка — загружена. */
-const ATTACHMENT_ACTIONS = new Set<ViewToHost['type']>(['loadImages', 'downloadAttachment', 'downloadAll', 'openAttachment']);
+const ATTACHMENT_ACTIONS = new Set<ViewToHost['type']>(['loadImages', 'downloadAttachment', 'downloadAll', 'openAttachment', 'submitWorklog']);
 const idOf = (r: IssueRef): string => `${r.instanceId}\n${r.key}`;
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 export const isIssueRef = (v: unknown): v is IssueRef =>
@@ -41,7 +45,7 @@ export const isIssueRef = (v: unknown): v is IssueRef =>
  * `retainContextWhenHidden: false`: скрытая вкладка выгружается, при показе webview шлёт `ready`, и мы отдаём
  * сохранённое состояние (данные и выбранная вкладка живут здесь, в хосте).
  */
-export class IssuePanelManager implements vscode.Disposable {
+export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
   private preview: Entry | undefined;
   private readonly pinned = new Map<string, Entry>();
   private active: Entry | undefined;
@@ -51,6 +55,7 @@ export class IssuePanelManager implements vscode.Disposable {
     private readonly store: InstanceStore,
     private readonly meta: InstanceMeta,
     private readonly attachments: AttachmentService,
+    private readonly worklog: WorklogService,
   ) {}
 
   dispose(): void {
@@ -73,6 +78,7 @@ export class IssuePanelManager implements vscode.Disposable {
         this.preview.files = [];
         this.preview.inlineUrls = [];
         this.preview.error = undefined;
+        this.preview.pendingForm = undefined;
         this.preview.tab = 'desc';
         this.preview.panel.title = ref.key;
       }
@@ -115,6 +121,39 @@ export class IssuePanelManager implements vscode.Disposable {
     return true;
   }
 
+  /** Задача активной карточки (или preview) — для `jiraffe.logWork` без аргумента. */
+  activeRef(): IssueRef | undefined {
+    return (this.active ?? this.preview)?.ref;
+  }
+
+  /**
+   * Диалог «Залогать время» в карточке задачи, если она открыта и загружена (вкладка выводится на передний план).
+   * Нет карточки — false: команда покажет QuickInput.
+   */
+  async showLogForm(ref: IssueRef): Promise<boolean> {
+    const e = this.find(ref);
+    const inst = this.store.get(ref.instanceId);
+    if (!e?.card || !inst) return false;
+    let form: LogFormView;
+    try {
+      form = { ...(await this.worklog.form(inst)), instanceName: inst.name, summary: e.card.issue.summary, today: localDate() };
+    } catch (err) {
+      void vscode.window.showErrorMessage(`Jiraffe: ${noticeText(errText(err))}`);
+      return true;
+    }
+    if (e.disposed || e.ref.key !== ref.key || !e.card) return false;
+    e.pendingForm = { key: ref.key, form };
+    e.panel.reveal(undefined, false);
+    this.flushForm(e);
+    return true;
+  }
+
+  /** Перечитать открытые карточки задачи (после записи времени). */
+  reload(ref: IssueRef): void {
+    const e = this.find(ref);
+    if (e && !e.disposed) void this.load(e);
+  }
+
   private find(ref: IssueRef): Entry | undefined {
     return this.pinned.get(idOf(ref)) ?? (this.preview && idOf(this.preview.ref) === idOf(ref) ? this.preview : undefined);
   }
@@ -145,6 +184,8 @@ export class IssuePanelManager implements vscode.Disposable {
     const e: Entry = { panel, ref, files: [], inlineUrls: [], tab: 'desc', pinned: false, ready: false, seq: 0, disposed: false };
     panel.webview.onDidReceiveMessage((m: ViewToHost) => this.onMessage(e, m));
     panel.onDidChangeViewState(() => {
+      // Скрытый webview (retainContextWhenHidden: false) выгружается: до нового `ready` сообщения ему не шлём.
+      if (!panel.visible) e.ready = false;
       if (panel.active) this.active = e;
       else if (this.active === e) this.active = undefined;
     });
@@ -166,7 +207,7 @@ export class IssuePanelManager implements vscode.Disposable {
     try {
       const inst = this.store.get(ref.instanceId);
       if (!inst) throw new Error('инстанс удалён — добавьте его заново');
-      const loaded = await loadCard(await this.meta.client(inst), inst, ref.key);
+      const loaded = await loadCard(await this.meta.client(inst), inst, ref.key, () => this.meta.workAttributes(inst));
       if (e.disposed || e.seq !== seq) return;
       e.card = loaded.card;
       e.files = loaded.files;
@@ -189,6 +230,25 @@ export class IssuePanelManager implements vscode.Disposable {
     if (e.error) msg = { type: 'error', instanceId, key, message: e.error };
     else if (e.card) msg = { type: 'issue', data: { ...e.card, pinned: e.pinned, tab: e.tab } };
     else msg = { type: 'loading', instanceId, key };
+    void e.panel.webview.postMessage(msg);
+    if (msg.type === 'issue') this.flushForm(e);
+  }
+
+  /** Диалог уходит после карточки и только в видимый webview (скрытый без retainContext сообщения теряет — дождёмся `ready`). */
+  private flushForm(e: Entry): void {
+    const p = e.pendingForm;
+    if (!p || e.disposed || !e.ready || !e.card || !e.panel.visible) return;
+    e.pendingForm = undefined;
+    if (p.key !== e.ref.key) return;
+    const msg: HostToView = { type: 'logForm', instanceId: e.ref.instanceId, key: e.ref.key, form: p.form };
+    void e.panel.webview.postMessage(msg);
+  }
+
+  private async submitWorklog(e: Entry, draft: unknown): Promise<void> {
+    const ref = { ...e.ref };
+    const r = await this.worklog.submit(ref, draft);
+    if (e.disposed) return;
+    const msg: HostToView = { type: 'logResult', instanceId: ref.instanceId, key: ref.key, ...r };
     void e.panel.webview.postMessage(msg);
   }
 
@@ -244,6 +304,9 @@ export class IssuePanelManager implements vscode.Disposable {
         break;
       case 'downloadAll':
         void this.withAttachments(e, (ctx) => this.attachments.downloadAll(ctx));
+        break;
+      case 'submitWorklog':
+        void this.submitWorklog(e, m.draft);
         break;
     }
   }

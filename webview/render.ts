@@ -1,8 +1,9 @@
 // Разметка карточки задачи — чистые функции «данные → HTML-строка» (без DOM), тестируются в vitest.
 // Inline-стили не используем (CSP): цвета и ширины проставляет issue.ts через CSSOM по data-атрибутам.
 import { formatDuration } from '../src/duration';
-import type { UserRef } from '../src/jira/types';
-import { ISSUE_TABS, type AttachmentView, type IssueCard, type IssueTab } from '../src/panels/protocol';
+import type { WorkAttribute } from '../src/jira/tempo';
+import type { UserRef, Worklog } from '../src/jira/types';
+import { ISSUE_TABS, type AttachmentView, type IssueCard, type IssueTab, type LogFormView } from '../src/panels/protocol';
 
 export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -18,6 +19,7 @@ const IC = {
   info: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" ${st}/><path d="M8 7.3v4M8 4.9v.1" ${st}/></svg>`,
   dl: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.6 7.2L8 10.6l3.4-3.4M3 13.5h10" ${st}/></svg>`,
   file: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.8h5l3.2 3.2v9.2H4zM9 1.8V5h3.2" ${st}/></svg>`,
+  x: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" ${st}/></svg>`,
   pin: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5l4 4-2 .8-2 2 .3 3-1 1-2.6-2.6-3.6 3.6M6.2 5.8l1.2-1.2z" ${st}/></svg>`,
 };
 
@@ -150,17 +152,89 @@ export function renderHistory(c: IssueCard): string {
   return rows.join('');
 }
 
+/** Колонки атрибутов Tempo: описанные на инстансе + ключи, встреченные в ворклогах (если описания не загрузились). */
+export function attrColumns(c: IssueCard): WorkAttribute[] {
+  if (!c.tempo) return [];
+  const cols = [...(c.workAttributes ?? [])];
+  const known = new Set(cols.map((a) => a.key));
+  for (const w of c.worklogs) {
+    for (const k of Object.keys(w.attributes ?? {})) {
+      if (!known.has(k)) {
+        known.add(k);
+        cols.push({ key: k, name: k, type: '', kind: 'text', required: false });
+      }
+    }
+  }
+  return cols;
+}
+
+const numberRu = (n: number): string => n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+
+/** Значение атрибута для таблицы: список — название значения, флажок — «да», число — с разрядами. */
+export function attrValue(a: WorkAttribute, v: string | undefined): string {
+  if (v === undefined || v === '') return dash;
+  if (a.kind === 'list') return esc(a.values?.find((x) => x.value === v)?.name ?? v);
+  if (a.kind === 'checkbox') return v === 'true' ? 'да' : 'нет';
+  if (a.kind === 'number' && Number.isFinite(Number(v))) return esc(numberRu(Number(v)));
+  return esc(v);
+}
+
+const attrSum = (a: WorkAttribute, logs: readonly Worklog[]): string => {
+  if (a.kind !== 'number') return '';
+  const vals = logs.map((l) => Number(l.attributes?.[a.key])).filter((n) => Number.isFinite(n));
+  return vals.length ? esc(numberRu(vals.reduce((s, n) => s + n, 0))) : '';
+};
+
 export function renderWorklog(c: IssueCard): string {
   const logs = [...c.worklogs].sort((a, b) => Date.parse(b.started) - Date.parse(a.started));
   const total = logs.reduce((s, l) => s + l.timeSpentSec, 0);
+  const cols = attrColumns(c);
   const src = c.tempo
-    ? `${IC.clock} Tempo Timesheets · атрибуты («Тип работ», «AI Tokens») — в этапе 6`
+    ? `${IC.clock} Tempo Timesheets${cols.length ? ` · атрибуты ${cols.map((a) => `«${esc(a.name)}»`).join(', ')}` : ''}`
     : `${IC.info} Tempo на ${esc(c.instanceName)} нет — стандартный журнал работ Jira`;
+  const num = (a: WorkAttribute): string => (a.kind === 'number' ? ' class="num"' : '');
   const table = logs.length
-    ? `<div class="tw-wrap"><table class="t"><thead><tr><th>Кто</th><th>Дата</th><th class="num">Время</th><th>Комментарий</th></tr></thead><tbody>${logs.map((l) =>
-      `<tr><td>${person(l.author)}</td><td class="left num">${esc(fmtDate(l.started))}</td><td class="num">${esc(dur(l.timeSpentSec))}</td><td>${esc(l.comment)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Итого</td><td></td><td class="num">${esc(dur(total))}</td><td></td></tr></tfoot></table></div>`
+    ? `<div class="tw-wrap"><table class="t"><thead><tr><th>Кто</th><th>Дата</th><th class="num">Время</th><th>Комментарий</th>${cols.map((a) => `<th${num(a)}>${esc(a.name)}</th>`).join('')}</tr></thead><tbody>${logs.map((l) =>
+      `<tr><td>${person(l.author)}</td><td class="left num">${esc(fmtDate(l.started))}</td><td class="num">${esc(dur(l.timeSpentSec))}</td><td>${esc(l.comment)}</td>${cols.map((a) => `<td${num(a)}>${attrValue(a, l.attributes?.[a.key])}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td>Итого</td><td></td><td class="num">${esc(dur(total))}</td><td></td>${cols.map((a) => `<td${num(a)}>${attrSum(a, logs)}</td>`).join('')}</tr></tfoot></table></div>`
     : c.worklogError ? `<p class="mut">Журнал работ не загрузился: ${esc(c.worklogError)}</p>` : '<p class="mut">Записей пока нет.</p>';
   return `<div class="toolbar"><span class="src">${src}</span><span class="sp"></span><button class="btn sm pri" data-act="logWork">${IC.clock} Залогать время</button></div>${table}`;
+}
+
+/** Поле атрибута Tempo в диалоге. AI Tokens рисуется отдельно (`#lg-tok`). */
+function attrField(a: WorkAttribute): string {
+  const id = `lg-a-${a.key.replace(/[^\w-]/g, '_')}`;
+  const label = `${esc(a.name)}${a.required ? ' *' : ''}`;
+  const data = `data-attr="${esc(a.key)}"`;
+  if (a.kind === 'list') {
+    return `<div class="fld"><label for="${esc(id)}">${label}</label><select id="${esc(id)}" ${data}>${a.required ? '<option value="" disabled selected>— выберите —</option>' : '<option value="">—</option>'}${(a.values ?? []).map((v) => `<option value="${esc(v.value)}">${esc(v.name)}</option>`).join('')}</select></div>`;
+  }
+  if (a.kind === 'checkbox') {
+    return `<div class="fld"><span class="lb">&nbsp;</span><label class="chk"><input type="checkbox" id="${esc(id)}" ${data} value="true"> ${label}</label></div>`;
+  }
+  return `<div class="fld"><label for="${esc(id)}">${label}</label><input id="${esc(id)}" ${data}${a.kind === 'number' ? ' inputmode="decimal"' : ''} maxlength="255" autocomplete="off"></div>`;
+}
+
+/** Диалог «Залогать время» (prototype: `logHtml`). Поля атрибутов — по ответу `work-attribute` инстанса. */
+export function renderLogDialog(key: string, f: LogFormView): string {
+  const ai = f.attributes.find((a) => a.key === f.aiTokensAttr);
+  const tok = `<div class="fld"><label for="lg-tok">${esc(ai?.name ?? 'AI Tokens')}${ai?.required ? ' *' : ''}</label><input id="lg-tok" inputmode="numeric" placeholder="например, 120000" maxlength="32" autocomplete="off"></div>`;
+  const rest = f.attributes.filter((a) => a.key !== f.aiTokensAttr);
+  const tempo = f.tempo
+    ? `<fieldset class="tempo"><legend>Tempo · рабочие атрибуты</legend><div class="g2">${rest.map(attrField).join('')}${tok}</div>${f.aiTokensAttr ? '' : '<div class="note">Атрибута AI Tokens на инстансе нет — значение допишется в комментарий.</div>'}${f.unsupportedRequired.length ? `<div class="note">Обязательные атрибуты ${f.unsupportedRequired.map((n) => `«${esc(n)}»`).join(', ')} форма заполнить не умеет — Tempo может отклонить запись.</div>` : ''}</fieldset>`
+    : `${tok}<div class="note">На ${esc(f.instanceName)} нет Tempo — запись уйдёт в стандартный журнал работ задачи, AI Tokens допишутся в комментарий.</div>`;
+  return `<div class="ov" data-act="dlg-bg"><div class="dlg" role="dialog" aria-modal="true" aria-label="Залогать время">
+    <div class="dlg-h">${IC.clock} Залогать время<button class="ib" data-act="dlg-x" aria-label="Закрыть">${IC.x}</button></div>
+    <form class="dlg-b" id="lg-form" novalidate>
+      <div class="fld"><span class="lb">Задача</span><div class="ro"><span class="k">${esc(key)}</span><span class="ell">${esc(f.summary)}</span></div></div>
+      <div class="g2"><div class="fld"><label for="lg-dur">Потрачено</label><input id="lg-dur" placeholder="1ч 30м" maxlength="64" autocomplete="off"><small>1ч 30м · 1h30m · 90m · 1.5h</small></div>
+      <div class="fld"><label for="lg-date">Дата</label><input type="date" id="lg-date" value="${esc(f.today)}" min="2000-01-01" max="${esc(f.today)}"></div></div>
+      <div class="fld"><label for="lg-c">Комментарий</label><textarea id="lg-c" rows="3" placeholder="Что сделано" maxlength="30000"></textarea></div>
+      ${tempo}
+      <div class="err" id="lg-err" role="alert" hidden></div>
+      <button type="submit" hidden></button>
+    </form>
+    <div class="dlg-f"><button class="btn" data-act="dlg-x">Отмена</button><button class="btn pri" data-act="log-save">Залогать</button></div>
+  </div></div>`;
 }
 
 export function renderMeta(c: IssueCard): string {

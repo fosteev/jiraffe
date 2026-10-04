@@ -17,7 +17,9 @@
     "Other"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
@@ -151,7 +153,8 @@
       },
       {
         "command": "jiraffe.logWork",
-        "title": "Jiraffe: Залогать время"
+        "title": "Jiraffe: Залогать время",
+        "icon": "$(clock)"
       },
       {
         "command": "jiraffe.openEpic",
@@ -182,10 +185,6 @@
         },
         {
           "command": "jiraffe.deleteFilter",
-          "when": "false"
-        },
-        {
-          "command": "jiraffe.logWork",
           "when": "false"
         },
         {
@@ -246,6 +245,16 @@
           "command": "jiraffe.saveFilter",
           "when": "view == jiraffe.filters",
           "group": "navigation@1"
+        },
+        {
+          "command": "jiraffe.logWork",
+          "when": "view == jiraffe.tempo",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jiraffe.refresh",
+          "when": "view == jiraffe.tempo",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -258,6 +267,11 @@
           "command": "jiraffe.deleteFilter",
           "when": "view == jiraffe.filters && viewItem == localFilter",
           "group": "1_edit"
+        },
+        {
+          "command": "jiraffe.logWork",
+          "when": "view == jiraffe.issues && viewItem == issue",
+          "group": "1_work"
         }
       ]
     },
@@ -288,6 +302,13 @@
           "minimum": 1,
           "maximum": 50,
           "description": "Максимальный размер картинки (МБ), которую карточка скачивает для превью и показа в описании. Больше — только «Скачать»."
+        },
+        "jiraffe.workdayHours": {
+          "type": "number",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 24,
+          "description": "Длина рабочего дня в часах: знаменатель сводки «Сегодня 3ч 15м / 8ч» в разделе Tempo и строке состояния."
         }
       }
     }

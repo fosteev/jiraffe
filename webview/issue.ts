@@ -1,6 +1,7 @@
 // Webview карточки задачи: слушает сообщения хоста, рисует render.ts, шлёт действия обратно.
+import { parseDuration } from '../src/duration';
 import { ISSUE_TABS, type HostToView, type IssueTab, type ViewToHost } from '../src/panels/protocol';
-import { esc, renderCard, renderLightbox } from './render';
+import { esc, renderCard, renderLightbox, renderLogDialog } from './render';
 
 declare function acquireVsCodeApi(): { postMessage(m: ViewToHost): void; getState(): unknown; setState(s: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -12,6 +13,11 @@ let tab: IssueTab = 'desc';
 /** Картинки текущей карточки: id протокола → data URI или ошибка. Сбрасываются с каждой новой карточкой. */
 let images = new Map<string, { dataUri?: string; error?: string }>();
 let pending = new Set<string>();
+/** Диалог «Залогать время» живёт вне #app: перерисовка карточки (обновление данных) не теряет введённое. */
+const dlgRoot = document.createElement('div');
+dlgRoot.id = 'dlg';
+document.body.appendChild(dlgRoot);
+let dialog: { instanceId: string; key: string; busy: boolean } | undefined;
 
 const isTab = (v: unknown): v is IssueTab => ISSUE_TABS.includes(v as IssueTab);
 function savedState(): State | undefined {
@@ -84,6 +90,66 @@ function closeLightbox(): void {
   app.querySelector('.ov')?.remove();
 }
 
+function closeDialog(force = false): void {
+  if (!dialog || (dialog.busy && !force)) return;
+  dialog = undefined;
+  dlgRoot.innerHTML = '';
+}
+
+/** Карточка сменилась на другую задачу — диалог старой закрываем (ответ на отправку всё равно придёт уведомлением). */
+function dropStaleDialog(instanceId: string, key: string): void {
+  if (dialog && (dialog.instanceId !== instanceId || dialog.key !== key)) closeDialog(true);
+}
+
+const dlgEl = <T extends HTMLElement>(sel: string): T | null => dlgRoot.querySelector<T>(sel);
+
+function showLogError(text: string, field?: string): void {
+  const err = dlgEl<HTMLElement>('#lg-err');
+  if (err) {
+    err.textContent = text;
+    err.hidden = false;
+  }
+  let target: HTMLElement | null = null;
+  if (field === 'duration') target = dlgEl('#lg-dur');
+  else if (field === 'date') target = dlgEl('#lg-date');
+  else if (field === 'comment') target = dlgEl('#lg-c');
+  else if (field === 'aiTokens') target = dlgEl('#lg-tok');
+  else if (field?.startsWith('attr:')) target = [...dlgRoot.querySelectorAll<HTMLElement>('[data-attr]')].find((el) => el.dataset.attr === field.slice(5)) ?? null;
+  target?.focus();
+}
+
+function setBusy(busy: boolean): void {
+  if (!dialog) return;
+  dialog.busy = busy;
+  const btn = dlgEl<HTMLButtonElement>('[data-act="log-save"]');
+  if (btn) {
+    btn.disabled = busy;
+    btn.textContent = busy ? 'Записываю…' : 'Залогать';
+  }
+}
+
+/** Значения формы уходят в хост как есть — проверяет хост (`validateDraft`); здесь — только быстрый отклик на длительность. */
+function submitLog(): void {
+  if (!dialog || dialog.busy) return;
+  const val = (sel: string): string => dlgEl<HTMLInputElement | HTMLTextAreaElement>(sel)?.value ?? '';
+  const duration = val('#lg-dur');
+  if (!parseDuration(duration)) {
+    showLogError('Не понял длительность. Напишите, например, 1ч 30м или 90m.', 'duration');
+    return;
+  }
+  const attributes = Object.fromEntries([...dlgRoot.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-attr]')].map((el) => [
+    el.dataset.attr ?? '',
+    el instanceof HTMLInputElement && el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value,
+  ]).filter(([k]) => k));
+  const err = dlgEl<HTMLElement>('#lg-err');
+  if (err) err.hidden = true;
+  setBusy(true);
+  vscode.postMessage({
+    type: 'submitWorklog', instanceId: dialog.instanceId, key: dialog.key,
+    draft: { duration, date: val('#lg-date'), comment: val('#lg-c'), aiTokens: val('#lg-tok'), attributes },
+  });
+}
+
 function note(html: string, cls = ''): void {
   current = undefined;
   app.className = `note ${cls}`.trim();
@@ -92,12 +158,14 @@ function note(html: string, cls = ''): void {
 
 window.addEventListener('message', (ev: MessageEvent<HostToView>) => {
   const m = ev.data;
+  if (m.type === 'loading' || m.type === 'error') dropStaleDialog(m.instanceId, m.key);
   if (m.type === 'loading') {
     // Та же задача (обновление) — оставляем старые данные до ответа; другая (в т.ч. тот же ключ на другом инстансе) — экран загрузки.
     if (!current || current.issue.key !== m.key || current.instanceId !== m.instanceId) note(`Загрузка ${esc(m.key)}…`);
   } else if (m.type === 'error') {
     note(`${esc(m.message)}<br><button class="btn" data-act="retry" data-key="${esc(m.key)}">Повторить</button>`, 'err');
   } else if (m.type === 'issue') {
+    dropStaleDialog(m.data.instanceId, m.data.issue.key);
     const s = savedState();
     // Та же задача (повторное открытие, возврат на вкладку) — остаёмся на выбранной вкладке; другая — вкладка из хоста.
     tab = s && s.key === m.data.issue.key && s.instanceId === m.data.instanceId ? s.tab : m.data.tab;
@@ -112,11 +180,62 @@ window.addEventListener('message', (ev: MessageEvent<HostToView>) => {
     const r = { dataUri: m.dataUri, error: m.error };
     images.set(m.id, r);
     for (const el of app.querySelectorAll<HTMLElement>('[data-img]')) if (el.dataset.img === m.id) apply(el, m.id, r);
+  } else if (m.type === 'logForm') {
+    if (!current || m.instanceId !== current.instanceId || m.key !== current.issue.key) return;
+    if (dialog?.busy) return;
+    // Диалог этой задачи уже открыт — не затираем введённое, только фокус.
+    if (dialog && dialog.instanceId === m.instanceId && dialog.key === m.key) {
+      dlgEl<HTMLInputElement>('#lg-dur')?.focus();
+      return;
+    }
+    closeLightbox();
+    dialog = { instanceId: m.instanceId, key: m.key, busy: false };
+    dlgRoot.innerHTML = renderLogDialog(m.key, m.form);
+    dlgEl<HTMLInputElement>('#lg-dur')?.focus();
+  } else if (m.type === 'logResult') {
+    if (!dialog || dialog.instanceId !== m.instanceId || dialog.key !== m.key) return;
+    setBusy(false);
+    if (!m.ok) {
+      showLogError(m.error ?? 'Не удалось залогать время', m.field);
+      return;
+    }
+    closeDialog(true);
+    // Как в прототипе: после записи — вкладка «Журнал работ» (данные придут следом: хост перечитывает карточку).
+    if (current && current.instanceId === m.instanceId && current.issue.key === m.key && tab !== 'wl') {
+      tab = 'wl';
+      vscode.setState({ instanceId: current.instanceId, key: current.issue.key, tab } satisfies State);
+      vscode.postMessage({ type: 'switchTab', key: current.issue.key, tab });
+      draw();
+    }
+  }
+});
+
+dlgRoot.addEventListener('click', (ev) => {
+  const t = ev.target as HTMLElement;
+  const el = t.closest<HTMLElement>('[data-act]');
+  if (!el) return;
+  switch (el.dataset.act) {
+    case 'dlg-x': closeDialog(); break;
+    case 'dlg-bg': if (t === el) closeDialog(); break;
+    case 'log-save': submitLog(); break;
+  }
+});
+dlgRoot.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  submitLog();
+});
+dlgRoot.addEventListener('keydown', (ev) => {
+  // Ctrl/Cmd+Enter — отправить и из комментария (Enter в однострочных полях отправляет форму сам).
+  if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+    ev.preventDefault();
+    submitLog();
   }
 });
 
 window.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && app.querySelector('.ov')) closeLightbox();
+  if (ev.key !== 'Escape') return;
+  if (app.querySelector('.ov')) closeLightbox();
+  else if (dialog) closeDialog();
 });
 
 app.addEventListener('click', (ev) => {

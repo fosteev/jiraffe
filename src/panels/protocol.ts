@@ -1,5 +1,7 @@
 // Сообщения host ↔ webview: типы и пара чистых проверок. Импортируются и хостом, и webview.
+import type { WorkAttribute } from '../jira/tempo';
 import type { Attachment, IssueDetail, Worklog } from '../jira/types';
+import type { LogDraft, LogForm, TodayInstance } from '../jira/worklog';
 import { ISSUE_KEY_RE } from '../jql';
 
 export type IssueTab = 'desc' | 'att' | 'com' | 'hist' | 'wl';
@@ -51,8 +53,18 @@ export interface IssueCard {
   /** Журнал не загрузился (не 403/404 — те дают пустой список): текст ошибки для вкладки «Журнал работ». */
   worklogError?: string;
   attachments: AttachmentView[];
+  /** Tempo-инстанс: рабочие атрибуты — колонки журнала (значения — в `worklogs[].attributes`). */
+  workAttributes?: WorkAttribute[];
   pinned: boolean;
   tab: IssueTab;
+}
+
+/** Данные диалога «Залогать время» в карточке. */
+export interface LogFormView extends LogForm {
+  instanceName: string;
+  summary: string;
+  /** Сегодня (`YYYY-MM-DD`, локально) — дата по умолчанию. */
+  today: string;
 }
 
 export type HostToView =
@@ -60,7 +72,10 @@ export type HostToView =
   | { type: 'error'; instanceId: string; key: string; message: string }
   | { type: 'issue'; data: IssueCard }
   // Картинки приходят по одной (а не всё сразу в `issue`): dataUri — только `data:image/…;base64`, или текст ошибки.
-  | { type: 'attachmentPreview'; instanceId: string; key: string; id: string; dataUri?: string; error?: string };
+  | { type: 'attachmentPreview'; instanceId: string; key: string; id: string; dataUri?: string; error?: string }
+  // Журнал работ (этап 6): хост открывает диалог (по команде `jiraffe.logWork`) и отвечает на отправку.
+  | { type: 'logForm'; instanceId: string; key: string; form: LogFormView }
+  | { type: 'logResult'; instanceId: string; key: string; ok: boolean; field?: string; error?: string };
 
 export type ViewToHost =
   | { type: 'ready' }
@@ -78,4 +93,27 @@ export type ViewToHost =
   | { type: 'loadImages'; instanceId: string; key: string; ids: string[] }
   | { type: 'downloadAttachment'; instanceId: string; key: string; id: string }
   | { type: 'downloadAll'; instanceId: string; key: string }
-  | { type: 'openAttachment'; instanceId: string; key: string; id: string };
+  | { type: 'openAttachment'; instanceId: string; key: string; id: string }
+  // Отправка формы «Залогать время»: значения недоверенные — хост проверяет `validateDraft` по атрибутам инстанса.
+  | { type: 'submitWorklog'; instanceId: string; key: string; draft: LogDraft };
+
+/** Раздел «Tempo» (WebviewView): сводка «сегодня». */
+export interface TodayView {
+  date: string;
+  /** Идёт загрузка (первая или обновление). */
+  loading: boolean;
+  totalSec: number;
+  workdaySec: number;
+  /** Нет ни одного инстанса. */
+  noInstances: boolean;
+  instances: TodayInstance[];
+}
+
+export type HostToTempo = { type: 'today'; data: TodayView };
+
+export type TempoToHost =
+  | { type: 'ready' }
+  | { type: 'openIssue'; instanceId: string; key: string }
+  | { type: 'logWork' }
+  | { type: 'refresh' }
+  | { type: 'addInstance' };

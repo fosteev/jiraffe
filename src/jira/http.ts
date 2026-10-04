@@ -1,5 +1,8 @@
 import type { InstanceKind } from './types';
 
+/** Хвост сообщения об ошибке записи, после которой запрос мог дойти до Jira (таймаут, обрыв, 5xx прокси, не-JSON 2xx). */
+export const MAYBE_SAVED = 'запись могла сохраниться — проверьте журнал задачи, прежде чем повторять';
+
 export class JiraError extends Error {
   constructor(
     public readonly status: number, // 0 — сеть/таймаут/невалидный ответ
@@ -257,6 +260,71 @@ export class HttpClient {
       const bytes = await readLimited(res, opts.maxBytes, () => new JiraError(0, `Файл больше лимита ${mb(opts.maxBytes)}`, url, 'limit'),
         () => new JiraError(0, `Скачивание с ${this.baseUrl} оборвалось (превышено время ожидания или разрыв соединения)`, url, 'network'));
       return { bytes, mime: res.headers.get('content-type') ?? '' };
+    }
+  }
+
+  /**
+   * POST с JSON-телом (запись ворклога). Отличия от `getJson`:
+   * - адрес — только `baseUrl` + путь, и он обязан пройти `isOwnUrl` (иначе `blocked` без запроса);
+   * - `redirect: 'manual'`, **любой 3xx — ошибка** `redirect`: тело записи и `Authorization` никуда не пересылаем
+   *   (fetch на 302/303 превратил бы POST в GET и молча «успешно» вернул HTML); `login.jsp` — 401;
+   * - обрыв или таймаут после отправки — «запись могла сохраниться»: повторять только после проверки журнала.
+   * Пустой ответ (204) — `undefined`. В сообщения не попадают ни токен, ни тело запроса.
+   */
+  async postJson<T>(path: string, body: unknown, query?: Query): Promise<T | undefined> {
+    const url = this.url(path, query);
+    if (!isOwnUrl(url, this.baseUrl)) throw new JiraError(0, 'Адрес не относится к инстансу — запрос с авторизацией запрещён', '', 'blocked');
+    if (this.badToken) throw new JiraError(0, 'Токен содержит пробелы, переводы строк или не-ASCII символы — скопируйте его заново', url, 'format');
+    const maybeSaved = MAYBE_SAVED;
+    let res: Response;
+    try {
+      res = await this.fetchImpl(url, {
+        method: 'POST',
+        headers: { Authorization: this.auth, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (e) {
+      const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+      // Соединение не установлено (отказ, DNS, сертификат) — запрос точно не ушёл; иначе (сброс и т. п.) — мог уйти.
+      const notSent = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|CERT|SIGNATURE|SELF_SIGNED|UNABLE_TO_VERIFY/i.test(networkReason(e));
+      throw new JiraError(
+        0,
+        timeout
+          ? `Нет ответа от ${this.baseUrl}: превышено время ожидания; ${maybeSaved}`
+          : `Нет соединения с ${this.baseUrl}: ${this.scrub(networkReason(e))}${notSent ? '' : `; ${maybeSaved}`}`,
+        url,
+        'network',
+      );
+    }
+    if ((res.status >= 300 && res.status < 400) || res.type === 'opaqueredirect') {
+      void res.body?.cancel().catch(() => undefined);
+      const loc = res.headers.get('location') ?? '';
+      if (/\/login\.jsp(?:[?#]|$)/i.test(loc)) throw new JiraError(401, 'Jira перенаправила на страницу входа — токен недействителен или нет прав на запись', url);
+      throw new JiraError(res.status, 'Сервер ответил перенаправлением на запись — запрос отменён; проверьте адрес инстанса (https, context path)', url, 'redirect');
+    }
+    let text: string;
+    try {
+      text = await res.text();
+    } catch {
+      throw new JiraError(0, `Ответ от ${this.baseUrl} оборвался; ${maybeSaved}`, url, 'network');
+    }
+    if (!res.ok) {
+      const denied = res.headers.get('x-authentication-denied-reason');
+      const details = [describeBody(text), denied ? `X-Authentication-Denied-Reason: ${denied}` : ''].filter(Boolean).join('; ');
+      // 502/503/504 — ответил прокси перед Jira, сама Jira запрос могла дописать: та же неоднозначность, что и таймаут.
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        throw new JiraError(res.status, `${messageForStatus(res.status, this.scrub(details))}; ${maybeSaved}`, url, 'network');
+      }
+      throw new JiraError(res.status, messageForStatus(res.status, this.scrub(details)), url);
+    }
+    if (!text.trim()) return undefined;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      // 2xx, но не JSON: запись, скорее всего, прошла — сообщаем, но не как «не сохранено».
+      throw new JiraError(0, `Ответ на запись не похож на JSON; ${maybeSaved}`, url, 'format');
     }
   }
 

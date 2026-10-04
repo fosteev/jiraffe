@@ -2,6 +2,7 @@
 import { extractInlineImages, isImageAttachment, isTextAttachment } from '../jira/attachments';
 import type { JiraClient } from '../jira/client';
 import { sanitizeDetail } from '../jira/sanitize';
+import { TempoClient, withTempoAttributes, type WorkAttribute } from '../jira/tempo';
 import type { Attachment, Instance } from '../jira/types';
 import type { AttachmentView, IssueCard } from './protocol';
 
@@ -29,8 +30,20 @@ export interface LoadedCard {
   inlineUrls: string[];
 }
 
-export async function loadCard(client: JiraClient, instance: Instance, key: string): Promise<LoadedCard> {
-  const { issue, worklogs, worklogError } = await client.issueDetail(key, instance);
+/**
+ * Карточка задачи. На Tempo-инстансе журнал — тот же стандартный `/worklog` (ворклоги Tempo там есть — проверено),
+ * плюс атрибуты Tempo по каждому ворклогу (`withTempoAttributes`) и их описания (`attrs`, колонки таблицы).
+ * Атрибуты — best effort: их ошибка карточку не роняет.
+ */
+export async function loadCard(client: JiraClient, instance: Instance, key: string, attrs?: () => Promise<WorkAttribute[]>): Promise<LoadedCard> {
+  const tempo = instance.caps?.tempo === true;
+  const [detail, workAttributes] = await Promise.all([
+    client.issueDetail(key, instance),
+    tempo && attrs ? attrs().catch((): WorkAttribute[] => []) : Promise.resolve([] as WorkAttribute[]),
+  ]);
+  const { issue, worklogError } = detail;
+  let { worklogs } = detail;
+  if (tempo && worklogs.length) worklogs = await withTempoAttributes(new TempoClient(client.http), worklogs).catch(() => worklogs);
   const { issue: clean, urls } = extractInlineImages(sanitizeDetail(issue, instance.baseUrl), instance.baseUrl);
   return {
     card: {
@@ -38,11 +51,12 @@ export async function loadCard(client: JiraClient, instance: Instance, key: stri
       instanceName: instance.name,
       host: hostOfUrl(instance.baseUrl),
       kind: instance.kind,
-      tempo: instance.caps?.tempo === true,
+      tempo,
       issue: { ...clean, attachments: [] },
       worklogs,
       ...(worklogError ? { worklogError } : {}),
       attachments: issue.attachments.map(attachmentView),
+      ...(tempo ? { workAttributes } : {}),
     },
     files: issue.attachments,
     inlineUrls: urls,

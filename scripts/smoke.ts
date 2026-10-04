@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { attachmentFileNames, attachmentUrls, extractInlineImages, isImageAttachment, sniffImage } from '../src/jira/attachments';
 import { detectCapabilities } from '../src/jira/capabilities';
-import { createJiraClient } from '../src/jira/client';
+import { createJiraClient, type MyselfInfo } from '../src/jira/client';
+import { formatDuration } from '../src/duration';
+import { TempoClient, withTempoAttributes } from '../src/jira/tempo';
+import { loadToday, localDate } from '../src/jira/worklog';
 import type { InstanceKind, SearchPage } from '../src/jira/types';
 import { sanitizeDetail } from '../src/jira/sanitize';
 import { buildJql } from '../src/jql';
@@ -113,11 +116,42 @@ async function attachmentCheck(t: Target, c: ReturnType<typeof createJiraClient>
   return [t.id, scope, String(issue.attachments.length), `${saved} Б = метаданные`, preview, inline];
 }
 
+/**
+ * Этап 6 (только GET): атрибуты Tempo, ворклоги Tempo за 14 дней (сколько с атрибутами), атрибуты в журнале карточки
+ * (стандартный /worklog + GET Tempo по id) и «сегодня» — обоими путями на Tempo-инстансе (Tempo и JQL worklogDate). Ключи не печатаем.
+ */
+async function tempoCheck(t: Target, c: ReturnType<typeof createJiraClient>, caps: Awaited<ReturnType<typeof detectCapabilities>>, me: MyselfInfo): Promise<{ row: string[]; totalSec: number }> {
+  const date = localDate();
+  const inst = { id: t.id, name: t.id, caps };
+  const today = await loadToday(c, inst, date, me);
+  const todayText = `${formatDuration(today.totalSec)} (${today.entries.length} зап.)`;
+  if (!caps.tempo) return { row: [t.id, '— (нет Tempo)', '—', '—', todayText, '—'], totalSec: today.totalSec };
+  const tempo = new TempoClient(c.http);
+  const attrs = await tempo.attributes();
+  const from = new Date(Date.now() - 14 * 864e5);
+  const recent = await tempo.worklogs({ dateFrom: localDate(from), dateTo: date, username: me.name });
+  const withAttrs = recent.filter((w) => Object.keys(w.attributes ?? {}).length).length;
+  let cardAttrs = '—';
+  const key = recent[0]?.issueKey;
+  if (key) {
+    const std = await c.worklogs(key);
+    const rich = await withTempoAttributes(tempo, std);
+    const tempoIds = new Set(recent.filter((w) => w.issueKey === key).map((w) => w.id));
+    const seen = std.filter((w) => tempoIds.has(w.id)).length;
+    cardAttrs = `${rich.filter((w) => Object.keys(w.attributes ?? {}).length).length}/${std.length} с атрибутами; Tempo-ворклогов в /worklog ${seen}/${tempoIds.size}`;
+  }
+  const viaJql = await loadToday(c, { ...inst, caps: { ...caps, tempo: false } }, date, me);
+  const same = viaJql.totalSec === today.totalSec ? '=' : '≠ (проверить)';
+  return { row: [t.id, attrs.map((a) => `${a.name} [${a.key}, ${a.type}${a.required ? ', обяз.' : ''}]`).join('; ') || 'нет', `${recent.length} / ${withAttrs}`, cardAttrs, todayText, `${formatDuration(viaJql.totalSec)} ${same}`], totalSec: today.totalSec };
+}
+
 async function main(): Promise<void> {
   const rows: string[][] = [['инстанс', 'пользователь', 'tempo', 'epicLinkField', 'задач', 'ожидание']];
   const jqlRows: string[][] = [['инстанс', 'проектов', 'типов', 'приоритетов', 'избр.фильтров', 'на мне', 'проект', 'быстрые+текст', 'готово', 'JQL-режим']];
   const cardRows: string[][] = [['инстанс', 'категория', 'описание, симв.', 'комментариев', 'история', 'ворклогов', 'спент/сумма', 'наблюдателей', 'эпик', 'релизов', 'вложений']];
   const attRows: string[][] = [['инстанс', 'задача', 'вложений', 'скачано (tmp, удалено)', 'превью', 'картинок в описании']];
+  const tempoRows: string[][] = [['инстанс', 'атрибуты Tempo', 'Tempo 14д: ворклогов / с атрибутами', 'журнал карточки', 'сегодня', 'сегодня через JQL']];
+  let todayTotal = 0;
   let mismatches = 0;
   for (const t of targets) {
     const token = process.env[t.tokenEnv];
@@ -152,12 +186,21 @@ async function main(): Promise<void> {
         mismatches++;
         attRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
       }
+      try {
+        const r = await tempoCheck(t, c, caps, me);
+        tempoRows.push(r.row);
+        todayTotal += r.totalSec;
+      } catch (e) {
+        mismatches++;
+        tempoRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
+      }
     } catch (e) {
       mismatches++;
       rows.push([t.id, '—', '—', '—', '—', `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
     }
   }
-  for (const table of [rows, jqlRows, cardRows, attRows]) {
+  tempoRows.push(['ВСЕГО', '', '', '', `сегодня ${formatDuration(todayTotal)}`, '']);
+  for (const table of [rows, jqlRows, cardRows, attRows, tempoRows]) {
     const w = table[0].map((_, i) => Math.max(...table.map((r) => (r[i] ?? '').length)));
     for (const r of table) console.log(r.map((c, i) => c.padEnd(w[i])).join('  '));
     console.log('');

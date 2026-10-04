@@ -1,6 +1,6 @@
 # Jiraffe MVP — расширение VS Code для Jira
 
-> Статус: этап 5 принят 2026-10-04 (этапы 1–5 приняты) · следующий — этап 6 (сессия 6) · ждёт пользователя: F5-проверка этапов 1–5 и решения на подтверждение (`roadmap-mvp.pending.md`)
+> Статус: этап 6 принят 2026-10-04 (этапы 1–6 приняты) · следующий — этап 7 (сессия 7) · ждёт пользователя: F5-проверка этапов 1–6, живая запись времени (Pilot/Tempo и sccloud) и решения на подтверждение (`roadmap-mvp.pending.md`)
 > Исполнитель отмечает чекбоксы `- [x]` по ходу работы — только после проверки, не «вроде сделал».
 > Приёмка этапа (Opus, `/plan-review`) меняет баннер этапа и коммитит.
 
@@ -59,13 +59,34 @@
     пользователь.
 - **Допущения** (проверить на своём этапе):
   - Чтение ворклогов Tempo v3: `GET /rest/tempo-timesheets/3/worklogs?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD&username=<login>`
-    (и/или `&projectKey=` / `&issue=`). Не проверено. Если endpoint не отвечает, атрибуты
-    в журнале задачи не показываем, а сводку «сегодня» строим через стандартный путь (этап 6).
+    (и/или `&projectKey=` / `&issue=`). **Проверено 2026-10-04 (этап 6, GET на Pilot):** endpoint
+    отвечает 200, массив. `username` фильтрует по автору (без него — ворклоги текущего пользователя;
+    `worker=<key>` даёт то же; несуществующий логин — 404 `{"errors":{"user":…}}`); `projectKey`
+    фильтрует по проекту (все авторы); **фильтра по задаче нет** — `issue`, `issueKey`, `issueId`,
+    `taskKey` сервер молча игнорирует; без `dateFrom/dateTo` — пустой массив. Элемент:
+    `{id, jiraWorklogId, timeSpentSeconds, dateStarted, dateCreated, dateUpdated, comment, self,
+    author:{name, key, displayName, avatar, self}, issue:{id, key, projectId, summary,
+    remainingEstimateSeconds, issueType:{name, iconUrl}, self}, worklogAttributes:[{key, value}]}`;
+    `id` = `jiraWorklogId` = id ворклога Jira (во всех 36 проверенных); `dateStarted` —
+    `YYYY-MM-DDTHH:mm:ss.SSS` **без пояса**; значение числового атрибута — строка с дробью
+    (`"120000.0"`); у части ворклогов `worklogAttributes` пустой. Один ворклог —
+    `GET …/3/worklogs/{id}` (те же поля + `workAttributeValues`). Поэтому атрибуты в журнале
+    карточки берутся по id стандартных ворклогов (до 50, параллельно 4), а «сегодня» на Tempo —
+    одним GET за день. Сумма за день совпала со стандартным путём (JQL `worklogDate` + `/worklog`)
+    на прошедшем дне с записями.
   - JQL `issuetype = Epic` находит эпики на русских инстансах. Если нет, ищем по id типа
     из `/rest/api/2/issuetype`.
-  - Ворклоги Tempo Server видны в стандартном `/rest/api/2/issue/{key}/worklog`.
+  - Ворклоги Tempo Server видны в стандартном `/rest/api/2/issue/{key}/worklog`. **Подтверждено
+    (этап 6):** все ворклоги Tempo задачи нашлись в `/worklog` по id — журнал карточки на Pilot
+    остаётся стандартным, Tempo лишь добавляет атрибуты.
   - Формат описаний рабочих атрибутов (`type`: `INPUT_FIELD`, `STATIC_LIST`, …) уточнить по
-    живому ответу на этапе 6.
+    живому ответу на этапе 6. **Проверено (этап 6):** `GET /rest/tempo-core/1/work-attribute` → массив
+    `{id, key, name, type:{name, value, systemType}, required, sequence}`; тип — в `type.value`
+    (объект, не строка; `type.name` локализован: «Числовое поле ввода»). На Pilot один атрибут:
+    `AI Tokens`, `_AITokensUsed_`, `INPUT_NUMERIC`, необязательный. `STATIC_LIST`
+    (`staticListValues`), `INPUT_FIELD`, `CHECKBOX` живьём не встречались — разобраны по документации
+    Tempo Server, покрыты только тестами; `ACCOUNT`/`DYNAMIC_DROPDOWN`/`BILLABLE_SECONDS` форма
+    не рисует (обязательный такой атрибут — предупреждение в форме).
 
 ## Архитектура и контракты
 
@@ -326,22 +347,39 @@ Webview-вкладка карточки: шапка, вкладки «Описа
 Запись времени из карточки и боковой панели, рабочие атрибуты Tempo с инстанса, сводка
 «сегодня» в разделе Tempo и в строке состояния.
 
-- [ ] Проверить допущения о Tempo v3 по живому Pilot **только GET-запросами**: `/rest/tempo-core/1/work-attribute` (формат атрибутов) и чтение ворклогов (`/rest/tempo-timesheets/3/worklogs?dateFrom&dateTo&username`). Результат и реальные форматы записать в раздел «Допущения» этого файла
-- [ ] `src/jira/tempo.ts`: `attributes()`, `worklogs({dateFrom, dateTo, username, issueKey?})` (если endpoint подтвердился), `addWorklog({issueKey, author, started, timeSpentSec, comment, attributes, remainingEstimateSec})` — payload как в `pilot-jira/jira.sh` `cmd_worklog`
-- [ ] Стандартный путь: `client.addWorklog(key, {started, timeSpentSec, comment}, adjustEstimate)`; AI Tokens без Tempo → `(AI Tokens: N)` в конце комментария
-- [ ] Форма «Залогать время» — webview-диалог в карточке (как `logHtml` в прототипе) и команда `jiraffe.logWork` (QuickInput: длительность → дата → комментарий → атрибуты) для вызова из дерева и палитры. Поля атрибутов строятся по ответу `work-attribute`
-- [ ] `remainingEstimateSec` для Tempo = `max(remaining − spent, 0)` по `timetracking` задачи (допущение о поведении — см. «Риски»)
-- [ ] После записи: обновить карточку (журнал, «Залогано»), дерево Tempo и строку состояния; сообщение `Залогано 1ч 30м в ABC-123 · Tempo`
-- [ ] Сводка «сегодня»: Tempo-инстанс — `tempo.worklogs(today, me)`; без Tempo — JQL `worklogAuthor = currentUser() AND worklogDate = "YYYY-MM-DD"`, затем `worklogs(key)` и фильтр по автору и дате. Сумма по всем инстансам
-- [ ] `tempoView.ts` (WebviewView): блок «Сегодня» из прототипа (`renderTempo`), без недельной таблицы; кнопка «Залогать»; `statusBar.ts`: `$(clock) Сегодня 3ч 15м / 8ч`, клик фокусирует раздел Tempo
-- [ ] Вкладка «Журнал работ» карточки: на Tempo-инстансе колонки атрибутов (если чтение Tempo подтвердилось), иначе без них
-- [ ] `test/worklog.test.ts`: payload Tempo (атрибуты, `remainingEstimateSeconds`, `dateStarted` без зоны), payload стандартный (`started` с локальным смещением, AI Tokens в комментарии), сумма «сегодня»
+- [x] Проверить допущения о Tempo v3 по живому Pilot **только GET-запросами**: `/rest/tempo-core/1/work-attribute` (формат атрибутов) и чтение ворклогов (`/rest/tempo-timesheets/3/worklogs?dateFrom&dateTo&username`). Результат и реальные форматы записать в раздел «Допущения» этого файла (записано 2026-10-04)
+- [x] `src/jira/tempo.ts`: `attributes()`, `worklogs({dateFrom, dateTo, username, issueKey?})` (если endpoint подтвердился), `addWorklog({issueKey, author, started, timeSpentSec, comment, attributes, remainingEstimateSec})` — payload как в `pilot-jira/jira.sh` `cmd_worklog` (чтение — тесты + smoke Pilot; `addWorklog` — тесты на моке fetch, **живая запись — пользователь**)
+- [x] Стандартный путь: `client.addWorklog(key, {started, timeSpentSec, comment}, adjustEstimate)`; AI Tokens без Tempo → `(AI Tokens: N)` в конце комментария (тесты на моке; **живая запись — пользователь**)
+- [ ] Форма «Залогать время» — webview-диалог в карточке (как `logHtml` в прототипе) и команда `jiraffe.logWork` (QuickInput: длительность → дата → комментарий → атрибуты) для вызова из дерева и палитры. Поля атрибутов строятся по ответу `work-attribute` (разметка диалога и проверка формы — тесты; **не отмечено: диалог и QuickInput в VS Code — пользователь, F5**)
+- [x] `remainingEstimateSec` для Tempo = `max(remaining − spent, 0)` по `timetracking` задачи (допущение о поведении — см. «Риски»)
+- [ ] После записи: обновить карточку (журнал, «Залогано»), дерево Tempo и строку состояния; сообщение `Залогано 1ч 30м в ABC-123 · Tempo` (код: `WorklogService.onDidLog` → `panels.reload` + `today.refresh`; **не отмечено: пользователь после живой записи**)
+- [x] Сводка «сегодня»: Tempo-инстанс — `tempo.worklogs(today, me)`; без Tempo — JQL `worklogAuthor = currentUser() AND worklogDate = "YYYY-MM-DD"`, затем `worklogs(key)` и фильтр по автору и дате. Сумма по всем инстансам (тесты + smoke 4 инстанса; на Pilot оба пути дали одну сумму за прошедший день с записями)
+- [ ] `tempoView.ts` (WebviewView): блок «Сегодня» из прототипа (`renderTempo`), без недельной таблицы; кнопка «Залогать»; `statusBar.ts`: `$(clock) Сегодня 3ч 15м / 8ч`, клик фокусирует раздел Tempo (разметка «Сегодня» и текст строки — тесты; **не отмечено: вид и клики — пользователь, F5**)
+- [ ] Вкладка «Журнал работ» карточки: на Tempo-инстансе колонки атрибутов (если чтение Tempo подтвердилось), иначе без них (данные — smoke Pilot: атрибуты у ворклогов задачи нашлись; разметка — тесты; **не отмечено: вид — пользователь**)
+- [x] `test/worklog.test.ts`: payload Tempo (атрибуты, `remainingEstimateSeconds`, `dateStarted` без зоны), payload стандартный (`started` с локальным смещением, AI Tokens в комментарии), сумма «сегодня»
 
 **Готово, когда:** тесты зелёные, сборка и линт проходят. В smoke добавлены атрибуты Pilot и
 сумма «сегодня» по каждому инстансу — только GET. **Запись проверяет пользователь:** одна запись
 в Pilot (Tempo с AI Tokens) и одна в sccloud, обе видны в Jira и в карточке.
 
 **Сессия:** opus, high — непроверенные endpoint'ы и запись в рабочие Jira; после этапа 5.
+
+**Решения (2026-10-04, по итогам сессии 6):**
+- Раскладка: `src/jira/http.ts` (+ `HttpClient.postJson`), `src/jira/client.ts` (+ `addWorklog`, `timetracking`), **новые** `src/jira/tempo.ts` (`TempoClient`: `attributes`, `worklogs`, `worklog(id)`, `addWorklog`; `tempoPayload`, `mapWorkAttribute`, `mapTempoWorklog`, `findAiTokensAttr`, `withTempoAttributes`) и `src/jira/worklog.ts` (чистые: `logFormFor`, `validateDraft`, `startedWithOffset`, `appendAiTokens`, `remainingAfter`, `submitWorklog`, `loadToday`, `mineOn`, `sumToday`, `localDate`), `src/state/meta.ts` (+ кэш `myself`, `workAttributes`), **новые** `src/state/today.ts` (`TodayService`, `statusBarText/Lines`, без vscode), `src/commands/logWork.ts` (`WorklogService` + `jiraffe.logWork` + QuickInput), `src/views/{tempoView,statusBar}.ts`, `webview/{today,tempo}.ts` (третий вход webview-бандла `dist/webview/tempo.js`), правки `src/panels/{protocol,card,issuePanel}.ts`, `src/commands/{issue,filters}.ts`, `src/extension.ts`, `webview/{issue,render}.ts`, `webview/common.css`, `esbuild.mjs`, `package.json`, `scripts/smoke.ts`, `test/worklog.test.ts`. Вне списка «Архитектуры»: `worklog.ts`, `today.ts`, `commands/logWork.ts`, `webview/{today,tempo}.ts`.
+- `HttpClient.postJson(path, body, query?)`: адрес — только `baseUrl`+путь и обязан пройти `isOwnUrl` (`/../` за context path → `blocked` без запроса); `redirect: 'manual'`, **любой 3xx — ошибка** (`login.jsp` → 401, иначе `redirect`), по Location не идём: тело записи и `Authorization` никуда не уходят, а `fetch` на 302/303 превратил бы POST в GET. Таймаут/обрыв/не-JSON после отправки — текст «запись могла сохраниться — проверьте журнал задачи, прежде чем повторять»; `scrub` как у GET, тело запроса в сообщения не попадает. Пустой ответ (204) → `undefined`.
+- Payload'ы (тесты на моке fetch, живьём POST **не выполнялся ни разу**): **Tempo** — `POST /rest/tempo-timesheets/3/worklogs/` `{issue:{key, remainingEstimateSeconds}, author:{name:<login из /myself>}, timeSpentSeconds, dateStarted:"YYYY-MM-DDT12:00:00.000" (без пояса), comment?, worklogAttributes?:[{key,value}]}` — как `cmd_worklog`; пустые атрибуты и пустой комментарий не шлются. `remainingEstimateSeconds = max(remaining − spent, 0)` по **свежему** `GET issue?fields=timetracking` прямо перед записью (нет оценки → 0, как скрипт). **Стандартный** — `POST /rest/api/2/issue/{key}/worklog?adjustEstimate=leave` `{started:"YYYY-MM-DDT12:00:00.000+HHMM" (локальное смещение на ту дату), timeSpentSeconds, comment?}` (Cloud — тот же v2-путь, комментарий строкой). Время записи — полдень выбранного дня (как в скриптах): дата не съезжает ни при каком поясе сервера. AI Tokens: на Tempo — атрибут `_AITokensUsed_` (или атрибут с именем «AI Tokens»), если его нет — `(AI Tokens: N)` в комментарий, как и без Tempo; N — целое без разделителей.
+- Проверка формы — в хосте (`validateDraft`, значения из webview недоверенные): длительность — `parseDuration`, не больше 24 ч (как прототип); дата — существующая `YYYY-MM-DD`, 2000–2100; комментарий ≤ 30 000; AI Tokens — цифры (пробелы-разделители допустимы); атрибуты — только ключи из `work-attribute` инстанса, число — `-?\d+([.,]\d+)?`, список — только его значения, флажок → `"true"`/не шлётся; обязательные пустые — ошибка с полем (`attr:<key>`). Типы `ACCOUNT`/`DYNAMIC_DROPDOWN`/`BILLABLE_SECONDS` форма не рисует; обязательный такой — заметка в форме/предупреждение (Tempo отклонит запись — ошибку покажем как есть). Не загрузились атрибуты Tempo — форма не открывается (ошибка), чтобы AI Tokens молча не ушли в комментарий вместо атрибута. Одновременно — одна запись в задачу (`inFlight`).
+- Протокол (дополнение): `host→view` `logForm {instanceId, key, form: LogFormView}` (`LogForm` + `instanceName`, `summary`, `today`) и `logResult {instanceId, key, ok, field?, error?}`; `view→host` `submitWorklog {instanceId, key, draft: LogDraft}` — в наборе `ATTACHMENT_ACTIONS` (instanceId и key сверяются с показанной задачей, карточка загружена). `IssueCard.workAttributes?: WorkAttribute[]` — колонки журнала. Раздел Tempo — свой протокол `HostToTempo {type:'today', data: TodayView}` / `TempoToHost` (`ready`, `openIssue {instanceId, key}` — инстанс должен существовать, ключ — `isIssueKey`; `logWork`, `refresh`, `addInstance`).
+- Точка входа — **команда `jiraffe.logWork(arg?)`** (`commands/logWork.ts`): аргумент — `IssueRef` или узел дерева «Задачи» (контекстное меню `viewItem == issue`), без аргумента — активная/preview карточка, нет её — InputBox ключа (`pickIssueRef`, вынесен из `openIssueByKey` в `commands/filters.ts`). Если карточка задачи открыта и загружена — вкладка выводится вперёд и в ней открывается webview-диалог (`IssuePanelManager.showLogForm`; кнопка карточки шлёт `logWork` → хост вызывает команду), иначе QuickInput: длительность → дата (Сегодня/Вчера/Другая) → комментарий → AI Tokens → прочие атрибуты. `IssuePanelManager` получил **5-й параметр `WorklogService`** и методы `activeRef`, `showLogForm`, `reload`. Диалог живёт в `#dlg` вне `#app` — перерисовка карточки (обновление данных) введённое не теряет; при смене задачи в preview закрывается. Скрытая карточка (`retainContextWhenHidden:false`) сбрасывает `ready` в `onDidChangeViewState` — диалог досылается после нового `ready`.
+- После записи `WorklogService.onDidLog` → `panels.reload(ref)` + `today.refresh()`; то же после неоднозначной ошибки (сеть/таймаут), чтобы было видно, прошла ли запись. Уведомление `Jiraffe: Залогано 1ч 30м в ABC-123 · Tempo` (`· журнал Jira`; не сегодня — ` за YYYY-MM-DD`), через `noticeText`. Webview после успеха закрывает диалог и переключается на «Журнал работ» (как прототип).
+- Журнал карточки на Tempo-инстансе: стандартный `/worklog` (Tempo-ворклоги там есть) + атрибуты `GET tempo-timesheets/3/worklogs/{id}` по каждому (новые первыми, до 50, параллельно 4; 401/403/сеть — прекращаем, 404 — строка без атрибутов; best effort, карточку не роняет) + описания атрибутов (`meta.workAttributes`, кэш). Колонки — атрибуты инстанса + ключи, встреченные в данных; список — название значения, число — с разрядами и суммой в «Итого». Строка «Tempo Timesheets · атрибуты «…»».
+- «Сегодня»: `TodayService` (все инстансы параллельно, упавший — строка с ошибкой, устаревший ответ отбрасывается по поколению; смена даты сбрасывает старые записи). Tempo — `worklogs(dateFrom=dateTo=сегодня, username=логин)`; без Tempo (и Cloud) — JQL `worklogAuthor = currentUser() AND worklogDate = "YYYY-MM-DD"` (до 100 задач) → `/worklog` каждой (параллельно 3) → автор = я (`name` DC / `accountId` Cloud) и префикс даты `started`. Обновляется: при активации, после записи, по `jiraffe.refresh` (у `registerFilterCommands` 7-й параметр `onRefresh`), при изменении инстансов, при возврате фокуса окну (не чаще раза в 5 мин) и раз в 15 мин, пока окно в фокусе. Строка состояния `$(clock) Сегодня 3ч 15м / 8ч` (до загрузки — «…», ошибка инстанса — `$(warning)`), tooltip — по инстансам обычным текстом (не markdown), клик — `jiraffe.tempo.focus`; без инстансов скрыта. Настройка `jiraffe.workdayHours` (8, 1..24).
+- Раздел Tempo: «Сегодня, <день недели, число месяц>», сумма, «из 8ч · осталось», полоска (ширина — CSSOM), строки «ключ · комментарий · время» (клик/Enter — карточка), ошибки инстансов, кнопки «Обновить» и «Залогать»; в заголовке view — «Залогать время» и «Обновить». Без инстансов — кнопка «Добавить инстанс». Недельной таблицы и кнопки «Неделя» нет (вне MVP).
+- Smoke (`npm run smoke`, только GET): таблица «Tempo» — атрибуты Pilot (`AI Tokens [_AITokensUsed_, INPUT_NUMERIC]`), ворклоги Tempo за 14 дней и сколько с атрибутами, атрибуты в журнале карточки (стандартный `/worklog` + Tempo по id) и доля Tempo-ворклогов, найденных в `/worklog`, «сегодня» по каждому инстансу, на Tempo — ещё и через JQL-путь (сравнение), строка «ВСЕГО». Прогон 2026-10-04: все 4 инстанса без ошибок; сегодня (воскресенье) везде 0м; разово (вне smoke) за последний день с записями: Pilot — Tempo-путь и JQL-путь дали одну сумму, Cloud — JQL-путь нашёл запись; у sccloud/tatikoma записей за 30 дней нет — путь проверен только на 0 и тестами.
+- Отступления: (1) `TempoClient.addWorklog` принимает `date` (`YYYY-MM-DD`), а не `started` — время всегда полдень; (2) `worklogs({…, issueKey})` фильтрует на клиенте — сервер фильтр по задаче игнорирует; (3) `jiraffe.logWork` теперь видна в палитре и в контекстном меню задачи дерева (была скрыта); (4) `activationEvents: ["onStartupFinished"]` — см. «Скоуп» в отчёте; (5) поле «Потрачено» в диалоге пустое с подсказкой «1ч 30м» (в прототипе было предзаполнено «1ч 30м» — так легко залогать полтора часа случайно); (6) в QuickInput AI Tokens спрашивается всегда (4-й шаг), прочие атрибуты Tempo — после него.
+- Не проверено: **любая живая запись** (Pilot/Tempo с AI Tokens, sccloud, Cloud) — пользователь; ответ Tempo на POST (берём `id` из объекта или первого элемента массива — по скрипту); поведение `adjustEstimate=leave` и пересчёт остатка в Tempo; всё видимое в VS Code (диалог в карточке, QuickInput, раздел Tempo, строка состояния и клик по ней, контекстное меню дерева, обновление карточки после записи, светлая/тёмная тема диалога); атрибуты `STATIC_LIST`/`INPUT_FIELD`/`CHECKBOX` — только тесты (на Pilot их нет); `<input type="date">` в webview VS Code.
+- Ревью (2026-10-04, два прохода): (1) `WorklogService.inFlight` ставится до первого `await` — раньше два сообщения подряд оба проходили проверку и давали дубль; (2) неоднозначные ошибки записи помечаются хвостом `MAYBE_SAVED` (`src/jira/http.ts`): таймаут, сброс соединения (кроме отказа/DNS/сертификата — тогда запрос точно не ушёл), **502/503/504 прокси** (`code: 'network'`), не-JSON 2xx; после такой ошибки карточка и «сегодня» перечитываются сразу и через 15 с, а следующая отправка в ту же задачу (10 мин) один раз останавливается предупреждением; (3) дата записи не позже сегодняшней (`validateDraft(…, today)`, `max` у `input type=date`, QuickInput); (4) обязательный список в диалоге — с пустым `— выберите —` (иначе браузер молча выбирал первое значение); (5) «сегодня» на Tempo сверяет логин без учёта регистра; (6) `client.worklogs` дочитывает постраничный ответ по `startAt` (≤10 страниц); (7) таймер «сегодня» обновляет и без фокуса окна, если сменилась дата; (8) повторный `logForm` при открытом диалоге той же задачи не затирает введённое. Тесты DST/поясов `startedWithOffset`/`localDate` через `process.env.TZ`. Осталось сознательно: у задачи без оценки Tempo получает `remainingEstimateSeconds: 0` (поле обязательное — `[скоуп]` в pending); JQL `worklogDate` считается в поясе профиля Jira (записи расширения — в 12:00, их не задевает); «сегодня» без Tempo — до 100 задач без пометки об обрезке.
+- Для этапа 7: `IssuePanelManager` — 5 параметров; в `esbuild.mjs` webview-входов уже три (`issue.ts`, `tempo.ts`, `common.css`) — `list.ts` добавляется четвёртым; в `common.css` есть `.dlg/.fld/.g2/.ib/.row-btns/.tl` (можно переиспользовать); `jiraffe.refresh` дергает `onRefresh` (сводку «сегодня»).
 
 ### 7. Эпики и релизы
 Разделы «Эпики» и «Релизы», вкладки эпика и релиза с прогрессом и таблицей задач.
@@ -517,8 +555,8 @@ DoD: npm run build && npm run lint && npm test зелёные; smoke печат�
 
 Работаем в /Users/fost/Projects/jiraffe. Задача: этап 7 roadmap-mvp.md — разделы «Эпики» и «Релизы», вкладки эпика и релиза.
 Читай: roadmap-mvp.md (решения про Epic Link/parent, этап 7). Эталон — prototype/index.html: renderEpics, renderRels, vEpic, vRel, progressBlock, issueTable, segBar.
-Точки входа: src/jira/client.ts, src/jira/capabilities.ts (epicLinkField), src/panels/html.ts (`renderShell` — общий каркас, подходит и для list.js; CSP тот же, картинок с инстанса в списках не грузить — иконки свои SVG, как в карточке) и protocol.ts (там типы карточки; для списков завести свои типы рядом), заглушки в src/commands/issue.ts: `jiraffe.openEpic({instanceId, key})` и `jiraffe.openRelease({instanceId, id})` — заменить тело, карточка уже вызывает их командами; `webview/list.ts` добавить вторым входом в `esbuild.mjs` (webview-бандл), стили — в `webview/common.css` (там уже есть `.pill`, `.bar`, `table.t`, `.crumbs`, `.hrow`; цвета только `--vscode-*`), `renderEpics`-аналоги писать чистыми функциями как `webview/render.ts`.
-Эпики — по «Контракту эпика» в решениях этапа 2 (DC — поле Epic Link и `cf[<id>] = KEY`, Cloud — `parent = KEY`, эпик = `hierarchyLevel === 1`); на Cloud `caps.epicLinkField` всегда `null` — это норма, не ошибка.
+Точки входа: src/jira/client.ts, src/jira/capabilities.ts (epicLinkField), src/panels/html.ts (`renderShell` — общий каркас, подходит и для list.js; CSP тот же, картинок с инстанса в списках не грузить — иконки свои SVG, как в карточке) и protocol.ts (там типы карточки; для списков завести свои типы рядом), заглушки в src/commands/issue.ts: `jiraffe.openEpic({instanceId, key})` и `jiraffe.openRelease({instanceId, id})` — заменить тело, карточка уже вызывает их командами; `webview/list.ts` добавить ещё одним входом в `esbuild.mjs` (webview-бандл; там уже `issue.ts`, `tempo.ts` и `common.css` — этап 6), стили — в `webview/common.css` (там уже есть `.pill`, `.bar`, `table.t`, `.crumbs`, `.hrow`; цвета только `--vscode-*`), `renderEpics`-аналоги писать чистыми функциями как `webview/render.ts`.
+По реальному коду (после этапа 6): `IssuePanelManager` принимает 5 параметров (5-й — `WorklogService`), протокол карточки дополнен `logForm`/`logResult`/`submitWorklog` — не ломать; `jiraffe.refresh` уже обновляет сводку «сегодня» (`onRefresh` в `registerFilterCommands`). Эпики — по «Контракту эпика» в решениях этапа 2 (DC — поле Epic Link и `cf[<id>] = KEY`, Cloud — `parent = KEY`, эпик = `hierarchyLevel === 1`); на Cloud `caps.epicLinkField` всегда `null` — это норма, не ошибка.
 
 Уже решено: DC — cf[<id>] = KEY, Cloud — parent = KEY; прогресс по statusCategory; у разделов свой выбор проекта.
 
@@ -537,7 +575,7 @@ DoD: npm run build && npm run lint && npm test зелёные; smoke печат�
 
 Работаем в /Users/fost/Projects/jiraffe. Задача: этап 8 roadmap-mvp.md — пустые состояния, устойчивость к ошибкам инстанса, кэш, README, CHANGELOG, .vsix 0.1.0.
 Читай: roadmap-mvp.md (этап 8), README.md.
-Точки входа: package.json (contributes.viewsWelcome, version), src/views/*.ts, src/jira/client.ts.
+Точки входа: package.json (contributes.viewsWelcome, version), src/views/*.ts, src/jira/client.ts. После этапа 6: расширение активируется `onStartupFinished` (строка состояния «Сегодня» с первых секунд) — если пользователь отклонил это в `roadmap-mvp.pending.md`, вернуть `activationEvents: []`; у раздела Tempo своё пустое состояние (`webview/today.ts`).
 
 Уже решено: кэш только в памяти; README отмечает чекбоксы функций по факту, не авансом.
 
@@ -551,9 +589,9 @@ DoD: npm run build && npm run lint && npm test && npm run smoke && npm run packa
 
 ## Риски и открытые вопросы
 
-- **Tempo v3 — чтение ворклогов.** Endpoint и параметры не проверены. Узнаем в начале этапа 6
-  по GET-запросу. Если не работает, атрибуты в журнале не показываем, а сводку строим через JQL
-  `worklogDate`.
+- **Tempo v3 — чтение ворклогов.** ~~Endpoint и параметры не проверены.~~ Проверено на этапе 6
+  (см. «Допущения»): работает, но без фильтра по задаче — атрибуты журнала карточки берутся
+  по одному GET на ворклог (до 50).
 - **`remainingEstimateSeconds` в Tempo.** Скрипт pilot-jira всегда шлёт `0`, то есть обнуляет
   остаток. В плане — `max(remaining − spent, 0)`. **Вопрос пользователю:** нужно ли вообще
   трогать остаток? Для стандартного worklog по умолчанию стоит `adjustEstimate=leave`, как в
@@ -564,8 +602,8 @@ DoD: npm run build && npm run lint && npm test && npm run smoke && npm run packa
   на внешние ресурсы. Чужие показываем ссылкой: CSP ослаблять не будем.
 - **Разные версии Jira** (8.22 и 9.12). Возможны расхождения в `/search` и changelog. Smoke
   гоняет все инстансы на каждом этапе, так что поймаем рано.
-- **Ворклоги Tempo в стандартном `/worklog`.** Если на Pilot их там нет, журнал задачи на Pilot
-  читаем через Tempo (этап 6).
+- **Ворклоги Tempo в стандартном `/worklog`.** ~~Если на Pilot их там нет…~~ Есть (этап 6) —
+  журнал задачи на Pilot стандартный + атрибуты Tempo.
 - **Секреты.** Токены не попадают ни в логи, ни в фикстуры, ни в smoke-вывод. Это проверяется
   на приёмке каждого этапа.
 
