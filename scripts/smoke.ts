@@ -1,4 +1,8 @@
 // Read-only smoke по живым инстансам из env. Только GET. Токены не печатаются.
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { attachmentFileNames, attachmentUrls, extractInlineImages, isImageAttachment, sniffImage } from '../src/jira/attachments';
 import { detectCapabilities } from '../src/jira/capabilities';
 import { createJiraClient } from '../src/jira/client';
 import type { InstanceKind, SearchPage } from '../src/jira/types';
@@ -60,10 +64,60 @@ async function cardCheck(t: Target, c: ReturnType<typeof createJiraClient>, caps
     String(issue.watchers.length), issue.epic ? (issue.epic.summary ? 'да+название' : 'да') : 'нет', String(issue.fixVersions.length), String(issue.attachments.length)];
 }
 
+/**
+ * Этап 5: первое вложение задачи из `assignee = currentUser()` скачивается (только GET) во временную папку, размер
+ * сверяется с метаданными, папка удаляется. Плюс превью картинки и картинки описания: тип по сигнатуре. Ключи и имена не печатаем.
+ */
+async function attachmentCheck(t: Target, c: ReturnType<typeof createJiraClient>, caps: Awaited<ReturnType<typeof detectCapabilities>>, baseUrl: string): Promise<string[]> {
+  const inst = { id: t.id, kind: t.kind, caps, baseUrl };
+  let page = await c.search('assignee = currentUser() AND attachments is not EMPTY ORDER BY updated DESC', ['summary'], { maxResults: 1 });
+  let scope = 'на мне';
+  if (!page.issues.length) {
+    page = await c.search('attachments is not EMPTY ORDER BY updated DESC', ['summary'], { maxResults: 1 });
+    scope = 'любая';
+  }
+  const key = page.issues[0]?.key;
+  if (!key) return [t.id, 'нет задач с вложениями'];
+  const { issue } = await c.issueDetail(key, inst);
+  const att = issue.attachments.find((a) => a.size <= 20 * 1024 * 1024);
+  if (!att) return [t.id, scope, String(issue.attachments.length), 'все > 20 МБ'];
+  const url = attachmentUrls(att, inst).content;
+  if (!url) throw new Error('адрес вложения не относится к инстансу');
+  const dir = await mkdtemp(join(tmpdir(), 'jiraffe-smoke-'));
+  let saved: number;
+  try {
+    const { bytes } = await c.downloadAttachment(url, 20 * 1024 * 1024);
+    const file = join(dir, attachmentFileNames(issue.attachments).get(att.id) ?? 'f');
+    await writeFile(file, bytes);
+    saved = (await stat(file)).size;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  if (saved !== att.size) throw new Error(`размер ${saved} != ${att.size} из метаданных`);
+  const img = issue.attachments.find(isImageAttachment);
+  let preview = '—';
+  if (img) {
+    const u = attachmentUrls(img, inst);
+    const src = u.thumbnail ?? (img.size <= 5 * 1024 * 1024 ? u.content : undefined);
+    preview = src ? `${u.thumbnail ? 'thumb' : 'full'} ${sniffImage((await c.downloadAttachment(src, 5 * 1024 * 1024)).bytes) ?? 'НЕ КАРТИНКА'}` : '> 5 МБ';
+  }
+  const { urls } = extractInlineImages(sanitizeDetail(issue, baseUrl), baseUrl);
+  let inline = String(urls.length);
+  if (urls.length) {
+    try {
+      inline += ` (${sniffImage((await c.downloadAttachment(urls[0], 5 * 1024 * 1024)).bytes) ?? 'НЕ КАРТИНКА'})`;
+    } catch (e) {
+      inline += ` (ошибка: ${e instanceof Error ? e.message : String(e)})`;
+    }
+  }
+  return [t.id, scope, String(issue.attachments.length), `${saved} Б = метаданные`, preview, inline];
+}
+
 async function main(): Promise<void> {
   const rows: string[][] = [['инстанс', 'пользователь', 'tempo', 'epicLinkField', 'задач', 'ожидание']];
   const jqlRows: string[][] = [['инстанс', 'проектов', 'типов', 'приоритетов', 'избр.фильтров', 'на мне', 'проект', 'быстрые+текст', 'готово', 'JQL-режим']];
   const cardRows: string[][] = [['инстанс', 'категория', 'описание, симв.', 'комментариев', 'история', 'ворклогов', 'спент/сумма', 'наблюдателей', 'эпик', 'релизов', 'вложений']];
+  const attRows: string[][] = [['инстанс', 'задача', 'вложений', 'скачано (tmp, удалено)', 'превью', 'картинок в описании']];
   let mismatches = 0;
   for (const t of targets) {
     const token = process.env[t.tokenEnv];
@@ -92,12 +146,18 @@ async function main(): Promise<void> {
         mismatches++;
         cardRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
       }
+      try {
+        attRows.push(await attachmentCheck(t, c, caps, baseUrl));
+      } catch (e) {
+        mismatches++;
+        attRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
+      }
     } catch (e) {
       mismatches++;
       rows.push([t.id, '—', '—', '—', '—', `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
     }
   }
-  for (const table of [rows, jqlRows, cardRows]) {
+  for (const table of [rows, jqlRows, cardRows, attRows]) {
     const w = table[0].map((_, i) => Math.max(...table.map((r) => (r[i] ?? '').length)));
     for (const r of table) console.log(r.map((c, i) => c.padEnd(w[i])).join('  '));
     console.log('');

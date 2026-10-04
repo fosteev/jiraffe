@@ -25,7 +25,7 @@ function resolveHref(url: string, baseUrl: string): string {
 }
 
 /**
- * Картинка своего инстанса (тот же origin и context path) — адрес для этапа 5, который скачает её С АВТОРИЗАЦИЕЙ.
+ * Картинка своего инстанса (тот же origin и context path) — адрес, который хост скачает С АВТОРИЗАЦИЕЙ.
  * Всё остальное (чужой хост, `data:`, `javascript:`, `file:`) сюда не попадает: токен не должен уйти наружу.
  */
 function ownImageSrc(abs: string, baseUrl: string): string {
@@ -57,14 +57,15 @@ export function sanitizeJiraHtml(html: string, baseUrl: string): string {
         const href = attribs.href ? resolveHref(attribs.href, baseUrl) : '';
         return { tagName: 'a', attribs: href ? { href, ...(attribs.title ? { title: attribs.title } : {}) } : {} };
       },
-      // Картинки — этап 5: своя — плейсхолдер с data-src (этап 5 скачает с авторизацией), чужая http(s) — ссылкой
-      // (CSP не пускает чужие хосты, а авторизованно качать с них нельзя), прочие схемы — плейсхолдер без адреса.
+      // Картинки: своя — плейсхолдер с data-src (хост заменит адрес на номер — `extractInlineImages` — и скачает с
+      // авторизацией), чужая http(s) — ссылкой (CSP не пускает чужие хосты, а авторизованно качать с них нельзя),
+      // прочие схемы — плейсхолдер без адреса.
       img: (_tag, attribs) => {
         const abs = attribs.src ? resolveHref(attribs.src, baseUrl) : '';
         const own = abs ? ownImageSrc(abs, baseUrl) : '';
         const title: Record<string, string> = attribs.alt ? { title: attribs.alt } : {};
         if (!own && /^https?:\/\//i.test(abs)) return { tagName: 'a', attribs: { href: abs, ...title }, text: '[внешняя картинка]' };
-        return { tagName: 'span', attribs: { class: 'img-ph', ...(own ? { 'data-src': own } : {}), ...title }, text: '[картинка — этап 5]' };
+        return { tagName: 'span', attribs: { class: 'img-ph', ...(own ? { 'data-src': own } : {}), ...title }, text: '[картинка]' };
       },
     },
     // Пустые якоря (`<a name="…"></a>` в заголовках) — мусор.

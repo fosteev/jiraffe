@@ -1,15 +1,23 @@
 import * as vscode from 'vscode';
+import { noticeText } from '../jira/attachments';
+import type { Attachment } from '../jira/types';
 import type { InstanceStore } from '../state/instances';
 import type { InstanceMeta } from '../state/meta';
 import type { IssueRef } from '../views/issuesTree';
+import type { AttachmentContext, AttachmentService } from './attachments';
 import { browseUrl, loadCard } from './card';
 import { makeNonce, renderShell } from './html';
-import { ISSUE_TABS, isIssueKey, isVersionId, safeExternalUrl, type HostToView, type IssueCard, type IssueTab, type ViewToHost } from './protocol';
+import {
+  ISSUE_TABS, isAttachmentId, isImageId, isIssueKey, isVersionId, MAX_IMAGE_IDS, safeExternalUrl, type HostToView, type IssueCard, type IssueTab, type ViewToHost,
+} from './protocol';
 
 interface Entry {
   panel: vscode.WebviewPanel;
   ref: IssueRef;
   card?: Omit<IssueCard, 'pinned' | 'tab'>;
+  /** Только в хосте: вложения с адресами и адреса картинок описания (`iN`). В webview адреса Jira не уходят. */
+  files: Attachment[];
+  inlineUrls: string[];
   error?: string;
   tab: IssueTab;
   pinned: boolean;
@@ -21,6 +29,8 @@ interface Entry {
 
 /** Действия над показанной задачей: принимаются, только если ключ в сообщении совпадает с текущим. */
 const CARD_ACTIONS = new Set<ViewToHost['type']>(['openInBrowser', 'copyKey', 'logWork', 'pin', 'switchTab']);
+/** Вложения и картинки: и instanceId, и key должны совпасть с показанной задачей, карточка — загружена. */
+const ATTACHMENT_ACTIONS = new Set<ViewToHost['type']>(['loadImages', 'downloadAttachment', 'downloadAll', 'openAttachment']);
 const idOf = (r: IssueRef): string => `${r.instanceId}\n${r.key}`;
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 export const isIssueRef = (v: unknown): v is IssueRef =>
@@ -40,6 +50,7 @@ export class IssuePanelManager implements vscode.Disposable {
     private readonly extensionUri: vscode.Uri,
     private readonly store: InstanceStore,
     private readonly meta: InstanceMeta,
+    private readonly attachments: AttachmentService,
   ) {}
 
   dispose(): void {
@@ -59,6 +70,8 @@ export class IssuePanelManager implements vscode.Disposable {
       if (!same) {
         this.preview.ref = ref;
         this.preview.card = undefined;
+        this.preview.files = [];
+        this.preview.inlineUrls = [];
         this.preview.error = undefined;
         this.preview.tab = 'desc';
         this.preview.panel.title = ref.key;
@@ -94,6 +107,14 @@ export class IssuePanelManager implements vscode.Disposable {
     return true;
   }
 
+  /** Команда `jiraffe.downloadAttachment({instanceId, key, id})`: вложение открытой карточки. */
+  downloadAttachment(ref: IssueRef, id: string): boolean {
+    const e = this.find(ref);
+    if (!e?.card || !isAttachmentId(id)) return false;
+    void this.withAttachments(e, (ctx) => this.attachments.download(ctx, id));
+    return true;
+  }
+
   private find(ref: IssueRef): Entry | undefined {
     return this.pinned.get(idOf(ref)) ?? (this.preview && idOf(this.preview.ref) === idOf(ref) ? this.preview : undefined);
   }
@@ -121,7 +142,7 @@ export class IssuePanelManager implements vscode.Disposable {
       styleUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(root, 'common.css')).toString(),
       title: ref.key,
     });
-    const e: Entry = { panel, ref, tab: 'desc', pinned: false, ready: false, seq: 0, disposed: false };
+    const e: Entry = { panel, ref, files: [], inlineUrls: [], tab: 'desc', pinned: false, ready: false, seq: 0, disposed: false };
     panel.webview.onDidReceiveMessage((m: ViewToHost) => this.onMessage(e, m));
     panel.onDidChangeViewState(() => {
       if (panel.active) this.active = e;
@@ -145,13 +166,17 @@ export class IssuePanelManager implements vscode.Disposable {
     try {
       const inst = this.store.get(ref.instanceId);
       if (!inst) throw new Error('инстанс удалён — добавьте его заново');
-      const card = await loadCard(await this.meta.client(inst), inst, ref.key);
+      const loaded = await loadCard(await this.meta.client(inst), inst, ref.key);
       if (e.disposed || e.seq !== seq) return;
-      e.card = card;
+      e.card = loaded.card;
+      e.files = loaded.files;
+      e.inlineUrls = loaded.inlineUrls;
       e.error = undefined;
     } catch (err) {
       if (e.disposed || e.seq !== seq) return;
       e.card = undefined;
+      e.files = [];
+      e.inlineUrls = [];
       e.error = errText(err);
     }
     this.render(e);
@@ -172,6 +197,10 @@ export class IssuePanelManager implements vscode.Disposable {
     const ref = e.ref;
     // Действие из устаревшего вида (preview уже переключили на другую задачу) не должно попасть в новую.
     if (CARD_ACTIONS.has(m.type) && (m as { key?: unknown }).key !== ref.key) return;
+    if (ATTACHMENT_ACTIONS.has(m.type)) {
+      const a = m as { instanceId?: unknown; key?: unknown };
+      if (a.instanceId !== ref.instanceId || a.key !== ref.key || !e.card) return;
+    }
     switch (m.type) {
       case 'ready':
         e.ready = true;
@@ -204,7 +233,46 @@ export class IssuePanelManager implements vscode.Disposable {
       case 'openExternal':
         openExternal(m.url);
         break;
+      case 'loadImages':
+        if (Array.isArray(m.ids)) this.loadImages(e, m.ids.slice(0, MAX_IMAGE_IDS).filter(isImageId));
+        break;
+      case 'downloadAttachment':
+        if (isAttachmentId(m.id)) void this.withAttachments(e, (ctx) => this.attachments.download(ctx, m.id));
+        break;
+      case 'openAttachment':
+        if (isAttachmentId(m.id)) void this.withAttachments(e, (ctx) => this.attachments.openInEditor(ctx, m.id));
+        break;
+      case 'downloadAll':
+        void this.withAttachments(e, (ctx) => this.attachments.downloadAll(ctx));
+        break;
     }
+  }
+
+  /** Контекст вложений текущей карточки (снимок: смена задачи в preview на уже начатое скачивание не влияет). */
+  private async withAttachments(e: Entry, fn: (ctx: AttachmentContext) => Promise<void>): Promise<void> {
+    const inst = this.store.get(e.ref.instanceId);
+    if (!inst || !e.card) return;
+    const seq = e.seq;
+    try {
+      const client = await this.meta.client(inst);
+      await fn({ inst, client, key: e.ref.key, files: e.files, inlineUrls: e.inlineUrls, alive: () => !e.disposed && e.seq === seq });
+    } catch (err) {
+      void vscode.window.showErrorMessage(`Jiraffe: ${noticeText(errText(err))}`);
+    }
+  }
+
+  /** Картинки уходят в webview по одной, по мере скачивания; ответ для устаревшей карточки (seq) отбрасывается. */
+  private loadImages(e: Entry, ids: string[]): void {
+    const seq = e.seq;
+    const { instanceId, key } = e.ref;
+    void this.withAttachments(e, async (ctx) => {
+      await Promise.all([...new Set(ids)].map(async (id) => {
+        const r = await this.attachments.image(ctx, id);
+        if (e.disposed || e.seq !== seq || !e.ready) return;
+        const msg: HostToView = { type: 'attachmentPreview', instanceId, key, id, ...r };
+        void e.panel.webview.postMessage(msg);
+      }));
+    });
   }
 }
 

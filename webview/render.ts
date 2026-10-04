@@ -2,11 +2,11 @@
 // Inline-стили не используем (CSP): цвета и ширины проставляет issue.ts через CSSOM по data-атрибутам.
 import { formatDuration } from '../src/duration';
 import type { UserRef } from '../src/jira/types';
-import { ISSUE_TABS, type IssueCard, type IssueTab } from '../src/panels/protocol';
+import { ISSUE_TABS, type AttachmentView, type IssueCard, type IssueTab } from '../src/panels/protocol';
 
 export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const TAB_LABEL: Record<IssueTab, string> = { desc: 'Описание', com: 'Комментарии', hist: 'История', wl: 'Журнал работ' };
+const TAB_LABEL: Record<IssueTab, string> = { desc: 'Описание', att: 'Вложения', com: 'Комментарии', hist: 'История', wl: 'Журнал работ' };
 const STATUS_LABEL = { new: 'Открыта', indeterminate: 'В работе', done: 'Готово' } as const;
 
 const st = 'fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"';
@@ -16,6 +16,8 @@ const IC = {
   ext: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-6 6M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" ${st}/></svg>`,
   clock: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.8" ${st}/><path d="M8 4.6V8l2.4 1.5" ${st}/></svg>`,
   info: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" ${st}/><path d="M8 7.3v4M8 4.9v.1" ${st}/></svg>`,
+  dl: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.6 7.2L8 10.6l3.4-3.4M3 13.5h10" ${st}/></svg>`,
+  file: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.8h5l3.2 3.2v9.2H4zM9 1.8V5h3.2" ${st}/></svg>`,
   pin: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5l4 4-2 .8-2 2 .3 3-1 1-2.6-2.6-3.6 3.6M6.2 5.8l1.2-1.2z" ${st}/></svg>`,
 };
 
@@ -80,7 +82,7 @@ const dash = '<span class="mut">—</span>';
 const clip = (s: string, n = 300): string => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 export function renderTabs(c: IssueCard, tab: IssueTab): string {
-  const counts: Record<IssueTab, number | undefined> = { desc: undefined, com: c.issue.comments.length, hist: c.issue.history.length + 1, wl: c.worklogs.length };
+  const counts: Record<IssueTab, number | undefined> = { desc: undefined, att: c.attachments.length, com: c.issue.comments.length, hist: c.issue.history.length + 1, wl: c.worklogs.length };
   return `<div class="subtabs" role="tablist">${ISSUE_TABS.map((t) =>
     `<button class="${t === tab ? 'on' : ''}" role="tab" aria-selected="${t === tab}" data-act="tab" data-tab="${t}">${TAB_LABEL[t]}${counts[t] != null ? `<span class="cnt">${counts[t]}</span>` : ''}</button>`,
   ).join('')}</div>`;
@@ -88,6 +90,49 @@ export function renderTabs(c: IssueCard, tab: IssueTab): string {
 
 export function renderDescription(c: IssueCard): string {
   return `<div class="rich">${c.issue.descriptionHtml || '<p class="mut">Описание не заполнено.</p>'}</div>`;
+}
+
+/** Размер файла по-человечески: `512 Б`, `12 КБ`, `1,4 МБ`. */
+export function fmtSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '—';
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} МБ`;
+}
+
+const fileExt = (name: string): string => {
+  const m = /\.([^.\s]{1,8})$/.exec(name);
+  return m ? `.${m[1].toLowerCase()}` : '';
+};
+const attInfo = (a: AttachmentView): string => [fmtSize(a.size), a.author?.name, a.created ? fmtDate(a.created) : ''].filter(Boolean).join(' · ');
+
+/**
+ * Вкладка «Вложения» (prototype: sub=='att'). Превью картинок — `span.img-ph[data-img="tID"]`: issue.ts просит их у хоста
+ * и вставляет `data:`-картинку. Кнопки шлют id вложения; что качать и куда сохранять — решает хост.
+ */
+export function renderAttachments(c: IssueCard): string {
+  const list = c.attachments;
+  if (!list.length) return '<p class="mut">Вложений нет.</p>';
+  const cards = list.map((a) => {
+    const thumb = a.image
+      ? `<button class="th" data-act="img" data-id="${esc(a.id)}" aria-label="Открыть ${esc(a.filename)}"><span class="img-ph" data-img="t${esc(a.id)}">загрузка…</span></button>`
+      : `<div class="th file">${IC.file}<span>${esc(fileExt(a.filename) || 'файл')}</span></div>`;
+    return `<div class="att">${thumb}<div class="inf"><span class="nm" title="${esc(a.filename)}">${esc(a.filename)}</span><span class="mut">${esc(attInfo(a))}</span></div>`
+      + `<div class="ab">${a.text ? `<button class="btn sm" data-act="openAtt" data-id="${esc(a.id)}">Открыть в редакторе</button>` : ''}`
+      + `<button class="btn sm" data-act="dl" data-id="${esc(a.id)}" aria-label="Скачать ${esc(a.filename)}" title="Скачать">${IC.dl}</button></div></div>`;
+  }).join('');
+  return `<div class="toolbar"><span class="mut sm">${list.length} файл(а) · картинки скачиваются расширением с авторизацией и показываются здесь</span><span class="sp"></span>`
+    + `<button class="btn sm" data-act="dlAll">${IC.dl} Скачать все</button></div><div class="att-grid">${cards}</div>`;
+}
+
+/**
+ * Лайтбокс: вложение (`fID`, с кнопкой «Скачать») или картинка описания (`iN`, уже скачанная). Картинку вставляет issue.ts
+ * по `data-img`, пока её нет — «загрузка…».
+ */
+export function renderLightbox(imgId: string, name: string, att?: AttachmentView): string {
+  return `<div class="ov" data-act="ov-bg"><div class="lb-box" role="dialog" aria-label="${esc(name)}"><span class="img-ph" data-img="${esc(imgId)}">загрузка…</span>`
+    + `<div class="hrow"><span class="nm">${esc(name)}</span>${att ? `<span class="mut sm">${esc(attInfo(att))}</span>` : ''}<span class="sp"></span>`
+    + `${att ? `<button class="btn sm" data-act="dl" data-id="${esc(att.id)}">${IC.dl} Скачать</button>` : ''}<button class="btn sm" data-act="ov-x">Закрыть</button></div></div></div>`;
 }
 
 export function renderComments(c: IssueCard): string {
@@ -139,7 +184,7 @@ export function renderMeta(c: IssueCard): string {
 export function renderCard(c: IssueCard, tab: IssueTab): string {
   const i = c.issue;
   const project = i.key.split('-')[0];
-  const body = tab === 'com' ? renderComments(c) : tab === 'hist' ? renderHistory(c) : tab === 'wl' ? renderWorklog(c) : renderDescription(c);
+  const body = tab === 'att' ? renderAttachments(c) : tab === 'com' ? renderComments(c) : tab === 'hist' ? renderHistory(c) : tab === 'wl' ? renderWorklog(c) : renderDescription(c);
   return `<div class="iv">
     <div class="iv-head">
       <div class="crumbs">${IC.server} ${esc(c.instanceName)}<span>›</span>${esc(project)}${i.epic ? `<span>›</span><button class="ln" data-act="epic" data-key="${esc(i.epic.key)}">${esc(i.epic.key)}</button>` : ''}<span>›</span>${typeIcon(i.type)}<span class="k">${esc(i.key)}</span></div>

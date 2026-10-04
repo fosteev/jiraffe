@@ -119,6 +119,25 @@ pre { font: 12px/1.5 var(--mono); background: var(--code-bg); border: 1px solid 
 pre code { background: none; padding: 0; }
 .img-ph { display: inline-block; padding: 2px 8px; border: 1px dashed var(--bd); border-radius: 3px; color: var(--mut); font-size: 12px; }
 
+.img-ph.err { color: var(--vscode-errorForeground); border-color: var(--vscode-inputValidation-errorBorder, var(--bd)); }
+.rich img.zoom { cursor: zoom-in; height: auto; border-radius: 3px; }
+
+/* вложения (prototype: .att-grid/.att, лайтбокс .ov/.lb-box) */
+.att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.att { border: 1px solid var(--bd); border-radius: 6px; overflow: hidden; background: var(--vscode-sideBar-background, var(--hov)); display: flex; flex-direction: column; min-width: 0; }
+.att .th { height: 160px; display: grid; place-items: center; background: var(--hov); cursor: zoom-in; overflow: hidden; border: 0; padding: 0; width: 100%; color: var(--mut); }
+.att .th img { max-width: 100%; max-height: 160px; object-fit: contain; }
+.att .th.file { cursor: default; gap: 4px; align-content: center; font: 600 13px var(--mono); }
+.att .th.file svg { height: 40px; width: 40px; }
+.att .inf { padding: 8px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.att .nm { color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att .ab { display: flex; gap: 6px; padding: 0 10px 10px; flex-wrap: wrap; margin-top: auto; }
+.ov { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; justify-content: center; align-items: flex-start; padding: 40px 16px 16px; z-index: 30; }
+.lb-box { background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); border: 1px solid var(--bd); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; max-height: 100%; overflow: auto; }
+.lb-box img { max-width: 100%; max-height: 75vh; height: auto; }
+.lb-box .hrow { width: 100%; }
+.lb-box .nm { color: var(--fg2); overflow-wrap: anywhere; }
+
 /* комментарии */
 .cm { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--bd); }
 .cm:last-of-type { border-bottom: 0; }
