@@ -70,12 +70,46 @@ export class JiraClient {
   /** Стандартный журнал работ (Tempo-атрибуты — этап 6). Старые записи — как отдал Jira, без догрузки страниц. */
   async worklogs(key: string): Promise<Worklog[]> {
     try {
-      const r = await this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/worklog`);
-      return asArray(r?.worklogs).map((w) => mapWorklog(this.kind, w));
+      const path = `/rest/api/2/issue/${encodeURIComponent(key)}/worklog`;
+      const r = await this.http.getJson<Raw>(path);
+      const all = asArray(r?.worklogs);
+      // DC обычно отдаёт весь журнал, Cloud — до 5000; если ответ всё же постраничный — дочитываем (не больше 10 страниц).
+      const total = typeof r?.total === 'number' ? r.total : all.length;
+      for (let page = 0; page < 10 && all.length < total; page++) {
+        const more = asArray((await this.http.getJson<Raw>(path, { startAt: all.length }))?.worklogs);
+        if (!more.length) break;
+        all.push(...more);
+      }
+      return all.map((w) => mapWorklog(this.kind, w));
     } catch (e) {
       if (e instanceof JiraError && (e.status === 403 || e.status === 404)) return [];
       throw e;
     }
+  }
+
+  /**
+   * Стандартная запись ворклога: `POST /rest/api/2/issue/{key}/worklog?adjustEstimate=…` (по умолчанию `leave` — как в
+   * скриптах: остаток оценки не трогаем). `started` — с локальным смещением (`startedWithOffset`), комментарий — строкой (API v2).
+   */
+  async addWorklog(
+    key: string,
+    w: { started: string; timeSpentSec: number; comment: string },
+    adjustEstimate: 'leave' | 'auto' = 'leave',
+  ): Promise<{ id?: string }> {
+    const body = { started: w.started, timeSpentSeconds: w.timeSpentSec, ...(w.comment ? { comment: w.comment } : {}) };
+    const r = await this.http.postJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/worklog`, body, { adjustEstimate });
+    return r && r.id !== undefined ? { id: String(r.id) } : {};
+  }
+
+  /** Учёт времени задачи (секунды) — свежий, прямо перед записью в Tempo. */
+  async timetracking(key: string): Promise<{ originalSec?: number; remainingSec?: number; spentSec?: number }> {
+    const r = await this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}`, { fields: 'timetracking' });
+    const t: Raw = r?.fields?.timetracking ?? {};
+    const n = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+    const o = n(t.originalEstimateSeconds);
+    const rem = n(t.remainingEstimateSeconds);
+    const s = n(t.timeSpentSeconds);
+    return { ...(o !== undefined ? { originalSec: o } : {}), ...(rem !== undefined ? { remainingSec: rem } : {}), ...(s !== undefined ? { spentSec: s } : {}) };
   }
 
   /**

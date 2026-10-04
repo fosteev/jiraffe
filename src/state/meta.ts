@@ -1,6 +1,7 @@
 // Кэш справочников инстансов (проекты, типы, приоритеты) и фабрика клиентов.
 // vscode не импортирует — тестируется в vitest.
-import { createJiraClient, type JiraClient, type NamedRef, type ProjectRef } from '../jira/client';
+import { createJiraClient, type JiraClient, type MyselfInfo, type NamedRef, type ProjectRef } from '../jira/client';
+import { TempoClient, type WorkAttribute } from '../jira/tempo';
 import type { Instance } from '../jira/types';
 import type { InstanceStore } from './instances';
 
@@ -11,6 +12,8 @@ export class InstanceMeta {
   private projectsC = new Map<string, Promise<ProjectRef[]>>();
   private typesC = new Map<string, Promise<NamedRef[]>>();
   private prioritiesC = new Map<string, Promise<NamedRef[]>>();
+  private myselfC = new Map<string, Promise<MyselfInfo>>();
+  private attrsC = new Map<string, Promise<WorkAttribute[]>>();
 
   constructor(
     private readonly store: InstanceStore,
@@ -41,10 +44,23 @@ export class InstanceMeta {
     return this.cached(this.prioritiesC, inst, (c) => c.priorities());
   }
 
+  /** Текущий пользователь инстанса (логин на DC — автор ворклога Tempo, id — фильтр «мои ворклоги»). */
+  myself(inst: Instance): Promise<MyselfInfo> {
+    return this.cached(this.myselfC, inst, (c) => c.myself());
+  }
+
+  /** Рабочие атрибуты Tempo (`/rest/tempo-core/1/work-attribute`); без Tempo — пусто, без запроса. */
+  workAttributes(inst: Instance): Promise<WorkAttribute[]> {
+    if (!inst.caps?.tempo) return Promise.resolve([]);
+    return this.cached(this.attrsC, inst, (c) => new TempoClient(c.http).attributes());
+  }
+
   invalidate(): void {
     this.projectsC.clear();
     this.typesC.clear();
     this.prioritiesC.clear();
+    this.myselfC.clear();
+    this.attrsC.clear();
   }
 
   /** Успешный ответ кэшируется, ошибка — нет (следующий вызов пойдёт в сеть заново). */

@@ -30,6 +30,50 @@ async function perInstance<T>(instances: Instance[], load: (i: Instance) => Prom
   return { ok, failed };
 }
 
+/**
+ * Ключ задачи (аргумент или InputBox) → `IssueRef`: инстанс по префиксу проекта (кэш проектов), при неоднозначности — QuickPick.
+ * Общий для `openIssueByKey` и `logWork` из палитры без открытой карточки.
+ */
+export async function pickIssueRef(store: InstanceStore, meta: InstanceMeta, arg?: unknown, title = 'Открыть задачу по ключу'): Promise<IssueRef | undefined> {
+  const all = store.list();
+  if (!all.length) {
+    const act = await vscode.window.showInformationMessage('Jiraffe: нет ни одного инстанса', 'Добавить');
+    if (act) await vscode.commands.executeCommand('jiraffe.addInstance');
+    return undefined;
+  }
+  let key = typeof arg === 'string' ? arg : undefined;
+  if (!key) {
+    key = await vscode.window.showInputBox({
+      title,
+      prompt: 'Например ABC-123',
+      validateInput: (v) => (isIssueKey(v) ? undefined : 'Ключ вида ABC-123'),
+    });
+  }
+  if (!key) return undefined;
+  key = key.trim().toUpperCase();
+  if (!isIssueKey(key)) {
+    void vscode.window.showWarningMessage(`Jiraffe: «${key.slice(0, 64)}» — не ключ задачи (нужен вида ABC-123)`);
+    return undefined;
+  }
+  let target: Instance | undefined;
+  if (all.length === 1) {
+    target = all[0];
+  } else {
+    const { ok } = await withProgress('Jiraffe: определяю инстанс по ключу…', () => perInstance(all, (i) => meta.projects(i)));
+    const matches = matchInstancesByKey(key, new Map(ok.map(([i, ps]) => [i.id, ps])));
+    if (matches.length === 1) target = store.get(matches[0]);
+    else {
+      const pool = matches.length ? all.filter((i) => matches.includes(i.id)) : all;
+      const picked = await vscode.window.showQuickPick(
+        pool.map((i) => ({ label: i.name, description: hostOf(i.baseUrl), instance: i })),
+        { placeHolder: matches.length ? `Проект ${key.split('-')[0]} есть на нескольких инстансах — какой?` : `Проект ${key.split('-')[0]} не найден — на каком инстансе искать ${key}?` },
+      );
+      target = picked?.instance;
+    }
+  }
+  return target ? { instanceId: target.id, key } : undefined;
+}
+
 export function registerFilterCommands(
   store: InstanceStore,
   filters: FilterState,
@@ -37,6 +81,8 @@ export function registerFilterCommands(
   issues: IssuesTree,
   refreshFilters: () => void,
   panels: IssuePanelManager,
+  /** Что ещё обновить по `jiraffe.refresh` (сводка «сегодня» — этап 6). */
+  onRefresh: () => void = () => undefined,
 ): vscode.Disposable[] {
   const needInstances = async (): Promise<Instance[] | undefined> => {
     const all = store.list();
@@ -177,39 +223,8 @@ export function registerFilterCommands(
   }
 
   async function openByKey(arg?: unknown): Promise<void> {
-    const all = await needInstances();
-    if (!all) return;
-    let key = typeof arg === 'string' ? arg : undefined;
-    if (!key) {
-      key = await vscode.window.showInputBox({
-        title: 'Открыть задачу по ключу',
-        prompt: 'Например ABC-123',
-        validateInput: (v) => (isIssueKey(v) ? undefined : 'Ключ вида ABC-123'),
-      });
-    }
-    if (!key) return;
-    key = key.trim().toUpperCase();
-    if (!isIssueKey(key)) {
-      void vscode.window.showWarningMessage(`Jiraffe: «${key.slice(0, 64)}» — не ключ задачи (нужен вида ABC-123)`);
-      return;
-    }
-    let target: Instance | undefined;
-    if (all.length === 1) {
-      target = all[0];
-    } else {
-      const { ok } = await withProgress('Jiraffe: определяю инстанс по ключу…', () => perInstance(all, (i) => meta.projects(i)));
-      const matches = matchInstancesByKey(key, new Map(ok.map(([i, ps]) => [i.id, ps])));
-      if (matches.length === 1) target = store.get(matches[0]);
-      else {
-        const pool = matches.length ? all.filter((i) => matches.includes(i.id)) : all;
-        const picked = await vscode.window.showQuickPick(
-          pool.map((i) => ({ label: i.name, description: hostOf(i.baseUrl), instance: i })),
-          { placeHolder: matches.length ? `Проект ${key.split('-')[0]} есть на нескольких инстансах — какой?` : `Проект ${key.split('-')[0]} не найден — на каком инстансе искать ${key}?` },
-        );
-        target = picked?.instance;
-      }
-    }
-    if (target) await vscode.commands.executeCommand('jiraffe.openIssue', { instanceId: target.id, key } satisfies IssueRef);
+    const ref = await pickIssueRef(store, meta, arg);
+    if (ref) await vscode.commands.executeCommand('jiraffe.openIssue', ref);
   }
 
   return [
@@ -261,6 +276,7 @@ export function registerFilterCommands(
       meta.invalidate();
       issues.refresh();
       refreshFilters();
+      onRefresh();
     }),
   ];
 }
