@@ -11,6 +11,9 @@ import { loadToday, localDate } from '../src/jira/worklog';
 import type { InstanceKind, SearchPage } from '../src/jira/types';
 import { sanitizeDetail } from '../src/jira/sanitize';
 import { buildJql } from '../src/jql';
+import { loadEpics } from '../src/jira/epics';
+import { loadEpicPage, loadReleasePage } from '../src/panels/list';
+import { visibleVersions } from '../src/views/format';
 
 interface Target { id: string; kind: InstanceKind; urlEnv: string; defUrl: string; tokenEnv: string; expect: { tempo: boolean; epic: string | null } }
 
@@ -145,12 +148,50 @@ async function tempoCheck(t: Target, c: ReturnType<typeof createJiraClient>, cap
   return { row: [t.id, attrs.map((a) => `${a.name} [${a.key}, ${a.type}${a.required ? ', обяз.' : ''}]`).join('; ') || 'нет', `${recent.length} / ${withAttrs}`, cardAttrs, todayText, `${formatDuration(viaJql.totalSec)} ${same}`], totalSec: today.totalSec };
 }
 
+
+/**
+ * Этап 7 (только GET): эпики проекта (GARM на Pilot, NEWMFC на sccloud, иначе первый проект) с прогрессом, вкладка первого эпика
+ * со строками, версии проекта со счётчиками и вкладка первой версии с задачами. Ключи и названия не печатаем — только числа.
+ */
+async function epicsReleasesCheck(t: Target, c: ReturnType<typeof createJiraClient>, caps: Awaited<ReturnType<typeof detectCapabilities>>, baseUrl: string): Promise<string[]> {
+  const inst = { id: t.id, name: t.id, kind: t.kind, baseUrl, caps };
+  const projects = await c.projects();
+  const want = t.id === 'pilot' ? 'GARM' : t.id === 'sccloud' ? 'NEWMFC' : process.env.JIRA_CLOUD_PROJECT;
+  const proj = projects.find((p) => p.key === want) ?? projects[0];
+  if (!proj) return [t.id, 'нет проектов'];
+  const list = await loadEpics(c, inst, proj.key, { maxResults: 50 });
+  const withProgress = list.epics.filter((e) => e.progress).length;
+  const first = list.epics.find((e) => e.progress?.total) ?? list.epics[0];
+  let epicText = '—';
+  if (first) {
+    const page = await loadEpicPage(c, inst, first.key);
+    const p = page.progress;
+    if (p.total !== page.rows.length) throw new Error(`строк ${page.rows.length} != прогресс ${p.total}`);
+    // Прогресс в списке и на вкладке считаются разными запросами — должны совпасть (если ничего не усечено).
+    if (first.progress && !first.partial && first.progress.total !== p.total) throw new Error(`список ${first.progress.total} != вкладка ${p.total}`);
+    epicText = `${p.done}/${p.total} (в работе ${p.prog}, не начато ${p.todo}), строк ${page.rows.length}${page.truncated ? '+' : ''}`;
+  }
+  const versions = await c.versions(proj.key);
+  const shown = visibleVersions(versions).versions;
+  const counts = await Promise.all(shown.slice(0, 5).map((v) => c.versionIssueCount(v.id)));
+  let relText = '—';
+  const v = shown.find((x, i) => (counts[i] ?? 0) > 0) ?? shown[0];
+  if (v) {
+    const page = await loadReleasePage(c, inst, v.id, (pid) => projects.find((p) => p.id === pid)?.key, localDate());
+    relText = `${page.progress.done}/${page.progress.total}, строк ${page.rows.length}, проект ${page.project === proj.key ? 'ок' : 'НЕ ОПРЕДЕЛЁН'}`;
+    const idx = shown.indexOf(v);
+    if (idx < counts.length && counts[idx] !== page.rows.length && !page.truncated) throw new Error(`счётчик ${counts[idx]} != задач ${page.rows.length}`);
+  }
+  return [t.id, proj.key, `${list.epics.length}${list.next ? '+' : ''} (с прогрессом ${withProgress})`, epicText, `${versions.length} (выпущено ${versions.filter((x) => x.released).length})`, counts.join(',') || '—', relText];
+}
+
 async function main(): Promise<void> {
   const rows: string[][] = [['инстанс', 'пользователь', 'tempo', 'epicLinkField', 'задач', 'ожидание']];
   const jqlRows: string[][] = [['инстанс', 'проектов', 'типов', 'приоритетов', 'избр.фильтров', 'на мне', 'проект', 'быстрые+текст', 'готово', 'JQL-режим']];
   const cardRows: string[][] = [['инстанс', 'категория', 'описание, симв.', 'комментариев', 'история', 'ворклогов', 'спент/сумма', 'наблюдателей', 'эпик', 'релизов', 'вложений']];
   const attRows: string[][] = [['инстанс', 'задача', 'вложений', 'скачано (tmp, удалено)', 'превью', 'картинок в описании']];
   const tempoRows: string[][] = [['инстанс', 'атрибуты Tempo', 'Tempo 14д: ворклогов / с атрибутами', 'журнал карточки', 'сегодня', 'сегодня через JQL']];
+  const epicRows: string[][] = [['инстанс', 'проект', 'эпиков', 'первый эпик: готово/всего', 'версий', 'счётчики первых 5', 'релиз: готово/всего']];
   let todayTotal = 0;
   let mismatches = 0;
   for (const t of targets) {
@@ -187,6 +228,12 @@ async function main(): Promise<void> {
         attRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
       }
       try {
+        epicRows.push(await epicsReleasesCheck(t, c, caps, baseUrl));
+      } catch (e) {
+        mismatches++;
+        epicRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
+      }
+      try {
         const r = await tempoCheck(t, c, caps, me);
         tempoRows.push(r.row);
         todayTotal += r.totalSec;
@@ -200,7 +247,7 @@ async function main(): Promise<void> {
     }
   }
   tempoRows.push(['ВСЕГО', '', '', '', `сегодня ${formatDuration(todayTotal)}`, '']);
-  for (const table of [rows, jqlRows, cardRows, attRows, tempoRows]) {
+  for (const table of [rows, jqlRows, cardRows, attRows, epicRows, tempoRows]) {
     const w = table[0].map((_, i) => Math.max(...table.map((r) => (r[i] ?? '').length)));
     for (const r of table) console.log(r.map((c, i) => c.padEnd(w[i])).join('  '));
     console.log('');

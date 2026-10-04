@@ -1,6 +1,6 @@
 // Сообщения host ↔ webview: типы и пара чистых проверок. Импортируются и хостом, и webview.
 import type { WorkAttribute } from '../jira/tempo';
-import type { Attachment, IssueDetail, Worklog } from '../jira/types';
+import type { Attachment, IssueDetail, Progress, StatusCategory, UserRef, Worklog } from '../jira/types';
 import type { LogDraft, LogForm, TodayInstance } from '../jira/worklog';
 import { ISSUE_KEY_RE } from '../jql';
 
@@ -117,3 +117,65 @@ export type TempoToHost =
   | { type: 'logWork' }
   | { type: 'refresh' }
   | { type: 'addInstance' };
+
+// ----- вкладки эпика и релиза (этап 7) -----
+
+/** Строка таблицы эпика/релиза. `extra` — релиз (в эпике) или название эпика (в релизе). Адресов Jira здесь нет. */
+export interface ListRow {
+  key: string;
+  summary: string;
+  type: string;
+  status: string;
+  statusCategory: StatusCategory;
+  priority?: string;
+  assignee?: UserRef;
+  extra?: string;
+}
+
+interface ListPageBase {
+  instanceId: string;
+  instanceName: string;
+  /** Ключ проекта (для крошек); пустой, если не удалось определить. */
+  project: string;
+  progress: Progress;
+  rows: ListRow[];
+  /** Задач больше лимита запроса: показаны первые, прогресс — по ним. */
+  truncated: boolean;
+}
+
+export interface EpicPage extends ListPageBase {
+  type: 'epic';
+  key: string;
+  summary: string;
+  status: string;
+  statusCategory: StatusCategory;
+  /** DC: id поля Epic Link; Cloud: `parent`; `null` — поля нет, задач эпика не найти. */
+  link: string | null;
+  kind: 'dc' | 'cloud';
+}
+
+export interface ReleasePage extends ListPageBase {
+  type: 'release';
+  id: string;
+  name: string;
+  description?: string;
+  released: boolean;
+  startDate?: string;
+  releaseDate?: string;
+  /** Дней до выпуска (не выпущен, дата задана; отрицательное — просрочен). */
+  daysLeft?: number;
+}
+
+export type ListPage = EpicPage | ReleasePage;
+
+/** `kind` + `id` — какая вкладка запрашивала: эпик (`id` = ключ) или релиз (`id` = id версии). */
+export type HostToList =
+  | { type: 'loading'; kind: ListPage['type']; instanceId: string; id: string }
+  | { type: 'error'; kind: ListPage['type']; instanceId: string; id: string; message: string }
+  | { type: 'page'; data: ListPage };
+
+export type ListToHost =
+  | { type: 'ready' }
+  | { type: 'openIssue'; instanceId: string; key: string }
+  | { type: 'openInBrowser'; instanceId: string; kind: ListPage['type']; id: string }
+  | { type: 'refresh'; instanceId: string; kind: ListPage['type']; id: string };

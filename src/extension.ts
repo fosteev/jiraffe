@@ -2,36 +2,29 @@ import * as vscode from 'vscode';
 import { registerInstanceCommands } from './commands/instances';
 import { registerFilterCommands } from './commands/filters';
 import { registerIssueCommands } from './commands/issue';
+import { registerSectionCommands } from './commands/sections';
 import { registerLogWorkCommand, WorklogService } from './commands/logWork';
 import { AttachmentService } from './panels/attachments';
 import { IssuePanelManager } from './panels/issuePanel';
+import { ListPanelManager } from './panels/listPanel';
 import { FilterState } from './state/filters';
 import { InstanceStore } from './state/instances';
 import { InstanceMeta } from './state/meta';
+import { EPIC_PROJECT_KEY, RELEASE_PROJECT_KEY, SectionProject } from './state/sectionProject';
 import { TodayService } from './state/today';
 import { localDate } from './jira/worklog';
+import { EpicsTree } from './views/epicsTree';
 import { FiltersTree } from './views/filtersTree';
 import { IssuesTree } from './views/issuesTree';
+import { ReleasesTree } from './views/releasesTree';
 import { TodayStatusBar } from './views/statusBar';
 import { TempoViewProvider } from './views/tempoView';
-
-class EmptyTree implements vscode.TreeDataProvider<never> {
-  getTreeItem(): vscode.TreeItem {
-    throw new Error('empty tree has no items');
-  }
-  getChildren(): never[] {
-    return [];
-  }
-}
 
 /** Сводку «сегодня» перечитываем, когда окно вернули в фокус (не чаще раза в 5 минут) и раз в 15 минут, пока окно в фокусе. */
 const FOCUS_REFRESH_MS = 5 * 60_000;
 const TIMER_REFRESH_MS = 15 * 60_000;
 
 export function activate(context: vscode.ExtensionContext): void {
-  for (const id of ['jiraffe.epics', 'jiraffe.releases']) {
-    context.subscriptions.push(vscode.window.registerTreeDataProvider(id, new EmptyTree()));
-  }
   const instances = new InstanceStore(context.globalState, context.secrets);
   const filters = new FilterState(context.globalState);
   const meta = new InstanceMeta(instances);
@@ -40,6 +33,15 @@ export function activate(context: vscode.ExtensionContext): void {
   const worklog = new WorklogService(instances, meta);
   const today = new TodayService(instances, meta);
   const panels = new IssuePanelManager(context.extensionUri, instances, meta, attachments, worklog);
+  const lists = new ListPanelManager(context.extensionUri, instances, meta);
+  const epicProject = new SectionProject(context.globalState, EPIC_PROJECT_KEY);
+  const releaseProject = new SectionProject(context.globalState, RELEASE_PROJECT_KEY);
+  const epicsTree = new EpicsTree(instances, epicProject, meta);
+  const releasesTree = new ReleasesTree(instances, releaseProject, meta);
+  const epicsView = vscode.window.createTreeView('jiraffe.epics', { treeDataProvider: epicsTree });
+  const releasesView = vscode.window.createTreeView('jiraffe.releases', { treeDataProvider: releasesTree });
+  epicsTree.attach(epicsView);
+  releasesTree.attach(releasesView);
   const tempoView = new TempoViewProvider(context.extensionUri, today, instances);
   let lastRefresh = 0;
   const refreshToday = (): void => {
@@ -60,10 +62,21 @@ export function activate(context: vscode.ExtensionContext): void {
     issuesTree,
     filtersTree,
     issuesView,
+    lists,
+    epicsTree,
+    releasesTree,
+    epicsView,
+    releasesView,
     vscode.window.createTreeView('jiraffe.filters', { treeDataProvider: filtersTree }),
     ...registerInstanceCommands(instances),
-    ...registerFilterCommands(instances, filters, meta, issuesTree, () => filtersTree.refresh(), panels, () => void today.refresh()),
-    ...registerIssueCommands(panels),
+    ...registerFilterCommands(instances, filters, meta, issuesTree, () => filtersTree.refresh(), panels, () => {
+      void today.refresh();
+      epicsTree.refresh();
+      releasesTree.refresh();
+      lists.reloadAll();
+    }),
+    ...registerIssueCommands(panels, lists),
+    ...registerSectionCommands(instances, meta, epicProject, releaseProject, epicsTree),
     ...registerLogWorkCommand(worklog, panels, instances, meta),
     today,
     new TodayStatusBar(today, instances),

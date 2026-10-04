@@ -167,6 +167,20 @@
       {
         "command": "jiraffe.downloadAttachment",
         "title": "Jiraffe: Скачать вложение"
+      },
+      {
+        "command": "jiraffe.pickEpicProject",
+        "title": "Jiraffe: Выбрать проект эпиков",
+        "icon": "$(project)"
+      },
+      {
+        "command": "jiraffe.pickReleaseProject",
+        "title": "Jiraffe: Выбрать проект релизов",
+        "icon": "$(project)"
+      },
+      {
+        "command": "jiraffe.loadMoreEpics",
+        "title": "Jiraffe: Загрузить ещё эпики"
       }
     ],
     "menus": {
@@ -198,6 +212,10 @@
         {
           "command": "jiraffe.downloadAttachment",
           "when": "false"
+        },
+        {
+          "command": "jiraffe.loadMoreEpics",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -218,7 +236,7 @@
         },
         {
           "command": "jiraffe.refresh",
-          "when": "view == jiraffe.issues || view == jiraffe.filters",
+          "when": "view == jiraffe.issues || view == jiraffe.filters || view == jiraffe.epics || view == jiraffe.releases",
           "group": "navigation@9"
         },
         {
@@ -255,6 +273,16 @@
           "command": "jiraffe.refresh",
           "when": "view == jiraffe.tempo",
           "group": "navigation@2"
+        },
+        {
+          "command": "jiraffe.pickEpicProject",
+          "when": "view == jiraffe.epics",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jiraffe.pickReleaseProject",
+          "when": "view == jiraffe.releases",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [

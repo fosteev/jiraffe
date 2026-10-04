@@ -50,7 +50,7 @@ export function luceneEscape(s: string): string {
     .replace(/(^|\s)(AND|OR|NOT)(?=\s|$)/g, (_, sp: string, w: string) => sp + w.toLowerCase());
 }
 
-const projectRef = (key: string): string => (/^[A-Z][A-Z0-9_]*$/.test(key) ? key : quoteJql(key));
+export const projectRef = (key: string): string => (/^[A-Z][A-Z0-9_]*$/.test(key) ? key : quoteJql(key));
 
 /** Отделяет верхнеуровневый `ORDER BY …` (вне кавычек) от условий. */
 export function splitOrderBy(jql: string): { where: string; order: string } {

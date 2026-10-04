@@ -1,5 +1,7 @@
 // Чистые функции для деревьев (без vscode — тестируются в vitest).
-import type { IssueSummary, StatusCategory } from '../jira/types';
+import type { EpicItem } from '../jira/epics';
+import { sortVersions } from '../jira/epics';
+import type { IssueSummary, StatusCategory, Version } from '../jira/types';
 
 export const CATEGORY_LABEL: Record<StatusCategory, string> = { new: 'Открыта', indeterminate: 'В работе', done: 'Готово' };
 
@@ -41,4 +43,19 @@ export function hostOf(baseUrl: string): string {
   } catch {
     return baseUrl;
   }
+}
+
+/** Подпись прогресса эпика: `3/10` (`+` — задач больше лимита запроса, цифры приблизительные). */
+export const progressLabel = (e: EpicItem): string | undefined =>
+  e.progress ? `${e.progress.done}/${e.progress.total}${e.partial ? '+' : ''}` : undefined;
+
+/** Выпущенных версий показываем не больше (остальные — строкой «скрыто»): на каждую версию уходит GET со счётчиком. */
+export const MAX_RELEASED = 20;
+
+/** Версии к показу: все не выпущенные + последние выпущенные; `hidden` — сколько выпущенных не вошло. */
+export function visibleVersions(all: readonly Version[]): { versions: Version[]; hidden: number } {
+  const sorted = sortVersions(all);
+  const open = sorted.filter((v) => !v.released);
+  const done = sorted.filter((v) => v.released);
+  return { versions: [...open, ...done.slice(0, MAX_RELEASED)], hidden: Math.max(0, done.length - MAX_RELEASED) };
 }

@@ -13,13 +13,13 @@ import type { IssueRef, IssuesTree } from '../views/issuesTree';
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-const withProgress = <T>(title: string, task: () => Promise<T>): Thenable<T> =>
+export const withProgress = <T>(title: string, task: () => Promise<T>): Thenable<T> =>
   vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title }, task);
 
 const MODE_LABEL: Record<Mode, string> = { mine: 'На мне', project: 'Проект', jql: 'JQL' };
 
 /** Результаты по инстансам: упавшие не мешают остальным, список ошибок показываем одним предупреждением. */
-async function perInstance<T>(instances: Instance[], load: (i: Instance) => Promise<T>): Promise<{ ok: [Instance, T][]; failed: string[] }> {
+export async function perInstance<T>(instances: Instance[], load: (i: Instance) => Promise<T>): Promise<{ ok: [Instance, T][]; failed: string[] }> {
   const res = await Promise.allSettled(instances.map(load));
   const ok: [Instance, T][] = [];
   const failed: string[] = [];

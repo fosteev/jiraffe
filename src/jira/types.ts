@@ -17,3 +17,8 @@ export interface HistoryEntry { author?: UserRef; created: string; items: { fiel
 export interface Worklog { id: string; author?: UserRef; started: string; timeSpentSec: number; comment: string;
   attributes?: Record<string, string> }
 export interface SearchPage { issues: IssueSummary[]; next?: { startAt?: number; nextPageToken?: string }; total?: number }
+/** Версия (релиз) проекта: `/rest/api/2/project/{key}/versions` и `/version/{id}`. Даты — `YYYY-MM-DD`. */
+export interface Version { id: string; name: string; description?: string; released: boolean; archived: boolean;
+  startDate?: string; releaseDate?: string; overdue: boolean; projectId?: string }
+/** Прогресс набора задач по `statusCategory`: готово / в работе / не начато (отдельной категории «ревью» в Jira нет). */
+export interface Progress { total: number; done: number; prog: number; todo: number }
