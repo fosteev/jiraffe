@@ -1,6 +1,6 @@
 # Jiraffe MVP — расширение VS Code для Jira
 
-> Статус: этап 1 принят 2026-10-04 · следующий — этап 2 (сессия 2)
+> Статус: этап 2 принят 2026-10-04 · следующий — этап 3 (сессия 3) · ждёт пользователя: F5-проверка этапов 1–2 (`roadmap-mvp.pending.md`)
 > Исполнитель отмечает чекбоксы `- [x]` по ходу работы — только после проверки, не «вроде сделал».
 > Приёмка этапа (Opus, `/plan-review`) меняет баннер этапа и коммитит.
 
@@ -172,21 +172,38 @@ export interface SearchPage { issues: IssueSummary[]; next?: { startAt?: number;
 Слой данных без UI-списков: хранение инстансов, авторизация DC и Cloud, HTTP-клиент с ошибками,
 поиск с пагинацией, определение возможностей инстанса.
 
-- [ ] `src/jira/types.ts` — типы из раздела «Архитектура» дословно
-- [ ] `src/jira/http.ts`: DC → `Authorization: Bearer <token>`, Cloud → `Basic base64(email:token)`; `baseUrl` может содержать context path (`https://host/jira`); `JiraError { status, message, url }`; сообщения для 401/403/404/сети на русском
-- [ ] `src/jira/client.ts`: `myself`, `search(jql, fields, page)` (DC — `GET /rest/api/2/search?startAt=`, Cloud — `GET /rest/api/2/search/jql?nextPageToken=`), `issue(key, expand)`, `fields`, `projects`, `issueTypes`, `priorities`, `favouriteFilters` (`/rest/api/2/filter/favourite`)
-- [ ] `src/jira/mappers.ts`: raw → `IssueSummary`/`UserRef` (DC: `name`; Cloud: `accountId`)
-- [ ] `src/jira/capabilities.ts`: Tempo по `/rest/tempo-core/1/work-attribute` (200/404), Epic Link по `/rest/api/2/field`, `serverInfo` → версия
-- [ ] `src/state/instances.ts`: CRUD в `globalState` под `jiraffe.instances`, токены в `SecretStorage`; `id` = slug хоста
-- [ ] Команда `jiraffe.addInstance` — многошаговый QuickInput (URL → тип DC/Cloud → email для Cloud → токен → проверка `/myself` → имя), плюс `removeInstance`, `testConnection`, `refreshCapabilities`
-- [ ] `test/http.test.ts`, `test/client.test.ts` с моком `fetch`: заголовки обоих типов, context path, пагинация DC и Cloud, маппинг 401
-- [ ] `scripts/smoke.ts`: для каждого инстанса с заданным в env токеном — `myself`, `capabilities`, `search("assignee = currentUser() AND resolution = Unresolved", 5)`; печатает таблицу «инстанс / пользователь / tempo / epicLinkField / задач». **Только GET**
+- [x] `src/jira/types.ts` — типы из раздела «Архитектура» дословно
+- [x] `src/jira/http.ts`: DC → `Authorization: Bearer <token>`, Cloud → `Basic base64(email:token)`; `baseUrl` может содержать context path (`https://host/jira`); `JiraError { status, message, url }`; сообщения для 401/403/404/сети на русском
+- [x] `src/jira/client.ts`: `myself`, `search(jql, fields, page)` (DC — `GET /rest/api/2/search?startAt=`, Cloud — `GET /rest/api/2/search/jql?nextPageToken=`), `issue(key, expand)`, `fields`, `projects`, `issueTypes`, `priorities`, `favouriteFilters` (`/rest/api/2/filter/favourite`)
+- [x] `src/jira/mappers.ts`: raw → `IssueSummary`/`UserRef` (DC: `name`; Cloud: `accountId`)
+- [x] `src/jira/capabilities.ts`: Tempo по `/rest/tempo-core/1/work-attribute` (200/404), Epic Link по `/rest/api/2/field`, `serverInfo` → версия
+- [x] `src/state/instances.ts`: CRUD в `globalState` под `jiraffe.instances`, токены в `SecretStorage`; `id` = slug хоста
+- [ ] Команда `jiraffe.addInstance` — многошаговый QuickInput (URL → тип DC/Cloud → email для Cloud → токен → проверка `/myself` → имя), плюс `removeInstance`, `testConnection`, `refreshCapabilities` — *код и сборка есть, QuickInput-цепочку и remove/test/refresh в VS Code проверяет пользователь (F5)*
+- [x] `test/http.test.ts`, `test/client.test.ts` с моком `fetch`: заголовки обоих типов, context path, пагинация DC и Cloud, маппинг 401
+- [x] `scripts/smoke.ts`: для каждого инстанса с заданным в env токеном — `myself`, `capabilities`, `search("assignee = currentUser() AND resolution = Unresolved", 5)`; печатает таблицу «инстанс / пользователь / tempo / epicLinkField / задач». **Только GET**
 
 **Готово, когда:** `npm run build && npm run lint && npm test` зелёные; `npm run smoke` показывает
 для Pilot `tempo=true, epicLinkField=customfield_10100`, для sccloud и tatikoma `tempo=false,
 customfield_10102`, для Cloud `epicLinkField=null`, у каждого больше 0 задач (или честно 0).
 
 **Сессия:** sonnet, high; после этапа 1.
+
+**Решения (2026-10-04, по итогам сессии 2):**
+- Раскладка — как в «Архитектуре»: `src/jira/{types,http,client,mappers,capabilities}.ts`, `src/state/instances.ts`, `test/{http,client}.test.ts`, `scripts/smoke.ts`. Вне списка: `src/commands/instances.ts` (четыре команды инстансов — чтобы не раздувать `extension.ts`; в `extension.ts` только создание `InstanceStore` и `registerInstanceCommands`). В `package.json` добавлены 4 команды (`addInstance`, `removeInstance`, `testConnection`, `refreshCapabilities`). Заглушки деревьев/Tempo не тронуты.
+- Контракт: `HttpClient.getJson<T>(path, query?)` (только GET), `JiraError{status, message, url, code}`; `code`: `http` | `network` (status 0) | `format` (200, но не JSON). Токен ни в message, ни в url не попадает (тест). Таймаут 30 с (`AbortSignal.timeout`). `createJiraClient(instance, token, {fetchImpl?})` в `client.ts` — единая фабрика для команд и smoke. `JiraClient`: `myself`, `search(jql, fields?, {startAt|nextPageToken, maxResults})`, `issue(key, expand: string | string[])` (возвращает сырой JSON, маппинг в `IssueDetail` — этап 4), `fields`, `projects`, `issueTypes`, `priorities`, `favouriteFilters`, `serverVersion`. `SearchPage`: DC — `next.startAt` пока `startAt+len < total`; Cloud — `next.nextPageToken`, пока `!isLast`; у Cloud `total` нет (поэтому в smoke «5+»). `fields` по умолчанию — `SUMMARY_FIELDS`. `InstanceStore` не импортирует vscode (только `import type`), поэтому тестируется в vitest; есть `onDidChange(fn)` — для деревьев этапа 3. `id` инстанса — slug `host+path` (`atlassian-tatikoma-ru-jira`); повторное добавление того же URL — модальное «Заменить?».
+- Отступление от формулировки плана: **Tempo на sccloud/tatikoma не даёт 404** — `/rest/tempo-core/1/work-attribute` отвечает 302 на `login.jsp`, `fetch` идёт по редиректу и получает 200 с HTML. Поэтому «Tempo нет» = 404 **или** `JiraError.code === 'format'` (HTML вместо JSON). 401/403/сеть пробрасываются (молча «нет Tempo» не говорим). Тест на этот случай есть.
+- На Cloud `detectCapabilities` не ходит ни за Tempo, ни за `/field`: `tempo=false`, `epicLinkField=null` (Tempo Cloud — другой API, вне MVP; эпик там — `parent`).
+- `Instance.epicLinkField` (ручной override из настроек) пока никем не заполняется — UI настроек инстанса в плане нет; потребители (этапы 4, 7) должны брать `instance.epicLinkField ?? instance.caps?.epicLinkField`.
+- В QuickInput `addInstance` 5 шагов (URL → тип DC/Cloud (по хосту `*.atlassian.net` предвыбран Cloud) → email (Cloud) → токен (password) → проверка `/myself` и имя по умолчанию = хост). Шага «назад» нет — Esc отменяет всё; `title` у QuickPick в `@types/vscode@1.90` нет — номер шага в `placeHolder`. Если определение возможностей упало после успешного `/myself`, инстанс всё равно сохраняется, без `caps` (предупреждение + команда «Обновить возможности»).
+- Smoke: `npm run smoke` — таблица по 4 инстансам, расхождение с ожиданием из roadmap → строка «РАСХОЖДЕНИЕ» и exit 1; инстанс без токена пропускается. URL — из `JIRA_*_URL` или дефолт. Прогон 2026-10-04: pilot `tempo=true, customfield_10100`; sccloud и tatikoma `tempo=false, customfield_10102`; Cloud `tempo=false, null`; у всех задач > 0 (Cloud — «5+», т.к. без total). Все расхождений с таблицей фактов нет.
+- **Не проверено (пользователь):** F5 — команды в палитре и вся QuickInput-цепочка, сохранение в `globalState`/`SecretStorage` в реальном VS Code, `removeInstance`/`testConnection`/`refreshCapabilities`. `favouriteFilters`, `projects`, `issueTypes`, `priorities` покрыты только моком, на живых Jira не вызывались. Атрибуты/ворклоги Tempo — этап 6.
+- Стыковка с поздними этапами: `client.issue(key, 'renderedFields,changelog')` из этапа 4 работает как написано (строка принимается).
+- *Приёмка:* `HttpClient` усилен. Токен `trim()`-ится, а пробел, перевод строки или не-ASCII внутри дают понятную ошибку до запроса: undici печатает невалидный заголовок вместе с токеном. Строки токена и auth-заголовка вычищаются (`***`) из всех сообщений. Сетевая ошибка показывает `cause.code` (`ENOTFOUND`, `ECONNRESET`), на TLS-ошибках подсказывает `NODE_EXTRA_CA_CERTS`. Обрыв или таймаут при чтении тела — тоже `JiraError network`. У 401 и 403 в сообщении есть `errorMessages` и `X-Authentication-Denied-Reason` (CAPTCHA на DC).
+- *Приёмка, редиректы:* `fetch` следует редиректам (`follow`); undici снимает `Authorization` при смене origin (проверено экспериментом на Node 18/20/24). Режим `manual` отвергнут: undici отдаёт 302 как обычный ответ, и сломался бы признак «Tempo нет» через `login.jsp`. Вместо него после ответа проверяем: если `res.redirected` и origin сменился, бросаем `JiraError code:'redirect'` с текстом «Сервер перенаправил на <origin> — укажите этот адрес». Редирект в пределах того же origin (`login.jsp`) работает как раньше и даёт `format`; smoke по 4 инстансам после правки зелёный. **Любой новый метод HttpClient (бинарный GET для этапа 5, POST для этапа 6) обязан повторить ту же проверку origin и `scrub`** — заводить его рядом с `getJson`, а не голым `fetch`.
+- *Приёмка, адрес инстанса:* `canonicalBaseUrl` (`http.ts`) убирает query, hash и `user:pw@`, а путь режет на `/browse/`, `/secure/`, `/projects/`, `/issues/`, `/plugins/`, `/rest/`, `/servicedesk/`, `/login.jsp`. Для `*.atlassian.net` остаётся только origin. Поэтому вставленная ссылка на задачу превращается в адрес инстанса. Для `http://` `addInstance` показывает модальное предупреждение. Токен валидируется в InputBox. `/myself` и определение возможностей идут под `withProgress`.
+- *Приёмка, мелочи:* в Cloud-поиске нет `next`, если курсор повторился или страница пустая (защита от зацикливания); `maxResults` зажат в 1..100. Списочные методы на не-массив возвращают `[]`. `InstanceStore.list()` отбрасывает битые записи `globalState`, а исключение слушателя `onDidChange` не ломает `add/remove`. `refreshCapabilities` на Cloud пишет «Epic Link: parent».
+- **Контракт эпика (для этапов 4 и 7, решено на приёмке):** эпик задачи определяется по `instance.kind`, а не по наличию поля. DC берёт `instance.epicLinkField ?? instance.caps?.epicLinkField`: значение поля — ключ эпика, а в JQL задачи эпика — `cf[<число из id>] = KEY`; если поля нет (`null`), эпика у задачи нет. Cloud берёт `fields.parent`: эпик — это `parent`, у которого `fields.issuetype.hierarchyLevel === 1` (у подзадачи `parent` — обычная задача, это не эпик); в JQL задачи эпика — `parent = KEY`. Atlassian перевёл company-managed проекты Cloud с `customfield_10014` на `parent`, поэтому на Cloud `/field` за Epic Link не запрашиваем. Шаблон `epicLinkField ?? caps.epicLinkField` для Cloud **не применять**: он даст `null`, и эпики пропадут.
+- **Приёмка (2026-10-04, Opus, два прохода):** принят с оговорками: F5 — у пользователя. Проверено: `npm run build && npm run lint && npm test && npm run package` зелёные, 87 тестов (69 у исполнителя, 18 добавила приёмка: токен с `\r`/пробелом, scrub, `cause`, cross-origin redirect, 401 details, `canonicalBaseUrl`, курсор Cloud, JQL со спецсимволами и кириллицей, `maxResults`, замена инстанса и падающий слушатель). `npm run smoke` после правок: pilot `true/customfield_10100` 159, sccloud `false/customfield_10102` 76, tatikoma `false/customfield_10102` 186, Cloud `false/null` «5+». **Не проверено:** QuickInput и команды инстансов в VS Code (F5); `favouriteFilters`/`projects`/`issueTypes`/`priorities` на живых Jira — в начале этапа 3.
 
 ### 3. Дерево задач и фильтры
 Разделы «Задачи» и «Фильтры» как в прототипе: три режима, поиск, быстрые фильтры, JQL,
@@ -254,7 +271,7 @@ Webview-вкладка карточки: шапка, вкладки «Описа
 - [ ] Стандартный путь: `client.addWorklog(key, {started, timeSpentSec, comment}, adjustEstimate)`; AI Tokens без Tempo → `(AI Tokens: N)` в конце комментария
 - [ ] Форма «Залогать время» — webview-диалог в карточке (как `logHtml` в прототипе) и команда `jiraffe.logWork` (QuickInput: длительность → дата → комментарий → атрибуты) для вызова из дерева и палитры. Поля атрибутов строятся по ответу `work-attribute`
 - [ ] `remainingEstimateSec` для Tempo = `max(remaining − spent, 0)` по `timetracking` задачи (допущение о поведении — см. «Риски»)
-- [ ] После записи: обновить карточку (журнал, «Залогано»), дерево Tempo и строку состояния; сообщение `Залогано 1ч 30м в GARM-710 · Tempo`
+- [ ] После записи: обновить карточку (журнал, «Залогано»), дерево Tempo и строку состояния; сообщение `Залогано 1ч 30м в ABC-123 · Tempo`
 - [ ] Сводка «сегодня»: Tempo-инстанс — `tempo.worklogs(today, me)`; без Tempo — JQL `worklogAuthor = currentUser() AND worklogDate = "YYYY-MM-DD"`, затем `worklogs(key)` и фильтр по автору и дате. Сумма по всем инстансам
 - [ ] `tempoView.ts` (WebviewView): блок «Сегодня» из прототипа (`renderTempo`), без недельной таблицы; кнопка «Залогать»; `statusBar.ts`: `$(clock) Сегодня 3ч 15м / 8ч`, клик фокусирует раздел Tempo
 - [ ] Вкладка «Журнал работ» карточки: на Tempo-инстансе колонки атрибутов (если чтение Tempo подтвердилось), иначе без них
@@ -361,6 +378,8 @@ DoD: npm run build && npm run lint && npm test зелёные; npm run smoke п�
 Читай: roadmap-mvp.md (решения, архитектура, этап 3). Эталон поведения — prototype/index.html, функции renderTree, renderExtra, renderChips, renderFilters, qpHtml (grep по имени). UI переносится на нативные TreeView/QuickPick/InputBox, не на webview.
 Точки входа: src/jira/client.ts (search, projects, issueTypes, priorities, favouriteFilters — из сессии 2), src/state/instances.ts, src/extension.ts.
 
+По реальному коду (после приёмки этапа 2): клиент — `createJiraClient(instance, token)` из src/jira/client.ts, токен — `await store.getToken(inst.id)` (InstanceStore в src/state/instances.ts, экземпляр создаётся в activate; передать его в деревья, `store.onDidChange(fn)` — перерисовка при add/remove/updateCaps). `client.search(jql, fields?, {startAt | nextPageToken, maxResults})` → `SearchPage`: DC — `total` и `next.startAt`; Cloud — без `total`, только `next.nextPageToken` (бейдж-счётчик на Cloud — «N+», пока есть `next`); «Загрузить ещё» передаёт `page.next` как есть. `favouriteFilters`, `projects`, `issueTypes`, `priorities` на живых Jira ещё не вызывались (только мок) — первым делом прогнать их в smoke. Ошибки — `JiraError {status, message (по-русски), url, code: 'http'|'network'|'format'}`: в узел ошибки инстанса — `message`, токена в нём нет. Команды инстансов (`addInstance`, `removeInstance`, `testConnection`, `refreshCapabilities`) — в src/commands/instances.ts; узел ошибки «Проверить подключение» вызывает `jiraffe.testConnection` (сейчас он сам спрашивает инстанс через QuickPick — добавить необязательный аргумент `instanceId`). В extension.ts заглушки EmptyTree для issues/filters заменить на реальные провайдеры; epics/releases и Tempo не трогать.
+
 Уже решено: фильтр статуса — по statusCategory (new/indeterminate/done → «Открыта/В работе/Готово»); фильтры превращаются в JQL на сервере; фильтр по инстансу — какие инстансы опрашивать; локальные фильтры в globalState; клик по задаче → команда jiraffe.openIssue (пока заглушка).
 
 Порядок: jql.ts с тестами → filters.ts → issuesTree → команды → filtersTree → openIssueByKey.
@@ -379,6 +398,7 @@ DoD: npm run build && npm run lint && npm test зелёные; smoke допол�
 Работаем в /Users/fost/Projects/jiraffe. Задача: этап 4 roadmap-mvp.md — webview-карточка задачи (шапка, описание, комментарии, история, журнал работ — чтение, мета-колонка), preview-вкладка с закреплением.
 Читай: roadmap-mvp.md (решения, архитектура, этап 4). Эталон разметки и CSS — prototype/index.html: функция vIssue и стили .iv, .meta, .mg, .mr, .subtabs, .cm, .hi, .chg, table.t, .pill, .btn (grep). Цвета прототипа заменить на --vscode-* переменные.
 Точки входа: src/jira/client.ts, src/jira/mappers.ts, команда jiraffe.openIssue (заглушка из сессии 3), esbuild.mjs (webview-бандл).
+Эпик в IssueDetail — строго по «Контракту эпика» в решениях этапа 2: DC — `instance.epicLinkField ?? caps.epicLinkField`, Cloud — `fields.parent` с `issuetype.hierarchyLevel === 1` (запросить `parent` в fields).
 
 Уже решено: CSP и протокол сообщений — дословно из этапа 4; санитизация в хосте через sanitize-html (это единственная новая runtime-зависимость); картинки описания — пока плейсхолдер; одна preview-панель плюс закреплённые; кнопка «Залогать время» и ссылки эпика/релиза — заглушки с сообщением «будет в этапе 6/7».
 
@@ -436,6 +456,7 @@ DoD: npm run build && npm run lint && npm test зелёные; smoke печат�
 Работаем в /Users/fost/Projects/jiraffe. Задача: этап 7 roadmap-mvp.md — разделы «Эпики» и «Релизы», вкладки эпика и релиза.
 Читай: roadmap-mvp.md (решения про Epic Link/parent, этап 7). Эталон — prototype/index.html: renderEpics, renderRels, vEpic, vRel, progressBlock, issueTable, segBar.
 Точки входа: src/jira/client.ts, src/jira/capabilities.ts (epicLinkField), src/panels/html.ts и protocol.ts, заглушки ссылок эпика/релиза в карточке (сессия 4).
+Эпики — по «Контракту эпика» в решениях этапа 2 (DC — поле Epic Link и `cf[<id>] = KEY`, Cloud — `parent = KEY`, эпик = `hierarchyLevel === 1`); на Cloud `caps.epicLinkField` всегда `null` — это норма, не ошибка.
 
 Уже решено: DC — cf[<id>] = KEY, Cloud — parent = KEY; прогресс по statusCategory; у разделов свой выбор проекта.
 
