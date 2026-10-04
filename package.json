@@ -18,6 +18,12 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Jiraffe ходит в Jira с вашим токеном и сохраняет вложения в папку рабочей области — только в доверенных папках."
+    }
+  },
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -154,6 +160,10 @@
       {
         "command": "jiraffe.openRelease",
         "title": "Jiraffe: Открыть релиз"
+      },
+      {
+        "command": "jiraffe.downloadAttachment",
+        "title": "Jiraffe: Скачать вложение"
       }
     ],
     "menus": {
@@ -184,6 +194,10 @@
         },
         {
           "command": "jiraffe.openRelease",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.downloadAttachment",
           "when": "false"
         }
       ],
@@ -262,6 +276,18 @@
           "minimum": 1,
           "maximum": 100,
           "description": "Сколько задач загружать за один запрос (и по кнопке «Загрузить ещё»)."
+        },
+        "jiraffe.attachmentsDir": {
+          "type": "string",
+          "default": ".jiraffe",
+          "description": "Куда сохранять вложения: путь относительно первой папки рабочей области (внутри неё), вложения задачи — в подпапке <KEY>. Абсолютный путь — только из пользовательских настроек. Без открытой папки — временный каталог (<tmp>/jiraffe, очищается через неделю)."
+        },
+        "jiraffe.maxImageMb": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Максимальный размер картинки (МБ), которую карточка скачивает для превью и показа в описании. Больше — только «Скачать»."
         }
       }
     }

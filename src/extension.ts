@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { registerInstanceCommands } from './commands/instances';
 import { registerFilterCommands } from './commands/filters';
 import { registerIssueCommands } from './commands/issue';
+import { AttachmentService } from './panels/attachments';
 import { IssuePanelManager } from './panels/issuePanel';
 import { FilterState } from './state/filters';
 import { InstanceStore } from './state/instances';
@@ -32,13 +33,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const instances = new InstanceStore(context.globalState, context.secrets);
   const filters = new FilterState(context.globalState);
   const meta = new InstanceMeta(instances);
-  const panels = new IssuePanelManager(context.extensionUri, instances, meta);
+  const attachments = new AttachmentService();
+  void attachments.cleanupTmp();
+  const panels = new IssuePanelManager(context.extensionUri, instances, meta, attachments);
   const issuesTree = new IssuesTree(instances, filters, meta);
   const filtersTree = new FiltersTree(instances, filters, meta);
   const issuesView = vscode.window.createTreeView('jiraffe.issues', { treeDataProvider: issuesTree });
   issuesTree.attach(issuesView);
   context.subscriptions.push(
     meta,
+    attachments,
     panels,
     issuesTree,
     filtersTree,

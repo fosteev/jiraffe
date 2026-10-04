@@ -18,6 +18,14 @@ export function registerIssueCommands(panels: IssuePanelManager): vscode.Disposa
       const key = arg && typeof arg === 'object' ? (arg as { key?: unknown }).key : undefined;
       void vscode.window.showInformationMessage(`Jiraffe: страница эпика${typeof key === 'string' ? ` ${key}` : ''} появится в этапе 7`);
     }),
+    // Аргумент — {instanceId, key, id}: вложение задачи, открытой в карточке (метаданные и адреса — из неё).
+    vscode.commands.registerCommand('jiraffe.downloadAttachment', (arg?: unknown) => {
+      const a = (arg && typeof arg === 'object' ? arg : {}) as { instanceId?: unknown; key?: unknown; id?: unknown };
+      const ref = { instanceId: a.instanceId, key: a.key };
+      if (!isIssueRef(ref) || typeof a.id !== 'string' || !panels.downloadAttachment(ref, a.id)) {
+        void vscode.window.showInformationMessage('Jiraffe: откройте карточку задачи и скачайте вложение на вкладке «Вложения»');
+      }
+    }),
     vscode.commands.registerCommand('jiraffe.openRelease', () => {
       void vscode.window.showInformationMessage('Jiraffe: страница релиза появится в этапе 7');
     }),

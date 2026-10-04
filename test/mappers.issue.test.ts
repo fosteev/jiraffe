@@ -124,7 +124,7 @@ describe('sanitize', () => {
     expect(out).not.toContain('<img');
     expect(out).toContain('class="img-ph"');
     expect(out).toContain('data-src="https://h.example/jira/secure/attachment/1/a.png"');
-    expect(out).toContain('картинка — этап 5');
+    expect(out).toContain('[картинка]');
   });
   it('data-src — только своя картинка (origin + context path); чужая — ссылкой, без data-src (токен не уйдёт наружу)', () => {
     for (const src of ['https://evil.example/p.png', '//evil.example/p.png', 'https://h.example.evil.example/jira/a.png', 'http://h.example:8080/jira/a.png', '/secure/admin/x.png']) {

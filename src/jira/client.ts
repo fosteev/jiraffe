@@ -1,4 +1,4 @@
-import { HttpClient, JiraError, type HttpOptions } from './http';
+import { HttpClient, JiraError, type BinaryResult, type HttpOptions } from './http';
 import { epicFieldOf, mapIssueDetail, mapIssueSummary, mapUser, mapWorklog } from './mappers';
 import type { Instance, InstanceKind, IssueDetail, SearchPage, UserRef, Worklog } from './types';
 
@@ -135,6 +135,14 @@ export class JiraClient {
   async serverVersion(): Promise<string | undefined> {
     const r = await this.http.getJson<Raw>('/rest/api/2/serverInfo');
     return r.version ? String(r.version) : undefined;
+  }
+
+  /**
+   * Содержимое вложения/превью/картинки описания с авторизацией. Адрес обязан быть адресом инстанса (иначе `blocked`),
+   * ответ больше `maxBytes` обрывается (`limit`). `mime` — заголовок ответа, ему не доверяем (см. `sniffImage`).
+   */
+  downloadAttachment(url: string, maxBytes: number): Promise<BinaryResult> {
+    return this.http.getBinary(url, { maxBytes });
   }
 
   private async namedList(path: string): Promise<NamedRef[]> {

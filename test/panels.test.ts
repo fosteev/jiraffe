@@ -13,6 +13,7 @@ const card: IssueCard = {
     epic: { key: 'ABC-0', summary: 'Epic' },
   },
   worklogs: [],
+  attachments: [],
 };
 
 describe('html shell', () => {
@@ -41,7 +42,7 @@ describe('render карточки', () => {
       expect(html).toContain('S &lt;img src=x onerror=1&gt;');
       expect(html).toContain('Sample &lt;b&gt;');
       for (const a of ['copyKey', 'openInBrowser', 'logWork', 'pin']) expect(html).toContain(`data-act="${a}"`);
-      expect(html.match(/data-act="tab"/g)).toHaveLength(4);
+      expect(html.match(/data-act="tab"/g)).toHaveLength(5);
     }
   });
   it('закреплённая: кнопка disabled; эпик и релиз — кнопки-ссылки с data-атрибутами', () => {
