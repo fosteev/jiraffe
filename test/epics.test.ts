@@ -8,7 +8,8 @@ import type { Version } from '../src/jira/types';
 import { epicNames, listRow, loadEpicPage, loadReleasePage, releaseUrl } from '../src/panels/list';
 import { isVersionId, isIssueKey } from '../src/panels/protocol';
 import { SectionProject, sanitizeProjectSel } from '../src/state/sectionProject';
-import { MAX_RELEASED, progressLabel, visibleVersions } from '../src/views/format';
+import { JiraError } from '../src/jira/http';
+import { MAX_RELEASED, progressLabel, projectErrorText, visibleVersions } from '../src/views/format';
 import { renderEpicPage, renderReleasePage, segBar } from '../webview/listRender';
 import type { EpicPage, ReleasePage } from '../src/panels/protocol';
 
@@ -351,5 +352,30 @@ describe('доводка приёмки этапа 7', () => {
     expect(p.project).toBe('ABC');
     const row = listRow({ instanceId: 'i', key: 'ABC-1', summary: 's', type: 'Task', status: 'Open', statusCategory: 'new', updated: '', assignee: { id: 'u', name: 'U', avatarUrl: 'https://h.example/a' } }, undefined);
     expect(row.assignee).toEqual({ id: 'u', name: 'U' });
+  });
+});
+
+describe('ошибка раздела проекта', () => {
+  it('404 и 400 с ключом проекта — «проект не найден» (DC отвечает 400 на JQL с несуществующим проектом)', () => {
+    const notFound = { text: 'Проект ZZZ не найден или нет доступа', project: true };
+    expect(projectErrorText(new JiraError(404, 'x', 'https://h.example/rest'), 'ZZZ')).toEqual(notFound);
+    const msg = "Неверный запрос (The value 'ZZZ' does not exist for the field 'project'.)";
+    expect(projectErrorText(new JiraError(400, msg, 'https://h.example/rest'), 'ZZZ')).toEqual(notFound);
+  });
+  it('400 без ключа проекта (нет типа «Эпик», неверное поле, ключ эпика ZZZ-1) — текст Jira', () => {
+    for (const msg of [
+      "Неверный запрос (The value 'Epic' does not exist for the field 'issuetype'.)",
+      "Неверный запрос (Field 'cf[10100]' does not exist)",
+      "Неверный запрос (Issue 'ZZZ-1' does not exist)",
+    ]) {
+      expect(projectErrorText(new JiraError(400, msg, 'https://h.example/rest'), 'ZZZ')).toEqual({ text: msg, project: false });
+    }
+  });
+  it('401, 403, сеть — текст ошибки Jira, не про проект', () => {
+    for (const status of [401, 403, 500, 0]) {
+      const r = projectErrorText(new JiraError(status, 'сообщение', 'https://h.example/rest'), 'ZZZ');
+      expect(r).toEqual({ text: 'сообщение', project: false });
+    }
+    expect(projectErrorText('boom', 'ZZZ')).toEqual({ text: 'boom', project: false });
   });
 });

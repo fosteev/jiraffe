@@ -1,19 +1,18 @@
 import * as vscode from 'vscode';
 import { loadEpics, type EpicItem } from '../jira/epics';
-import { JiraError } from '../jira/http';
 import type { PageRequest } from '../jira/client';
 import type { InstanceMeta } from '../state/meta';
 import type { InstanceStore } from '../state/instances';
 import type { SectionProject } from '../state/sectionProject';
-import { CATEGORY_LABEL, hostOf, mdEscape, progressLabel } from './format';
+import { CATEGORY_LABEL, hostOf, mdEscape, progressLabel, projectErrorText } from './format';
 
 type Node =
   | { kind: 'epic'; epic: EpicItem }
   | { kind: 'more' }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; project: boolean; instanceId: string }
   | { kind: 'hint'; id: string; text: string; command?: string };
 
-interface State { loading: boolean; loadingMore: boolean; epics: EpicItem[]; next?: PageRequest; error?: string; jql?: string }
+interface State { loading: boolean; loadingMore: boolean; epics: EpicItem[]; next?: PageRequest; error?: string; errorIsProject?: boolean; jql?: string }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const pageSize = (): number => vscode.workspace.getConfiguration('jiraffe').get<number>('maxResults', 50);
@@ -82,7 +81,13 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
         const item = new vscode.TreeItem(n.message, vscode.TreeItemCollapsibleState.None);
         item.id = 'epics-err';
         item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
-        item.tooltip = `${n.message}\n\nОбновить — кнопка в заголовке раздела`;
+        if (n.project) {
+          item.tooltip = `${n.message}\n\nНажмите — выбрать другой проект`;
+          item.command = { command: 'jiraffe.pickEpicProject', title: 'Выбрать проект' };
+        } else {
+          item.tooltip = `${n.message}\n\nНажмите — проверить подключение; «Обновить» в заголовке раздела — повторить запрос`;
+          item.command = { command: 'jiraffe.testConnection', title: 'Проверить подключение', arguments: [n.instanceId] };
+        }
         return item;
       }
       case 'hint': {
@@ -106,7 +111,7 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
       return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
     }
     if (st.loading) return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
-    if (st.error) return [{ kind: 'error', message: st.error }];
+    if (st.error) return [{ kind: 'error', message: st.error, project: !!st.errorIsProject, instanceId: sel.instanceId }];
     if (!st.epics.length) return [{ kind: 'hint', id: 'empty', text: `В ${sel.key} нет нерешённых эпиков` }];
     return [...st.epics.map((epic): Node => ({ kind: 'epic', epic })), ...(st.next ? [{ kind: 'more' } as Node] : [])];
   }
@@ -127,7 +132,9 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
       st.jql = r.jql;
     } catch (e) {
       if (gen !== this.gen) return;
-      st.error = e instanceof JiraError && e.status === 404 ? `Проект ${sel.key} не найден или нет доступа` : errText(e);
+      const pe = projectErrorText(e, sel.key);
+      st.error = pe.text;
+      st.errorIsProject = pe.project;
     }
     st.loading = false;
     this.updateHeader();

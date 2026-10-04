@@ -1,6 +1,7 @@
 // Чистые функции для деревьев (без vscode — тестируются в vitest).
 import type { EpicItem } from '../jira/epics';
 import { sortVersions } from '../jira/epics';
+import { JiraError } from '../jira/http';
 import type { IssueSummary, StatusCategory, Version } from '../jira/types';
 
 export const CATEGORY_LABEL: Record<StatusCategory, string> = { new: 'Открыта', indeterminate: 'В работе', done: 'Готово' };
@@ -58,4 +59,22 @@ export function visibleVersions(all: readonly Version[]): { versions: Version[];
   const open = sorted.filter((v) => !v.released);
   const done = sorted.filter((v) => v.released);
   return { versions: [...open, ...done.slice(0, MAX_RELEASED)], hidden: Math.max(0, done.length - MAX_RELEASED) };
+}
+
+const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Текст ошибки раздела проекта («Эпики», «Релизы») и признак «это про проект, а не про подключение».
+ * Несуществующий или недоступный проект: Cloud и DC (версии) отвечают 404, DC на JQL с таким проектом — 400
+ * (`The value 'X' does not exist for the field 'project'`; в русской локали текст другой, но ключ в нём есть).
+ * Прочие 400 (нет типа «Эпик», неверное поле) ключа проекта как отдельного слова не содержат — показываем текст Jira.
+ */
+export function projectErrorText(e: unknown, projectKey: string): { text: string; project: boolean } {
+  if (e instanceof JiraError && e.code === 'http') {
+    const mentionsKey = new RegExp(`(^|[^A-Za-z0-9_-])${escapeRe(projectKey)}([^A-Za-z0-9_-]|$)`, 'i').test(e.message);
+    if (e.status === 404 || (e.status === 400 && mentionsKey)) {
+      return { text: `Проект ${projectKey} не найден или нет доступа`, project: true };
+    }
+  }
+  return { text: e instanceof Error ? e.message : String(e), project: false };
 }

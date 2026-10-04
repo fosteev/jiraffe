@@ -1,21 +1,19 @@
 import * as vscode from 'vscode';
-import { JiraError } from '../jira/http';
 import type { Version } from '../jira/types';
 import type { InstanceMeta } from '../state/meta';
 import type { InstanceStore } from '../state/instances';
 import type { SectionProject } from '../state/sectionProject';
 import { plural } from '../state/filters';
-import { hostOf, mdEscape, visibleVersions } from './format';
+import { hostOf, mdEscape, projectErrorText, visibleVersions } from './format';
 
 type Node =
   | { kind: 'version'; v: Version }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; project: boolean; instanceId: string }
   | { kind: 'hint'; id: string; text: string; command?: string };
 
-interface State { loading: boolean; versions: Version[]; hidden: number; counts: Map<string, number | 'err'>; error?: string }
+interface State { loading: boolean; versions: Version[]; hidden: number; counts: Map<string, number | 'err'>; error?: string; errorIsProject?: boolean }
 
 const COUNT_CONCURRENCY = 4;
-const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 const ddmmyyyy = (s: string): string => s.split('-').reverse().join('.');
 
@@ -73,7 +71,13 @@ export class ReleasesTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
         const item = new vscode.TreeItem(n.message, vscode.TreeItemCollapsibleState.None);
         item.id = 'rel-err';
         item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
-        item.tooltip = `${n.message}\n\nОбновить — кнопка в заголовке раздела`;
+        if (n.project) {
+          item.tooltip = `${n.message}\n\nНажмите — выбрать другой проект`;
+          item.command = { command: 'jiraffe.pickReleaseProject', title: 'Выбрать проект' };
+        } else {
+          item.tooltip = `${n.message}\n\nНажмите — проверить подключение; «Обновить» в заголовке раздела — повторить запрос`;
+          item.command = { command: 'jiraffe.testConnection', title: 'Проверить подключение', arguments: [n.instanceId] };
+        }
         return item;
       }
       case 'hint': {
@@ -97,7 +101,7 @@ export class ReleasesTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
       return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
     }
     if (st.loading) return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
-    if (st.error) return [{ kind: 'error', message: st.error }];
+    if (st.error) return [{ kind: 'error', message: st.error, project: !!st.errorIsProject, instanceId: sel.instanceId }];
     if (!st.versions.length) return [{ kind: 'hint', id: 'empty', text: `В ${sel.key} нет версий` }];
     return [
       ...st.versions.map((v): Node => ({ kind: 'version', v })),
@@ -137,7 +141,9 @@ export class ReleasesTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
       return;
     } catch (e) {
       if (gen !== this.gen) return;
-      st.error = e instanceof JiraError && e.status === 404 ? `Проект ${sel.key} не найден или нет доступа` : errText(e);
+      const pe = projectErrorText(e, sel.key);
+      st.error = pe.text;
+      st.errorIsProject = pe.project;
     }
     st.loading = false;
     this.updateHeader();
