@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { registerInstanceCommands } from './commands/instances';
+import { InstanceStore } from './state/instances';
 
 class EmptyTree implements vscode.TreeDataProvider<never> {
   getTreeItem(): vscode.TreeItem {
@@ -20,6 +22,8 @@ export function activate(context: vscode.ExtensionContext): void {
   for (const id of ['jiraffe.issues', 'jiraffe.filters', 'jiraffe.epics', 'jiraffe.releases']) {
     context.subscriptions.push(vscode.window.registerTreeDataProvider(id, new EmptyTree()));
   }
+  const instances = new InstanceStore(context.globalState, context.secrets);
+  context.subscriptions.push(...registerInstanceCommands(instances));
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('jiraffe.tempo', new TempoViewProvider()),
     vscode.commands.registerCommand('jiraffe.refresh', () => {

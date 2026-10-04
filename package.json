@@ -58,6 +58,22 @@
         "command": "jiraffe.refresh",
         "title": "Jiraffe: Обновить",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "jiraffe.addInstance",
+        "title": "Jiraffe: Добавить инстанс"
+      },
+      {
+        "command": "jiraffe.removeInstance",
+        "title": "Jiraffe: Удалить инстанс"
+      },
+      {
+        "command": "jiraffe.testConnection",
+        "title": "Jiraffe: Проверить подключение"
+      },
+      {
+        "command": "jiraffe.refreshCapabilities",
+        "title": "Jiraffe: Обновить возможности инстанса"
       }
     ]
   },
