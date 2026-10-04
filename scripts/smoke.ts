@@ -1,7 +1,8 @@
 // Read-only smoke по живым инстансам из env. Только GET. Токены не печатаются.
 import { detectCapabilities } from '../src/jira/capabilities';
 import { createJiraClient } from '../src/jira/client';
-import type { InstanceKind } from '../src/jira/types';
+import type { InstanceKind, SearchPage } from '../src/jira/types';
+import { buildJql } from '../src/jql';
 
 interface Target { id: string; kind: InstanceKind; urlEnv: string; defUrl: string; tokenEnv: string; expect: { tempo: boolean; epic: string | null } }
 
@@ -12,8 +13,37 @@ const targets: Target[] = [
   { id: 'cloud', kind: 'cloud', urlEnv: 'JIRA_CLOUD_URL', defUrl: 'https://fosteev.atlassian.net', tokenEnv: 'JIRA_CLOUD_TOKEN', expect: { tempo: false, epic: null } },
 ];
 
+const countOf = (p: SearchPage): string => (p.total !== undefined ? String(p.total) : p.next ? `${p.issues.length}+` : String(p.issues.length));
+
+/** Этап 3: справочники и JQL из buildJql на живом инстансе (только GET). Возвращает строку таблицы. */
+async function jqlChecks(t: Target, c: ReturnType<typeof createJiraClient>): Promise<string[]> {
+  const projects = await c.projects();
+  const types = await c.issueTypes();
+  const prios = await c.priorities();
+  const favs = await c.favouriteFilters();
+  const count = async (jql: string): Promise<string> => countOf(await c.search(jql, undefined, { maxResults: 100 }));
+  const mine = await count(buildJql({ mode: 'mine' }));
+  // «проект GARM» — на Pilot; на остальных первый доступный проект
+  const projKey = t.id === 'pilot' && projects.some((p) => p.key === 'GARM') ? 'GARM' : projects[0]?.key;
+  const proj = projKey ? await count(buildJql({ mode: 'project', projectKey: projKey })) : '—';
+  const quick = await count(buildJql({
+    mode: 'mine',
+    quick: { statusCategory: ['new', 'indeterminate'], types: types.slice(0, 1).map((x) => x.name), priorities: prios.slice(0, 1).map((x) => x.name) },
+    text: 'test',
+  }));
+  const done = await count(buildJql({ mode: 'project', projectKey: projKey, quick: { statusCategory: ['done'] } }));
+  // инвариант: три категории в сумме дают весь проект (проверяет, что id 2/3/4 в JQL — те самые категории)
+  const parts = await Promise.all((['new', 'indeterminate', 'done'] as const).map((k) => count(buildJql({ mode: 'project', projectKey: projKey, quick: { statusCategory: [k] } }))));
+  const sum = parts.reduce((a, x) => a + parseInt(x, 10), 0);
+  const catsOk = !proj.endsWith('+') && sum === parseInt(proj, 10);
+  if (!catsOk && !proj.endsWith('+')) throw new Error(`категории статусов: сумма ${sum} != проект ${proj}`);
+  const jqlMode = await count(buildJql({ mode: 'jql', jql: 'resolution = Unresolved ORDER BY created ASC', text: 'a "quoted" \\ word [UI] C++ foo! 5" AND x\\' }));
+  return [t.id, String(projects.length), String(types.length), String(prios.length), String(favs.length), mine, `${projKey ?? '—'}: ${proj}`, quick, `${done} (${parts.join('+')})`, jqlMode];
+}
+
 async function main(): Promise<void> {
   const rows: string[][] = [['инстанс', 'пользователь', 'tempo', 'epicLinkField', 'задач', 'ожидание']];
+  const jqlRows: string[][] = [['инстанс', 'проектов', 'типов', 'приоритетов', 'избр.фильтров', 'на мне', 'проект', 'быстрые+текст', 'готово', 'JQL-режим']];
   let mismatches = 0;
   for (const t of targets) {
     const token = process.env[t.tokenEnv];
@@ -30,13 +60,22 @@ async function main(): Promise<void> {
       if (!ok) mismatches++;
       const count = page.total !== undefined ? String(page.total) : page.next ? `${page.issues.length}+` : String(page.issues.length);
       rows.push([t.id, me.displayName, String(caps.tempo), String(caps.epicLinkField), count, ok ? 'ок' : `РАСХОЖДЕНИЕ (ждали tempo=${t.expect.tempo}, epic=${t.expect.epic})`]);
+      try {
+        jqlRows.push(await jqlChecks(t, c));
+      } catch (e) {
+        mismatches++;
+        jqlRows.push([t.id, `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
+      }
     } catch (e) {
       mismatches++;
       rows.push([t.id, '—', '—', '—', '—', `ОШИБКА: ${e instanceof Error ? e.message : String(e)}`]);
     }
   }
-  const w = rows[0].map((_, i) => Math.max(...rows.map((r) => r[i].length)));
-  for (const r of rows) console.log(r.map((c, i) => c.padEnd(w[i])).join('  '));
+  for (const table of [rows, jqlRows]) {
+    const w = table[0].map((_, i) => Math.max(...table.map((r) => (r[i] ?? '').length)));
+    for (const r of table) console.log(r.map((c, i) => c.padEnd(w[i])).join('  '));
+    console.log('');
+  }
   if (mismatches) process.exitCode = 1;
 }
 

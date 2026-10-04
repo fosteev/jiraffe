@@ -74,8 +74,161 @@
       {
         "command": "jiraffe.refreshCapabilities",
         "title": "Jiraffe: Обновить возможности инстанса"
+      },
+      {
+        "command": "jiraffe.setMode",
+        "title": "Jiraffe: Режим списка (на мне / проект / JQL)",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "jiraffe.pickProject",
+        "title": "Jiraffe: Выбрать проект",
+        "icon": "$(project)"
+      },
+      {
+        "command": "jiraffe.quickFilters",
+        "title": "Jiraffe: Быстрые фильтры",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "jiraffe.editJql",
+        "title": "Jiraffe: Редактировать JQL",
+        "icon": "$(code)"
+      },
+      {
+        "command": "jiraffe.search",
+        "title": "Jiraffe: Поиск по тексту или ключу",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jiraffe.resetFilters",
+        "title": "Jiraffe: Сбросить фильтры",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "jiraffe.saveFilter",
+        "title": "Jiraffe: Сохранить как фильтр",
+        "icon": "$(save)"
+      },
+      {
+        "command": "jiraffe.deleteFilter",
+        "title": "Jiraffe: Удалить фильтр",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "jiraffe.applyFilter",
+        "title": "Jiraffe: Применить фильтр"
+      },
+      {
+        "command": "jiraffe.loadMore",
+        "title": "Jiraffe: Загрузить ещё"
+      },
+      {
+        "command": "jiraffe.openIssue",
+        "title": "Jiraffe: Открыть задачу"
+      },
+      {
+        "command": "jiraffe.openIssueByKey",
+        "title": "Jiraffe: Открыть задачу по ключу"
       }
-    ]
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "jiraffe.applyFilter",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.loadMore",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.openIssue",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.deleteFilter",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "jiraffe.search",
+          "when": "view == jiraffe.issues",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jiraffe.quickFilters",
+          "when": "view == jiraffe.issues",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jiraffe.setMode",
+          "when": "view == jiraffe.issues",
+          "group": "navigation@3"
+        },
+        {
+          "command": "jiraffe.refresh",
+          "when": "view == jiraffe.issues || view == jiraffe.filters",
+          "group": "navigation@9"
+        },
+        {
+          "command": "jiraffe.pickProject",
+          "when": "view == jiraffe.issues",
+          "group": "1_filters@1"
+        },
+        {
+          "command": "jiraffe.editJql",
+          "when": "view == jiraffe.issues",
+          "group": "1_filters@2"
+        },
+        {
+          "command": "jiraffe.saveFilter",
+          "when": "view == jiraffe.issues",
+          "group": "1_filters@3"
+        },
+        {
+          "command": "jiraffe.resetFilters",
+          "when": "view == jiraffe.issues",
+          "group": "1_filters@4"
+        },
+        {
+          "command": "jiraffe.saveFilter",
+          "when": "view == jiraffe.filters",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "jiraffe.deleteFilter",
+          "when": "view == jiraffe.filters && viewItem == localFilter",
+          "group": "inline"
+        },
+        {
+          "command": "jiraffe.deleteFilter",
+          "when": "view == jiraffe.filters && viewItem == localFilter",
+          "group": "1_edit"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "jiraffe.issues",
+        "contents": "Нет подключённых инстансов Jira.\n[Добавить инстанс](command:jiraffe.addInstance)"
+      }
+    ],
+    "configuration": {
+      "title": "Jiraffe",
+      "properties": {
+        "jiraffe.maxResults": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Сколько задач загружать за один запрос (и по кнопке «Загрузить ещё»)."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node esbuild.mjs",
