@@ -1,6 +1,6 @@
-import { HttpClient, type HttpOptions } from './http';
-import { mapIssueSummary } from './mappers';
-import type { InstanceKind, SearchPage } from './types';
+import { HttpClient, JiraError, type HttpOptions } from './http';
+import { epicFieldOf, mapIssueDetail, mapIssueSummary, mapUser, mapWorklog } from './mappers';
+import type { Instance, InstanceKind, IssueDetail, SearchPage, UserRef, Worklog } from './types';
 
 type Raw = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const asArray = (r: unknown): Raw[] => (Array.isArray(r) ? (r as Raw[]) : []);
@@ -50,10 +50,60 @@ export class JiraClient {
     return { issues, ...(total !== undefined ? { total } : {}), ...(hasMore ? { next: { startAt: nextStart } } : {}) };
   }
 
-  /** Сырой ответ: маппинг в IssueDetail — этап 4. */
+  /** Сырой ответ; для карточки — `issueDetail`. */
   issue(key: string, expand: string | string[] = []): Promise<Raw> {
     const e = Array.isArray(expand) ? expand.join(',') : expand;
     return this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}`, e ? { expand: e } : undefined);
+  }
+
+  /** Наблюдатели. Нет прав на просмотр (403/404) — пустой список, карточка от этого не падает. */
+  async watchers(key: string): Promise<UserRef[]> {
+    try {
+      const r = await this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/watchers`);
+      return asArray(r?.watchers).flatMap((w) => mapUser(w, this.kind) ?? []);
+    } catch (e) {
+      if (e instanceof JiraError && (e.status === 403 || e.status === 404)) return [];
+      throw e;
+    }
+  }
+
+  /** Стандартный журнал работ (Tempo-атрибуты — этап 6). Старые записи — как отдал Jira, без догрузки страниц. */
+  async worklogs(key: string): Promise<Worklog[]> {
+    try {
+      const r = await this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/worklog`);
+      return asArray(r?.worklogs).map((w) => mapWorklog(this.kind, w));
+    } catch (e) {
+      if (e instanceof JiraError && (e.status === 403 || e.status === 404)) return [];
+      throw e;
+    }
+  }
+
+  /**
+   * Всё для карточки тремя параллельными GET + (DC) название эпика. HTML в результате не санитизирован.
+   * Падение запроса самой задачи — ошибка; название эпика — best effort.
+   */
+  async issueDetail(
+    key: string,
+    instance: Pick<Instance, 'id' | 'kind' | 'epicLinkField' | 'caps'>,
+  ): Promise<{ issue: IssueDetail; worklogs: Worklog[]; worklogError?: string }> {
+    // Наблюдатели и журнал не должны ронять карточку: любая их ошибка (500, таймаут) — пустой список; для журнала ещё и текст.
+    let worklogError: string | undefined;
+    const [raw, watchers, worklogs] = await Promise.all([
+      this.issue(key, ['renderedFields', 'changelog']),
+      this.watchers(key).catch((): UserRef[] => []),
+      this.worklogs(key).catch((e: unknown): Worklog[] => {
+        worklogError = e instanceof Error ? e.message : String(e);
+        return [];
+      }),
+    ]);
+    const issue = mapIssueDetail(instance, raw, watchers);
+    if (issue.epic && !issue.epic.summary && epicFieldOf(instance)) {
+      try {
+        const e = await this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(issue.epic.key)}`, { fields: 'summary' });
+        if (typeof e?.fields?.summary === 'string') issue.epic = { key: issue.epic.key, summary: e.fields.summary };
+      } catch { /* название эпика не критично */ }
+    }
+    return { issue, worklogs, ...(worklogError ? { worklogError } : {}) };
   }
 
   async fields(): Promise<FieldInfo[]> {

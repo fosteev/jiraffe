@@ -5,6 +5,8 @@ import { instancesApply, type FilterState } from '../state/filters';
 import type { InstanceStore } from '../state/instances';
 import { matchInstancesByKey, unionNames, type InstanceMeta } from '../state/meta';
 import { jqlForInstance } from '../state/query';
+import { isIssueRef, type IssuePanelManager } from '../panels/issuePanel';
+import { isIssueKey as isCardKey } from '../panels/protocol';
 import { CATEGORY_LABEL, hostOf } from '../views/format';
 import { savedFilterIdOf, type ApplyFilterArg } from '../views/filtersTree';
 import type { IssueRef, IssuesTree } from '../views/issuesTree';
@@ -34,6 +36,7 @@ export function registerFilterCommands(
   meta: InstanceMeta,
   issues: IssuesTree,
   refreshFilters: () => void,
+  panels: IssuePanelManager,
 ): vscode.Disposable[] {
   const needInstances = async (): Promise<Instance[] | undefined> => {
     const all = store.list();
@@ -186,6 +189,10 @@ export function registerFilterCommands(
     }
     if (!key) return;
     key = key.trim().toUpperCase();
+    if (!isIssueKey(key)) {
+      void vscode.window.showWarningMessage(`Jiraffe: «${key.slice(0, 64)}» — не ключ задачи (нужен вида ABC-123)`);
+      return;
+    }
     let target: Instance | undefined;
     if (all.length === 1) {
       target = all[0];
@@ -247,11 +254,8 @@ export function registerFilterCommands(
     }),
     vscode.commands.registerCommand('jiraffe.loadMore', (instanceId: unknown) => (typeof instanceId === 'string' ? issues.loadMore(instanceId) : undefined)),
     vscode.commands.registerCommand('jiraffe.openIssueByKey', (key?: unknown) => openByKey(key)),
-    // Заглушка до этапа 4 (карточка задачи).
-    vscode.commands.registerCommand('jiraffe.openIssue', (ref?: IssueRef) => {
-      if (!ref) return;
-      const inst = store.get(ref.instanceId);
-      void vscode.window.showInformationMessage(`Jiraffe: ${ref.key} (${inst?.name ?? ref.instanceId}) — карточка задачи появится на этапе 4`);
+    vscode.commands.registerCommand('jiraffe.openIssue', (ref?: unknown) => {
+      if (isIssueRef(ref) && isCardKey(ref.key)) panels.open({ instanceId: ref.instanceId, key: ref.key });
     }),
     vscode.commands.registerCommand('jiraffe.refresh', () => {
       meta.invalidate();

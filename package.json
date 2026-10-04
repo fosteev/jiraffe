@@ -130,6 +130,30 @@
       {
         "command": "jiraffe.openIssueByKey",
         "title": "Jiraffe: Открыть задачу по ключу"
+      },
+      {
+        "command": "jiraffe.pinIssue",
+        "title": "Jiraffe: Закрепить карточку задачи"
+      },
+      {
+        "command": "jiraffe.copyKey",
+        "title": "Jiraffe: Копировать ключ задачи"
+      },
+      {
+        "command": "jiraffe.openInBrowser",
+        "title": "Jiraffe: Открыть задачу в Jira"
+      },
+      {
+        "command": "jiraffe.logWork",
+        "title": "Jiraffe: Залогать время"
+      },
+      {
+        "command": "jiraffe.openEpic",
+        "title": "Jiraffe: Открыть эпик"
+      },
+      {
+        "command": "jiraffe.openRelease",
+        "title": "Jiraffe: Открыть релиз"
       }
     ],
     "menus": {
@@ -148,6 +172,18 @@
         },
         {
           "command": "jiraffe.deleteFilter",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.logWork",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.openEpic",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.openRelease",
           "when": "false"
         }
       ],
@@ -240,6 +276,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@types/sanitize-html": "^2.16.2",
     "@types/vscode": "1.90.0",
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
@@ -248,5 +285,8 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",
     "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "sanitize-html": "^2.18.0"
   }
 }

@@ -29,7 +29,9 @@ export const MINE_JQL = 'assignee = currentUser() AND resolution = Unresolved';
 const CATEGORY_IDS: Record<StatusCategory, number[]> = { new: [1, 2], done: [3], indeterminate: [4] };
 const CATEGORY_ORDER: StatusCategory[] = ['new', 'indeterminate', 'done'];
 
-const KEY_RE = /^[A-Za-z][A-Za-z0-9_]+-\d+$/;
+/** Нормализованный ключ задачи (как его отдаёт Jira). Ввод пользователя сверяется без учёта регистра и приводится к верхнему. */
+export const ISSUE_KEY_RE = /^[A-Z][A-Z0-9_]+-\d+$/;
+const KEY_RE = new RegExp(ISSUE_KEY_RE.source, 'i');
 export const isIssueKey = (s: string): boolean => KEY_RE.test(s.trim());
 
 /** Строка в двойных кавычках JQL: экранируем `\` и `"`, переводы строк — в пробел. */

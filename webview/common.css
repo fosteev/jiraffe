@@ -1,0 +1,169 @@
+/* Общие стили webview-панелей Jiraffe (карточка задачи; эпик и релиз — этап 7).
+   Разметка и размеры — из prototype/index.html, цвета — только --vscode-*. */
+:root {
+  --bd: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, .35)));
+  --fg: var(--vscode-foreground);
+  --fg2: var(--vscode-editor-foreground, var(--vscode-foreground));
+  --mut: var(--vscode-descriptionForeground);
+  --acc: var(--vscode-button-background);
+  --acc-fg: var(--vscode-button-foreground);
+  --acc-hov: var(--vscode-button-hoverBackground);
+  --btn2: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, .2));
+  --btn2-fg: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --btn2-hov: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, .3));
+  --link: var(--vscode-textLink-foreground);
+  --hov: var(--vscode-list-hoverBackground);
+  --badge: var(--vscode-badge-background);
+  --badge-fg: var(--vscode-badge-foreground);
+  --code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, .15));
+  --red: var(--vscode-charts-red, #d1242f);
+  --orange: var(--vscode-charts-orange, #c96a0a);
+  --green: var(--vscode-charts-green, #1f8a3d);
+  --blue: var(--vscode-charts-blue, #2f6fd6);
+  --purple: var(--vscode-charts-purple, #8250df);
+  --warn: var(--vscode-charts-yellow, #bf8700);
+  --track: color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
+  --ui: var(--vscode-font-family, system-ui, sans-serif);
+  --mono: var(--vscode-editor-font-family, Menlo, Consolas, monospace);
+}
+
+* { box-sizing: border-box; }
+html { height: 100%; }
+body {
+  margin: 0; padding: 0; height: 100%;
+  background: var(--vscode-editor-background); color: var(--fg);
+  font: var(--vscode-font-size, 13px) / 1.4 var(--ui);
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+svg { flex: none; }
+.mut { color: var(--mut); }
+.sm { font-size: 12px; }
+.k { font-family: var(--mono); font-size: 12px; color: var(--fg2); }
+.sp { flex: 1; }
+.note { padding: 28px; color: var(--mut); }
+.note.err { color: var(--vscode-errorForeground); }
+.note .btn { margin-top: 12px; }
+
+/* кнопки */
+.btn {
+  height: 26px; padding: 0 11px; border-radius: 2px; border: 1px solid transparent;
+  background: var(--btn2); color: var(--btn2-fg); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none; white-space: nowrap; font-size: 12.5px;
+}
+.btn:hover { background: var(--btn2-hov); }
+.btn svg { width: 14px; height: 14px; }
+.btn.pri { background: var(--acc); color: var(--acc-fg); }
+.btn.pri:hover { background: var(--acc-hov); }
+.btn.sm { height: 22px; padding: 0 8px; font-size: 12px; }
+.btn[disabled] { opacity: .6; cursor: default; }
+a.ln, button.ln { color: var(--link); text-decoration: none; border: 0; background: none; padding: 0; cursor: pointer; text-align: left; }
+a.ln:hover, button.ln:hover { text-decoration: underline; }
+
+/* плашки статуса по statusCategory */
+.pill {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 3px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; flex: none;
+}
+.s-new { background: color-mix(in srgb, var(--vscode-foreground) 14%, transparent); color: var(--fg); }
+.s-indeterminate { background: color-mix(in srgb, var(--blue) 24%, transparent); color: color-mix(in srgb, var(--blue) 65%, var(--vscode-foreground)); }
+.s-done { background: color-mix(in srgb, var(--green) 24%, transparent); color: color-mix(in srgb, var(--green) 65%, var(--vscode-foreground)); }
+.cnt { background: var(--badge); color: var(--badge-fg); border-radius: 9px; padding: 0 6px; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* аватарки-инициалы (цвет задаётся из JS через CSSOM: inline style запрещён CSP) */
+.av { border-radius: 50%; color: #fff; display: inline-grid; place-items: center; font-weight: 600; flex: none; letter-spacing: 0; line-height: 1; }
+.av.s18 { width: 18px; height: 18px; font-size: 8px; }
+.av.s22 { width: 22px; height: 22px; font-size: 9px; }
+.av.s28 { width: 28px; height: 28px; font-size: 12px; }
+.who-c { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.stack { display: flex; }
+.stack .av { border: 2px solid var(--vscode-editor-background); margin-left: -5px; }
+.stack .av:first-child { margin-left: 0; }
+
+/* иконки типа и приоритета */
+.ti, .pi { width: 14px; height: 14px; }
+.prio { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; }
+.r-red { fill: var(--red); } .r-green { fill: var(--green); } .r-blue { fill: var(--blue); } .r-purple { fill: var(--purple); }
+.st-red { stroke: var(--red); } .st-orange { stroke: var(--orange); } .st-blue { stroke: var(--blue); }
+.pi path { fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* карточка */
+.iv { padding: 18px 28px 48px; display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 12px 32px; max-width: 1120px; }
+.iv-head { grid-column: 1 / -1; }
+.crumbs { display: flex; align-items: center; gap: 6px; color: var(--mut); font-size: 12px; flex-wrap: wrap; }
+.crumbs svg { width: 14px; height: 14px; }
+h1 { font-size: 20px; line-height: 1.3; font-weight: 600; color: var(--fg2); margin: 8px 0 10px; text-wrap: balance; overflow-wrap: anywhere; }
+.hrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.subtabs { display: flex; gap: 20px; border-bottom: 1px solid var(--bd); margin-bottom: 16px; overflow-x: auto; }
+.subtabs button { border: 0; background: none; color: var(--mut); padding: 8px 0 7px; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+.subtabs button:hover { color: var(--fg2); }
+.subtabs button.on { color: var(--fg2); border-color: var(--acc); }
+
+/* HTML из Jira (описание, комментарии) */
+.rich { max-width: 72ch; line-height: 1.6; overflow-wrap: anywhere; }
+.rich h1, .rich h2, .rich h3, .rich h4, .rich h5, .rich h6 { margin: 16px 0 4px; font-size: 13px; color: var(--fg2); }
+.rich h1 { font-size: 16px; } .rich h2 { font-size: 15px; } .rich h3 { font-size: 14px; }
+.rich p { margin: 0 0 8px; }
+.rich ul, .rich ol { margin: 0 0 8px; padding-left: 22px; }
+.rich blockquote { margin: 0 0 8px; padding: 2px 12px; border-left: 3px solid var(--bd); color: var(--mut); }
+.rich a { color: var(--link); text-decoration: none; }
+.rich a:hover { text-decoration: underline; }
+.rich hr { border: 0; border-top: 1px solid var(--bd); margin: 12px 0; }
+.rich table { border-collapse: collapse; margin: 0 0 8px; max-width: 100%; }
+.rich th, .rich td { border: 1px solid var(--bd); padding: 4px 8px; text-align: left; vertical-align: top; }
+.rich th { background: var(--hov); }
+.rich img { max-width: 100%; }
+code { font-family: var(--mono); font-size: 12px; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+pre { font: 12px/1.5 var(--mono); background: var(--code-bg); border: 1px solid var(--bd); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0 0 8px; }
+pre code { background: none; padding: 0; }
+.img-ph { display: inline-block; padding: 2px 8px; border: 1px dashed var(--bd); border-radius: 3px; color: var(--mut); font-size: 12px; }
+
+/* комментарии */
+.cm { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--bd); }
+.cm:last-of-type { border-bottom: 0; }
+.cm .who { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 3px; }
+.cm .who b { color: var(--fg2); font-weight: 600; }
+.cm .tx { line-height: 1.55; max-width: 72ch; overflow-wrap: anywhere; }
+.ro-note { margin-top: 12px; border: 1px dashed var(--bd); border-radius: 4px; padding: 8px 10px; color: var(--mut); font-size: 12px; }
+
+/* история */
+.hi { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--bd); }
+.hi .who { margin-bottom: 3px; }
+.hi .who b { color: var(--fg2); font-weight: 600; }
+.chg { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 12.5px; }
+.chg .f { color: var(--mut); min-width: 90px; }
+.chg .val { overflow-wrap: anywhere; white-space: pre-wrap; max-width: 100%; }
+.old { text-decoration: line-through; color: var(--mut); }
+.arr { color: var(--mut); }
+
+/* журнал работ */
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.src { font-size: 12px; color: var(--mut); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.src svg { width: 14px; height: 14px; }
+.tw-wrap { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.t th { text-align: left; font-weight: 600; color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--bd); white-space: nowrap; }
+table.t td { padding: 7px 8px; border-bottom: 1px solid var(--bd); vertical-align: middle; }
+table.t tfoot td { font-weight: 600; color: var(--fg2); border-bottom: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.left { text-align: left; }
+
+/* правая колонка */
+.meta { font-size: 12.5px; min-width: 0; }
+.meta h5 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut); font-weight: 600; }
+.mg { padding: 0 0 14px; margin-bottom: 14px; border-bottom: 1px solid var(--bd); }
+.mg:last-child { border-bottom: 0; }
+.mr { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; padding: 3px 0; align-items: center; }
+.mr .l { color: var(--mut); }
+.mr .v { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
+.tag { font-size: 11.5px; background: var(--code-bg); border-radius: 3px; padding: 1px 6px; }
+.under { color: var(--warn); }
+.bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--track); margin-top: 6px; }
+.bar i { display: block; height: 100%; }
+.b-acc { background: var(--acc); } .b-over { background: var(--red); }
+
+@media (max-width: 760px) {
+  .iv { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+}
+.main { min-width: 0; }
