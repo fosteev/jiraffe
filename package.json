@@ -2,7 +2,7 @@
   "name": "jiraffe",
   "displayName": "Jiraffe",
   "description": "Jira в VS Code: задачи, фильтры, карточка, журнал работ, эпики и релизы",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "jiraffe",
   "private": true,
   "license": "UNLICENSED",
@@ -16,6 +16,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "media/icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
     "onStartupFinished"
@@ -307,6 +308,14 @@
       {
         "view": "jiraffe.issues",
         "contents": "Нет подключённых инстансов Jira.\n[Добавить инстанс](command:jiraffe.addInstance)"
+      },
+      {
+        "view": "jiraffe.epics",
+        "contents": "Нет подключённых инстансов Jira.\n[Добавить инстанс](command:jiraffe.addInstance)"
+      },
+      {
+        "view": "jiraffe.releases",
+        "contents": "Нет подключённых инстансов Jira.\n[Добавить инстанс](command:jiraffe.addInstance)"
       }
     ],
     "configuration": {
@@ -346,6 +355,7 @@
     "watch": "node esbuild.mjs --watch",
     "lint": "tsc --noEmit && eslint .",
     "test": "vitest run",
+    "vscode:prepublish": "npm run build",
     "package": "vsce package --no-dependencies",
     "smoke": "tsx scripts/smoke.ts"
   },
