@@ -4,6 +4,7 @@ import { registerFilterCommands } from './commands/filters';
 import { registerIssueCommands } from './commands/issue';
 import { registerSectionCommands } from './commands/sections';
 import { registerLogWorkCommand, WorklogService } from './commands/logWork';
+import { registerTransitionCommand } from './commands/transition';
 import { AttachmentService } from './panels/attachments';
 import { IssuePanelManager } from './panels/issuePanel';
 import { ListPanelManager } from './panels/listPanel';
@@ -80,6 +81,13 @@ export function activate(context: vscode.ExtensionContext): void {
     ...registerIssueCommands(panels, lists),
     ...registerSectionCommands(instances, meta, epicProject, releaseProject, epicsTree),
     ...registerLogWorkCommand(worklog, panels, instances, meta),
+    ...registerTransitionCommand(panels, instances, meta, (ref) => {
+      panels.reload(ref);
+      issuesTree.refresh();
+      epicsTree.refresh();
+      releasesTree.refresh();
+      lists.reloadAll();
+    }),
     today,
     new TodayStatusBar(today, instances),
     tempoView,

@@ -1,6 +1,6 @@
 import { HttpClient, JiraError, type BinaryResult, type HttpOptions } from './http';
 import { epicFieldOf, mapIssueDetail, mapIssueSummary, mapUser, mapVersion, mapWorklog } from './mappers';
-import type { Instance, InstanceKind, IssueDetail, SearchPage, UserRef, Version, Worklog } from './types';
+import type { Instance, InstanceKind, IssueDetail, SearchPage, StatusCategory, UserRef, Version, Worklog } from './types';
 
 type Raw = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const mapNamed = (x: Raw): NamedRef => ({
@@ -17,6 +17,30 @@ export interface NamedRef { id: string; name: string; iconUrl?: string; hierarch
 export interface FilterRef { id: string; name: string; jql: string }
 export interface FieldInfo { id: string; name: string; custom: boolean; schemaCustom?: string }
 export interface PageRequest { startAt?: number; nextPageToken?: string; maxResults?: number }
+/** Поле экрана перехода, которое надо заполнить: обязательное и без значения по умолчанию. */
+export interface TransitionField { id: string; name: string; array: boolean; allowedValues?: NamedRef[] }
+export interface Transition { id: string; name: string; to: { name: string; category: StatusCategory }; fields: TransitionField[] }
+
+const CATEGORY: Record<string, StatusCategory> = { new: 'new', indeterminate: 'indeterminate', done: 'done' };
+
+/** Ответ `GET /issue/{key}/transitions?expand=transitions.fields`. */
+export function mapTransitions(r: unknown): Transition[] {
+  return asArray((r as Raw | undefined)?.transitions).map((t) => {
+    const fields = Object.entries((t.fields ?? {}) as Record<string, Raw>)
+      .filter(([, f]) => f && f.required === true && f.hasDefaultValue !== true)
+      .map(([id, f]): TransitionField => ({
+        id, name: String(f.name ?? id), array: f.schema?.type === 'array',
+        ...(Array.isArray(f.allowedValues)
+          ? { allowedValues: asArray(f.allowedValues).map((v) => ({ id: String(v.id), name: String(v.name ?? v.value ?? v.id) })) }
+          : {}),
+      }));
+    return {
+      id: String(t.id), name: String(t.name ?? ''),
+      to: { name: String(t.to?.name ?? ''), category: CATEGORY[String(t.to?.statusCategory?.key)] ?? 'indeterminate' },
+      fields,
+    };
+  });
+}
 
 export class JiraClient {
   constructor(
@@ -109,6 +133,17 @@ export class JiraClient {
     const body = { started: w.started, timeSpentSeconds: w.timeSpentSec, ...(w.comment ? { comment: w.comment } : {}) };
     const r = await this.http.postJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/worklog`, body, { adjustEstimate });
     return r && r.id !== undefined ? { id: String(r.id) } : {};
+  }
+
+  /** Доступные текущему пользователю переходы задачи (с полями экрана перехода). */
+  async transitions(key: string): Promise<Transition[]> {
+    return mapTransitions(await this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/transitions`, { expand: 'transitions.fields' }));
+  }
+
+  /** Перевести задачу: `POST /issue/{key}/transitions`; `fields` — значения обязательных полей экрана (`{id}` или `[{id}]`). */
+  async transition(key: string, id: string, fields: Record<string, unknown> = {}): Promise<void> {
+    const body = { transition: { id }, ...(Object.keys(fields).length ? { fields } : {}) };
+    await this.http.postJson(`/rest/api/2/issue/${encodeURIComponent(key)}/transitions`, body);
   }
 
   /** Учёт времени задачи (секунды) — свежий, прямо перед записью в Tempo. */

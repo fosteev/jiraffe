@@ -20,12 +20,26 @@ export function readScope(): string[] | undefined {
   return list.length ? list : undefined;
 }
 
-/** Инстанс, добавленный из workspace с заданным набором, сразу попадает в этот набор — иначе он «пропал» бы после добавления. */
-async function addToWorkspaceScope(id: string): Promise<void> {
+/**
+ * После добавления: набор workspace задан — новый инстанс дописываем в него (иначе он «пропал» бы); не задан,
+ * а инстансов уже несколько — предлагаем оставить в этом workspace только новый.
+ */
+async function offerWorkspaceScope(store: InstanceStore, inst: Instance): Promise<void> {
+  if (!vscode.workspace.workspaceFolders?.length) return;
   const ws = config().inspect<unknown>(SCOPE_KEY)?.workspaceValue;
-  if (!Array.isArray(ws) || !ws.length || ws.includes(id)) return;
-  await config().update(SCOPE_KEY, [...ws, id], vscode.ConfigurationTarget.Workspace);
+  if (Array.isArray(ws) && ws.length) {
+    if (!ws.includes(inst.id)) await config().update(SCOPE_KEY, [...ws, inst.id], vscode.ConfigurationTarget.Workspace);
+    return;
+  }
+  if (store.all().length < 2) return;
+  const act = await vscode.window.showInformationMessage(
+    `Jiraffe: показывать в этом workspace только «${inst.name}»? Остальные инстансы останутся в других окнах.`,
+    'Только его', 'Все инстансы',
+  );
+  if (act === 'Только его') await config().update(SCOPE_KEY, [inst.id], vscode.ConfigurationTarget.Workspace);
 }
+
+const ADD_BUTTON: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('add'), tooltip: 'Добавить инстанс' };
 
 async function scopeInstances(store: InstanceStore): Promise<void> {
   if (!vscode.workspace.workspaceFolders?.length) {
@@ -38,10 +52,25 @@ async function scopeInstances(store: InstanceStore): Promise<void> {
     return;
   }
   const scope = readScope();
-  const picked = await vscode.window.showQuickPick(
-    all.map((i) => ({ label: i.name, description: i.baseUrl, picked: inScope(i, scope), id: i.id })),
-    { canPickMany: true, placeHolder: 'Какие инстансы показывать в этом workspace (все отмечены — все)' },
-  );
+  type Item = vscode.QuickPickItem & { id: string };
+  const qp = vscode.window.createQuickPick<Item>();
+  qp.title = 'Инстансы этого workspace';
+  qp.placeholder = 'Отметьте, какие показывать здесь (все отмечены — все); «+» — новое подключение';
+  qp.canSelectMany = true;
+  qp.buttons = [ADD_BUTTON];
+  qp.items = all.map((i) => ({ label: i.name, description: i.baseUrl, id: i.id }));
+  qp.selectedItems = qp.items.filter((it) => inScope(all.find((i) => i.id === it.id)!, scope));
+  const picked = await new Promise<readonly Item[] | 'add' | undefined>((resolve) => {
+    qp.onDidAccept(() => resolve(qp.selectedItems));
+    qp.onDidTriggerButton(() => resolve('add'));
+    qp.onDidHide(() => resolve(undefined));
+    qp.show();
+  });
+  qp.dispose();
+  if (picked === 'add') {
+    await vscode.commands.executeCommand('jiraffe.addInstance');
+    return;
+  }
   if (!picked) return;
   if (!picked.length) {
     void vscode.window.showWarningMessage('Jiraffe: нужен хотя бы один инстанс');
@@ -144,9 +173,9 @@ async function addInstance(store: InstanceStore): Promise<void> {
   } catch (e) {
     void vscode.window.showWarningMessage(`Jiraffe: возможности инстанса не определены (${errText(e)}). Повторите «Обновить возможности инстанса».`);
   }
-  await addToWorkspaceScope(id);
   await store.add(instance, token.trim());
   void vscode.window.showInformationMessage(`Jiraffe: инстанс «${instance.name}» добавлен` + (instance.caps ? ` (Tempo: ${instance.caps.tempo ? 'есть' : 'нет'})` : ''));
+  await offerWorkspaceScope(store, instance);
 }
 
 async function clientFor(store: InstanceStore, inst: Instance) {

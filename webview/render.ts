@@ -264,7 +264,7 @@ export function renderCard(c: IssueCard, tab: IssueTab): string {
     <div class="iv-head">
       <div class="crumbs">${IC.server} ${esc(c.instanceName)}<span>›</span>${esc(project)}${i.epic ? `<span>›</span><button class="ln" data-act="epic" data-key="${esc(i.epic.key)}">${esc(i.epic.key)}</button>` : ''}<span>›</span>${typeIcon(i.type)}<span class="k">${esc(i.key)}</span></div>
       <h1>${esc(i.summary)}</h1>
-      <div class="hrow"><span class="pill s-${i.statusCategory}" title="${esc(STATUS_LABEL[i.statusCategory])}">${esc(i.status || STATUS_LABEL[i.statusCategory])}</span>${i.priority ? `<span class="prio">${priorityIcon(i.priority)}${esc(i.priority)}</span>` : ''}<span class="mut sm">${esc(i.type)}</span><span class="sp"></span>
+      <div class="hrow"><button class="pill pill-btn s-${i.statusCategory}" data-act="transition" title="Сменить статус">${esc(i.status || STATUS_LABEL[i.statusCategory])} ▾</button>${i.priority ? `<span class="prio">${priorityIcon(i.priority)}${esc(i.priority)}</span>` : ''}<span class="mut sm">${esc(i.type)}</span><span class="sp"></span>
         <button class="btn" data-act="copyKey">${IC.copy} Ключ</button>
         <button class="btn" data-act="openInBrowser">${IC.ext} Открыть в Jira</button>
         <button class="btn" data-act="pin"${c.pinned ? ' disabled' : ''}>${IC.pin} ${c.pinned ? 'Закреплена' : 'Закрепить'}</button>

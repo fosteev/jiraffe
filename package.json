@@ -74,7 +74,8 @@
       },
       {
         "command": "jiraffe.scopeInstances",
-        "title": "Jiraffe: Инстансы этого workspace"
+        "title": "Jiraffe: Инстансы этого workspace",
+        "icon": "$(server-environment)"
       },
       {
         "command": "jiraffe.removeInstance",
@@ -162,6 +163,11 @@
         "icon": "$(clock)"
       },
       {
+        "command": "jiraffe.transition",
+        "title": "Jiraffe: Сменить статус",
+        "icon": "$(arrow-swap)"
+      },
+      {
         "command": "jiraffe.openEpic",
         "title": "Jiraffe: Открыть эпик"
       },
@@ -245,6 +251,26 @@
           "group": "navigation@9"
         },
         {
+          "command": "jiraffe.scopeInstances",
+          "when": "view == jiraffe.issues || view == jiraffe.filters",
+          "group": "navigation@8"
+        },
+        {
+          "command": "jiraffe.addInstance",
+          "when": "view == jiraffe.issues || view == jiraffe.filters",
+          "group": "2_instances@1"
+        },
+        {
+          "command": "jiraffe.testConnection",
+          "when": "view == jiraffe.issues || view == jiraffe.filters",
+          "group": "2_instances@2"
+        },
+        {
+          "command": "jiraffe.removeInstance",
+          "when": "view == jiraffe.issues || view == jiraffe.filters",
+          "group": "2_instances@3"
+        },
+        {
           "command": "jiraffe.pickProject",
           "when": "view == jiraffe.issues",
           "group": "1_filters@1"
@@ -304,7 +330,12 @@
         {
           "command": "jiraffe.logWork",
           "when": "view == jiraffe.issues && viewItem == issue",
-          "group": "1_work"
+          "group": "1_work@1"
+        },
+        {
+          "command": "jiraffe.transition",
+          "when": "view == jiraffe.issues && viewItem == issue",
+          "group": "1_work@2"
         }
       ]
     },
