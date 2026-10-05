@@ -2,7 +2,7 @@
   "name": "jiraffe",
   "displayName": "Jiraffe",
   "description": "Jira в VS Code: задачи, фильтры, карточка, журнал работ, эпики и релизы",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "jiraffe",
   "private": true,
   "license": "UNLICENSED",
