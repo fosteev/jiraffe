@@ -1,121 +1,88 @@
 # Jiraffe 🦒
 
-Расширение VS Code для повседневной работы с Jira без браузера: найти свои задачи,
-прочитать задачу целиком (описание, вложения, комментарии, история), посмотреть
-и залогать время (в том числе Tempo), пройтись по эпикам и релизам.
+Jira inside VS Code: your issues, the full issue card, attachments, time logging (including Tempo), status changes, epics and releases. Works with several Jira instances at once — Server/Data Center and Cloud side by side.
 
-Сделано под реальное использование, а не под весь функционал Jira: чтение, журнал
-работ и смена статуса. Создание и редактирование задач — позже.
+It covers the daily routine, not all of Jira. Creating and editing issues is not there yet.
 
-## Поддерживаемые инстансы
+> The UI is in Russian for now. [Русская версия README](README.ru.md)
 
-Несколько Jira одновременно, каждая со своей авторизацией:
+![Issue card next to the issue tree](docs/screenshots/card.png)
 
-| Тип | Авторизация | Особенности |
-|---|---|---|
-| Jira Server / Data Center 8.22+ | Personal Access Token (`Authorization: Bearer`) | возможен context path (`https://host/jira`); assignee — `{"name": login}` |
-| Jira Cloud | Basic `email:API token` | поиск через `/rest/api/2/search/jql` (курсорная пагинация); пользователи по `accountId` |
+## Features
 
-Токены хранятся в VS Code SecretStorage, не в settings.json.
+**Issues.** Assigned to me, by project, or any JQL. Quick filters by status category, type, priority and instance. Search by key (`ABC-123`) or text. Your saved filters and Jira favourite filters in a separate view.
 
-## Установка
+**Issue card.** Description, comments, change history, work log, people, epic and fix versions. Clicking the status opens the transitions available to you; required fields with a list of values (resolution, etc.) are asked for in a picker.
 
-Расширение ставится из `.vsix` (в Marketplace пока не опубликовано). Нужен VS Code 1.90 или новее.
+**Attachments.** Image previews in the description, comments and attachments tab, with a lightbox. Download one or all, open text files in the editor. Files go to `.jiraffe/<KEY>/` in the workspace (git-ignored automatically).
 
-1. Взять `jiraffe-<версия>.vsix` со страницы GitHub Releases или собрать из исходников: `npm ci && npm run package` (сборка `dist/` запускается сама).
-2. Установить: палитра команд → «Extensions: Install from VSIX…» → выбрать файл. То же из терминала: `code --install-extension jiraffe-0.2.0.vsix`.
-3. Для пробной установки без влияния на основной профиль: `code --profile jiraffe-test --install-extension jiraffe-0.2.0.vsix`, затем `code --profile jiraffe-test`.
-4. В панели слева появится иконка жирафа — разделы «Задачи», «Фильтры», «Эпики», «Релизы», «Tempo».
+![Attachments tab](docs/screenshots/attachments.png)
 
-Расширение работает только в доверенных папках (оно ходит в Jira с вашим токеном и сохраняет вложения в папку рабочей области).
+**Time logging.** From the card or the tree. Uses Tempo where it is installed (including work attributes), the standard Jira worklog otherwise. The status bar shows how much you've logged today against your workday.
 
-## Добавление инстанса
+![Log work dialog](docs/screenshots/log-work.png)
 
-Палитра команд → «Jiraffe: Добавить инстанс» (или кнопка в пустом разделе). Шаги: адрес, тип, токен (для Cloud — ещё email). Вместо адреса можно вставить ссылку на задачу (`https://jira.example.com/browse/ABC-1`) — адрес инстанса выделится сам. Подключение проверяется сразу (`/rest/api/2/myself`); при ошибке инстанс не сохраняется. Токены лежат в SecretStorage VS Code и нигде не показываются.
+**Epics and releases.** Per-project lists with progress. An epic or release opens in a tab with a status breakdown and its issues.
 
-**Server / Data Center — Personal Access Token.** Jira → аватар → «Профиль» → «Личные токены доступа» (Personal Access Tokens) → «Создать токен». Токен показывается один раз. Если Jira живёт под context path, адрес с ним: `https://jira.example.com/jira`.
+![Epic tab](docs/screenshots/epic.png)
 
-**Cloud — API token.** Откройте <https://id.atlassian.com/manage-profile/security/api-tokens> → «Create API token», скопируйте токен. В расширении нужны адрес вида `https://your-domain.atlassian.net`, email вашей учётной записи Atlassian и этот токен.
+![Release tab](docs/screenshots/release.png)
 
-Другие команды: «Проверить подключение», «Обновить возможности инстанса» (заново определить Tempo и поле Epic Link после смены настроек Jira), «Удалить инстанс».
+## Supported Jira
 
-### Инстансы по workspace
+| Type | Auth |
+|---|---|
+| Server / Data Center 8.22+ | Personal Access Token. A context path is fine: `https://host/jira` |
+| Cloud | Account email + API token |
 
-Подключения и токены общие для всех окон, но каждому workspace можно оставить только свои инстансы: кнопка с иконкой сервера в заголовке «Задач» или «Фильтров» (или «Jiraffe: Инстансы этого workspace») — галочки и «+» для нового подключения. После добавления инстанса Jiraffe сам предложит оставить в этом workspace только его. Добавить, проверить и удалить инстанс можно и из меню «…» этих разделов. Вручную — в `.vscode/settings.json` папки:
+Tokens are stored in VS Code SecretStorage, never in `settings.json`. The extension talks only to the Jira instances you add, and runs only in trusted workspaces.
+
+Tempo is supported on Server/DC. On Cloud, time goes to the standard worklog.
+
+## Install
+
+Requires VS Code 1.90+.
+
+1. Download `jiraffe-<version>.vsix` from [Releases](https://github.com/fosteev/jiraffe/releases), or build it: `npm ci && npm run package`.
+2. Command Palette → **Extensions: Install from VSIX…**, or `code --install-extension jiraffe-0.2.0.vsix`.
+3. A giraffe icon appears in the Activity Bar.
+
+## Adding an instance
+
+Command Palette → **Jiraffe: Добавить инстанс** (Add instance), or the button in an empty view. Enter the URL, type and token. You can paste an issue link instead of the URL — the base address is taken from it. The connection is checked right away; a failing instance is not saved.
+
+- **Server / Data Center:** Jira → avatar → Profile → Personal Access Tokens → Create token.
+- **Cloud:** create a token at <https://id.atlassian.com/manage-profile/security/api-tokens>; use `https://your-domain.atlassian.net` and your Atlassian account email.
+
+### Instances per workspace
+
+Connections are shared across windows, but each workspace can show only some of them: the server icon in the Issues or Filters view title, or in `.vscode/settings.json`:
 
 ```json
 { "jiraffe.instances": ["https://jira.example.com"] }
 ```
 
-Элемент — адрес или id инстанса; без настройки видны все. Выбранные режим, проект, быстрые фильтры и проекты «Эпиков» и «Релизов» тоже свои у каждого workspace (пока не меняли — берутся последние глобальные); сохранённые фильтры общие, привязанные к скрытому инстансу не показываются. Инстанс, добавленный из workspace с заданным набором, сразу попадает в этот набор.
+Mode, project, quick filters and the Epics/Releases project are remembered per workspace too.
 
-## Настройки
+## Settings
 
-| Настройка | По умолчанию | Что делает |
+| Setting | Default | |
 |---|---|---|
-| `jiraffe.instances` | — (все) | Какие инстансы показывать в этом workspace (адреса или id) |
-| `jiraffe.maxResults` | 50 | Сколько задач (эпиков) грузить за запрос и по «Загрузить ещё» |
-| `jiraffe.attachmentsDir` | `.jiraffe` | Куда сохранять вложения (внутри первой папки рабочей области; без папки — временный каталог) |
-| `jiraffe.maxImageMb` | 5 | Лимит размера картинки для превью |
-| `jiraffe.workdayHours` | 8 | Рабочий день для сводки «Сегодня» |
+| `jiraffe.instances` | all | Instances shown in this workspace (URLs or ids) |
+| `jiraffe.maxResults` | 50 | Page size for issue and epic lists |
+| `jiraffe.attachmentsDir` | `.jiraffe` | Where attachments are saved, relative to the first workspace folder |
+| `jiraffe.maxImageMb` | 5 | Max image size for previews |
+| `jiraffe.workdayHours` | 8 | Workday length for the "today" summary |
 
-Данные кэшируются в памяти на сессию (проекты, типы, приоритеты, пользователь); списки задач, эпиков и версий перечитываются кнопкой «Обновить» в заголовке раздела — она же сбрасывает справочники.
+## Not yet
 
-## Функции (MVP)
+Subtasks and linked issues, assigning, creating and editing issues, comments, weekly time summary, Tempo Cloud.
 
-### 1. Инстансы и авторизация
-- [x] Добавить / удалить инстанс (URL, тип Server/DC или Cloud, токен); показывать один или все — быстрый фильтр «Инстанс»
-- [x] Проверка подключения (`/rest/api/2/myself`)
-- [x] Несколько инстансов в дереве одновременно
+## Development
 
-### 2. Поиск задач и фильтры
-- [x] «Открытые на мне» — по каждому инстансу
-- [x] Задачи по проекту (выбор проекта из списка)
-- [x] Быстрые фильтры: категория статуса (Открыта / В работе / Готово), тип задачи, приоритет, инстанс
-- [ ] Быстрые фильтры по исполнителю и по конкретному статусу — не вошли в 0.1.0 (свои задачи — режим «на мне», остальное — через JQL)
-- [x] Произвольный JQL
-- [x] Сохранённые фильтры (свои) и избранные фильтры из Jira
-- [x] Поиск по ключу (`ABC-123`) и по тексту
-- [x] Подгрузка длинных списков (пагинация)
-
-### 3. Карточка задачи
-- [x] Шапка: ключ, заголовок, тип, статус, приоритет, ссылка «открыть в браузере»
-- [x] Люди: автор, исполнитель, наблюдатели
-- [x] Описание — отрендеренным HTML (`expand=renderedFields`)
-- [x] Эпик, fix version, метки, компоненты (ссылки на эпик и релиз ведут во вкладки)
-- [ ] Подзадачи и связанные задачи — не вошли в 0.1.0
-- [x] Комментарии: автор, дата, текст
-
-### 4. Вложения
-- [x] Список вложений: имя, размер, автор, дата
-- [x] Превью картинок прямо в карточке (скачиваются расширением с авторизацией)
-- [x] Открыть / скачать файл (в папку проекта или temp)
-
-### 5. История задачи
-- [x] Лента изменений: кто, когда, какое поле, было → стало (`expand=changelog`)
-
-### 6. Журнал работ и Tempo
-- [x] Список записей по задаче: кто, сколько, когда, комментарий
-- [x] Залогать время: длительность, дата, комментарий
-- [x] Tempo (где установлен): запись через `/rest/tempo-timesheets/3/worklogs/`, рабочие атрибуты (`/rest/tempo-core/1/work-attribute`), в т.ч. «AI Tokens»
-- [x] Где Tempo нет — стандартный `/rest/api/2/issue/{key}/worklog`
-- [x] Сводка «сколько я залогал сегодня» (раздел «Tempo» и строка состояния)
-- [ ] Сводка за неделю — не вошла в 0.1.0
-
-### 7. Эпики
-- [x] Список эпиков проекта
-- [x] Задачи эпика с прогрессом (сколько закрыто / всего)
-- [x] Server/DC: связь через кастомное поле `Epic Link` (id поля определяется для каждого инстанса); Cloud — через `parent`
-
-### 8. Релизы
-- [x] Версии проекта: выпущенные / невыпущенные, даты (`/rest/api/2/project/{key}/versions`)
-- [x] Задачи релиза (`fixVersion = X`) и прогресс (`/rest/api/2/version/{id}/relatedIssueCounts`)
-
-## Позже (не в MVP)
-- Смена статуса (transitions), назначение исполнителя
-- Создание и правка задач, добавление комментариев
-- Ветка git от задачи, ключ задачи в коммите
-
-## Стек
-TypeScript, VS Code Extension API: TreeView — для списков, Webview — для карточки задачи.
-Jira REST API v2 и Agile API v1.0.
+```sh
+npm ci
+npm run watch   # then F5 in VS Code
+npm test
+npm run lint
+```
