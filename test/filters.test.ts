@@ -120,26 +120,26 @@ describe('describeFilters', () => {
     const f = base();
     f.setProject({ instanceId: 'a', key: 'GARM' });
     f.setQuick({ statusCategory: ['new', 'done'], types: [], priorities: [] }, []);
-    expect(describeFilters(f.snapshot)).toBe('2 фильтра · GARM');
+    expect(describeFilters(f.snapshot)).toBe('2 filters · GARM');
   });
   it('склонения и режимы', () => {
     const f = base();
-    expect(describeFilters(f.snapshot)).toBe('на мне');
+    expect(describeFilters(f.snapshot)).toBe('assigned to me');
     f.setText('x');
-    expect(describeFilters(f.snapshot)).toBe('1 фильтр');
+    expect(describeFilters(f.snapshot)).toBe('1 filter');
     f.setQuick({ statusCategory: ['new', 'done'], types: ['a', 'b', 'c'], priorities: [] }, []);
-    expect(describeFilters(f.snapshot)).toBe('6 фильтров');
+    expect(describeFilters(f.snapshot)).toBe('6 filters');
     f.setJql('a = 1', { savedName: 'Баги' });
-    expect(describeFilters(f.snapshot)).toBe('6 фильтров · «Баги»');
+    expect(describeFilters(f.snapshot)).toBe('6 filters · “Баги”');
     f.setJql('a = 1');
-    expect(describeFilters(f.snapshot)).toBe('6 фильтров · JQL');
+    expect(describeFilters(f.snapshot)).toBe('6 filters · JQL');
     f.setMode('project');
-    expect(describeFilters(f.snapshot)).toBe('6 фильтров · проект не выбран');
+    expect(describeFilters(f.snapshot)).toBe('6 filters · no project selected');
   });
   it('выбор инстансов не считается там, где не действует', () => {
     const f = base();
     f.setQuick(emptyQuick(), ['a']);
-    expect(describeFilters(f.snapshot)).toBe('1 фильтр');
+    expect(describeFilters(f.snapshot)).toBe('1 filter');
     f.setProject({ instanceId: 'b', key: 'GARM' });
     expect(describeFilters(f.snapshot)).toBe('GARM');
     f.setJql('x = 1', { scope: 'b' });
@@ -191,7 +191,7 @@ describe('InstanceMeta', () => {
 
   it('без токена — понятная ошибка', async () => {
     const meta = new InstanceMeta(store, (() => ({})) as never);
-    await expect(meta.projects({ ...inst, id: 'zzz' })).rejects.toThrow('токен не найден');
+    await expect(meta.projects({ ...inst, id: 'zzz' })).rejects.toThrow('token not found');
   });
 });
 
@@ -208,8 +208,8 @@ describe('format', () => {
     const t = tooltipMarkdown({ instanceId: 'a', key: 'ABC-1', summary: 'Fix *it*', type: 'Bug', status: 'Open', statusCategory: 'new', updated: '2026-10-02T10:20:30.000+0300' }, 'Main');
     expect(t).toContain('ABC\\-1');
     expect(t).toContain('Fix \\*it\\*');
-    expect(t).toContain('Открыта');
-    expect(t).toContain('не назначен');
+    expect(t).toContain('To Do');
+    expect(t).toContain('unassigned');
   });
 });
 

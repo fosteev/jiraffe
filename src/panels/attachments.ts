@@ -12,6 +12,7 @@ import {
   imageRejection, LruCache, MAX_DOWNLOAD_BYTES, MAX_TEXT_OPEN_BYTES, noticeText, resolveAttachmentsRoot, sniffImage, toDataUri,
 } from '../jira/attachments';
 import type { JiraClient } from '../jira/client';
+import { t } from '../l10n';
 import type { Attachment, Instance } from '../jira/types';
 
 export type ImageResult = { dataUri: string } | { error: string };
@@ -31,7 +32,7 @@ const TMP_TTL_MS = 7 * 24 * 3600 * 1000;
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 /** Недоверенное (имя из Jira, текст ошибки) — в уведомление только через `noticeText` (там работают markdown-ссылки). */
 const q = (s: string): string => `«${noticeText(s, 120)}»`;
-const CANCELLED = 'отменено: карточка закрыта или сменилась';
+const cancelled = (): string => t('cancelled: the card was closed or changed');
 
 export class AttachmentService implements vscode.Disposable {
   /** ~64 МБ data URI на все карточки; ключ — инстанс + адрес. Ошибки не кэшируются (повтор при следующем показе). */
@@ -58,15 +59,15 @@ export class AttachmentService implements vscode.Disposable {
     const max = this.maxImageBytes();
     if (id.startsWith('i')) {
       const url = ctx.inlineUrls[Number(id.slice(1))];
-      return url ? this.fetchImage(ctx, url, max) : Promise.resolve({ error: 'картинка не найдена' });
+      return url ? this.fetchImage(ctx, url, max) : Promise.resolve({ error: t('image not found') });
     }
     const att = ctx.files.find((a) => a.id === id.slice(1));
-    if (!att) return Promise.resolve({ error: 'вложение не найдено' });
-    if (!isImageAttachment(att)) return Promise.resolve({ error: 'не картинка' });
+    if (!att) return Promise.resolve({ error: t('attachment not found') });
+    if (!isImageAttachment(att)) return Promise.resolve({ error: t('not an image') });
     const urls = attachmentUrls(att, ctx.inst);
     const full = (): Promise<ImageResult> => {
-      if (!urls.content) return Promise.resolve({ error: 'адрес вложения не относится к инстансу' });
-      if (att.size > max) return Promise.resolve({ error: `больше лимита превью ${fmtMb(max)} (${fmtMb(att.size)}) — скачайте файл` });
+      if (!urls.content) return Promise.resolve({ error: t('attachment URL does not belong to the instance') });
+      if (att.size > max) return Promise.resolve({ error: t('larger than the preview limit {0} ({1}) — download the file', fmtMb(max), fmtMb(att.size)) });
       return this.fetchImage(ctx, urls.content, max);
     };
     if (id.startsWith('t') && urls.thumbnail) {
@@ -88,11 +89,11 @@ export class AttachmentService implements vscode.Disposable {
     const waiters = [alive];
     const p = this.limit(async (): Promise<ImageResult> => {
       // Пока задача стояла в очереди, карточку могли закрыть или сменить — тогда не качаем (и не кэшируем отказ).
-      if (!waiters.some((a) => a())) return { error: CANCELLED };
+      if (!waiters.some((a) => a())) return { error: cancelled() };
       try {
         const { bytes } = await ctx.client.downloadAttachment(url, max);
         const mime = sniffImage(bytes);
-        if (!mime) return { error: 'файл не является картинкой (или нет доступа)' };
+        if (!mime) return { error: t('the file is not an image (or access denied)') };
         const rejected = imageRejection(bytes, mime);
         if (rejected) return { error: rejected };
         const dataUri = toDataUri(mime, bytes);
@@ -123,7 +124,7 @@ export class AttachmentService implements vscode.Disposable {
     if (r.inWorkspace && ws) await assertInside(ws, await existingAncestor(r.root), r.root);
     await fs.mkdir(r.root, { recursive: true, mode: 0o700 });
     if (r.inWorkspace || r.tmp) await assertRealDir(r.root, r.tmp);
-    else if (!(await fs.stat(r.root)).isDirectory()) throw new Error(`${r.root} — не каталог; сохранение отменено`); // путь пользователя: симлинк допустим
+    else if (!(await fs.stat(r.root)).isDirectory()) throw new Error(t('{0} is not a directory; save cancelled', r.root)); // путь пользователя: симлинк допустим
     if (r.inWorkspace && ws) await assertInside(ws, r.root, r.root);
     if (r.inWorkspace && r.isDefault) {
       // .jiraffe не должен уехать в git пользователя: `*` в своём .gitignore (wx — не трогаем существующий и симлинк).
@@ -141,13 +142,13 @@ export class AttachmentService implements vscode.Disposable {
   }
 
   private async saveNow(ctx: AttachmentContext, att: Attachment, maxBytes: number): Promise<{ file: string; shown: string; text: boolean }> {
-    if (att.size > maxBytes) throw new Error(`больше лимита ${fmtMb(maxBytes)} (${fmtMb(att.size)})`);
+    if (att.size > maxBytes) throw new Error(t('larger than the limit {0} ({1})', fmtMb(maxBytes), fmtMb(att.size)));
     const url = attachmentUrls(att, ctx.inst).content;
-    if (!url) throw new Error('адрес вложения не относится к инстансу — скачивание запрещено');
+    if (!url) throw new Error(t('attachment URL does not belong to the instance — download forbidden'));
     const name = attachmentFileNames(ctx.files).get(att.id) ?? `attachment-${att.id}`;
     const { root, inWorkspace, ws } = await this.root();
     const file = attachmentPath(root, ctx.key, name);
-    if (!file) throw new Error('недопустимое имя файла');
+    if (!file) throw new Error(t('invalid file name'));
     const { bytes } = await ctx.client.downloadAttachment(url, maxBytes);
     const dir = path.dirname(file);
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
@@ -167,26 +168,26 @@ export class AttachmentService implements vscode.Disposable {
   /** «Скачать»: прогресс в уведомлении, итог — «Показать в папке» / «Открыть в редакторе» (для текстовых). */
   async download(ctx: AttachmentContext, id: string): Promise<void> {
     const att = ctx.files.find((a) => a.id === id);
-    if (!att) return void vscode.window.showWarningMessage('Jiraffe: вложение не найдено — обновите карточку');
+    if (!att) return void vscode.window.showWarningMessage(t('Jiraffe: attachment not found — refresh the card'));
     try {
-      const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Jiraffe: скачиваю ${q(att.filename)}…` }, () => this.save(ctx, att));
-      const actions = ['Показать в папке', ...(isTextAttachment(att) && r.text ? ['Открыть в редакторе'] : [])];
-      const pick = await vscode.window.showInformationMessage(`Jiraffe: сохранено ${q(r.shown)}`, ...actions);
-      if (pick === 'Показать в папке') void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(r.file));
-      if (pick === 'Открыть в редакторе') await openText(r.file);
+      const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Jiraffe: downloading {0}…', q(att.filename)) }, () => this.save(ctx, att));
+      const actions = [t('Show in Folder'), ...(isTextAttachment(att) && r.text ? [t('Open in Editor')] : [])];
+      const pick = await vscode.window.showInformationMessage(t('Jiraffe: saved {0}', q(r.shown)), ...actions);
+      if (pick === t('Show in Folder')) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(r.file));
+      if (pick === t('Open in Editor')) await openText(r.file);
     } catch (e) {
-      void vscode.window.showErrorMessage(`Jiraffe: не удалось скачать ${q(att.filename)}: ${noticeText(errText(e))}`);
+      void vscode.window.showErrorMessage(t('Jiraffe: failed to download {0}: {1}', q(att.filename), noticeText(errText(e))));
     }
   }
 
   /** «Скачать все»: по одному, с отменой между файлами; ошибки отдельных файлов не останавливают остальные. */
   async downloadAll(ctx: AttachmentContext): Promise<void> {
-    if (!ctx.files.length) return void vscode.window.showInformationMessage('Jiraffe: у задачи нет вложений');
+    if (!ctx.files.length) return void vscode.window.showInformationMessage(t('Jiraffe: the issue has no attachments'));
     const failed: string[] = [];
     let saved = 0;
     let last = '';
     await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Jiraffe: вложения ${ctx.key}`, cancellable: true },
+      { location: vscode.ProgressLocation.Notification, title: t('Jiraffe: attachments {0}', ctx.key), cancellable: true },
       async (progress, token) => {
         for (const [n, att] of ctx.files.entries()) {
           if (token.isCancellationRequested) break;
@@ -200,9 +201,9 @@ export class AttachmentService implements vscode.Disposable {
         }
       },
     );
-    if (failed.length) void vscode.window.showWarningMessage(`Jiraffe: не скачано ${failed.length}: ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? '…' : ''}`);
+    if (failed.length) void vscode.window.showWarningMessage(t('Jiraffe: not downloaded {0}: {1}', failed.length, `${failed.slice(0, 3).join('; ')}${failed.length > 3 ? '…' : ''}`));
     if (!saved) return;
-    const pick = await vscode.window.showInformationMessage(`Jiraffe: сохранено ${saved} из ${ctx.files.length} в папку ${ctx.key}`, 'Показать в папке');
+    const pick = await vscode.window.showInformationMessage(t('Jiraffe: saved {0} of {1} to folder {2}', saved, ctx.files.length, ctx.key), t('Show in Folder'));
     if (pick && last) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(last));
   }
 
@@ -212,18 +213,18 @@ export class AttachmentService implements vscode.Disposable {
    */
   async openInEditor(ctx: AttachmentContext, id: string): Promise<void> {
     const att = ctx.files.find((a) => a.id === id);
-    if (!att) return void vscode.window.showWarningMessage('Jiraffe: вложение не найдено — обновите карточку');
-    if (!isTextAttachment(att)) return void vscode.window.showWarningMessage(`Jiraffe: ${q(att.filename)} не текстовый файл — используйте «Скачать»`);
+    if (!att) return void vscode.window.showWarningMessage(t('Jiraffe: attachment not found — refresh the card'));
+    if (!isTextAttachment(att)) return void vscode.window.showWarningMessage(t('Jiraffe: {0} is not a text file — use “Download”', q(att.filename)));
     try {
-      const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Jiraffe: открываю ${q(att.filename)}…` }, () => this.save(ctx, att, MAX_TEXT_OPEN_BYTES));
+      const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Jiraffe: opening {0}…', q(att.filename)) }, () => this.save(ctx, att, MAX_TEXT_OPEN_BYTES));
       if (!r.text) {
-        const pick = await vscode.window.showWarningMessage(`Jiraffe: ${q(att.filename)} не похож на текст — сохранён в ${q(r.shown)}, в редакторе не открываю`, 'Показать в папке');
+        const pick = await vscode.window.showWarningMessage(t('Jiraffe: {0} does not look like text — saved to {1}, not opening in the editor', q(att.filename), q(r.shown)), t('Show in Folder'));
         if (pick) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(r.file));
         return;
       }
       await openText(r.file);
     } catch (e) {
-      void vscode.window.showErrorMessage(`Jiraffe: не удалось открыть ${q(att.filename)}: ${noticeText(errText(e))}`);
+      void vscode.window.showErrorMessage(t('Jiraffe: failed to open {0}: {1}', q(att.filename), noticeText(errText(e))));
     }
   }
 
@@ -268,7 +269,7 @@ async function existingAncestor(p: string): Promise<string> {
 /** Реальный путь `p` (с раскрытыми симлинками) лежит внутри реального `ws`; иначе — отказ. */
 async function assertInside(ws: string, p: string, shown: string): Promise<void> {
   const rel = path.relative(await fs.realpath(ws), await fs.realpath(p));
-  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(`${shown} ведёт за пределы рабочей области (символическая ссылка); сохранение отменено`);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(t('{0} leads outside the workspace (symbolic link); save cancelled', shown));
 }
 
 async function assertRealDir(dir: string, ownTmp: boolean): Promise<void> {
@@ -276,8 +277,8 @@ async function assertRealDir(dir: string, ownTmp: boolean): Promise<void> {
   try {
     st = await fs.lstat(dir);
   } catch (e) {
-    throw new Error(`каталог ${dir} недоступен: ${errText(e)}`);
+    throw new Error(t('directory {0} is unavailable: {1}', dir, errText(e)));
   }
-  if (st.isSymbolicLink() || !st.isDirectory()) throw new Error(`${dir} — не каталог или символическая ссылка; сохранение отменено`);
-  if (ownTmp && typeof process.getuid === 'function' && st.uid !== process.getuid()) throw new Error(`${dir} принадлежит другому пользователю; сохранение отменено`);
+  if (st.isSymbolicLink() || !st.isDirectory()) throw new Error(t('{0} is not a directory or is a symbolic link; save cancelled', dir));
+  if (ownTmp && typeof process.getuid === 'function' && st.uid !== process.getuid()) throw new Error(t('{0} belongs to another user; save cancelled', dir));
 }

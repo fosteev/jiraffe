@@ -4,6 +4,7 @@ import { localDate } from '../jira/worklog';
 import type { InstanceStore } from '../state/instances';
 import type { InstanceMeta } from '../state/meta';
 import { browseUrl } from './card';
+import { getBundle, locale, t } from '../l10n';
 import { makeNonce, renderShell } from './html';
 import { loadEpicPage, loadReleasePage, releaseUrl } from './list';
 import { isIssueKey, isVersionId, type HostToList, type ListPage, type ListToHost } from './protocol';
@@ -63,7 +64,7 @@ export class ListPanelManager implements vscode.Disposable {
 
   private create(ref: ListRef): Entry {
     const root = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
-    const title = ref.kind === 'epic' ? ref.id : 'Релиз';
+    const title = ref.kind === 'epic' ? ref.id : t('Release');
     const panel = vscode.window.createWebviewPanel(`jiraffe.${ref.kind}`, title, { viewColumn: vscode.ViewColumn.Active, preserveFocus: false }, {
       enableScripts: true,
       retainContextWhenHidden: false,
@@ -75,6 +76,7 @@ export class ListPanelManager implements vscode.Disposable {
       scriptUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(root, 'list.js')).toString(),
       styleUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(root, 'common.css')).toString(),
       title,
+      l10n: { bundle: getBundle(), locale: locale() },
     });
     const e: Entry = { panel, ref, ready: false, seq: 0, disposed: false };
     panel.webview.onDidReceiveMessage((m: ListToHost) => this.onMessage(e, m));
@@ -100,7 +102,7 @@ export class ListPanelManager implements vscode.Disposable {
     this.render(e);
     try {
       const inst = this.store.get(ref.instanceId);
-      if (!inst) throw new Error('инстанс удалён — добавьте его заново');
+      if (!inst) throw new Error(t('instance removed — add it again'));
       const client = await this.meta.client(inst);
       let data: ListPage;
       if (ref.kind === 'epic') {
@@ -159,7 +161,7 @@ export class ListPanelManager implements vscode.Disposable {
       ? browseUrl(inst.baseUrl, e.ref.id)
       : releaseUrl(inst.baseUrl, d?.project ?? '', e.ref.id);
     if (!url) {
-      void vscode.window.showInformationMessage('Jiraffe: не удалось определить проект версии — адрес релиза неизвестен');
+      void vscode.window.showInformationMessage(t('Jiraffe: could not determine the version’s project — release URL unknown'));
       return;
     }
     void vscode.env.openExternal(vscode.Uri.parse(url)).then(undefined, (err: unknown) => vscode.window.showErrorMessage(`Jiraffe: ${noticeText(errText(err))}`));

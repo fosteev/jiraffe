@@ -21,7 +21,7 @@ describe('html shell', () => {
     expect(csp('vscode-webview://x', 'N')).toBe("default-src 'none'; img-src vscode-webview://x data:; style-src vscode-webview://x; script-src 'nonce-N'");
     const nonce = makeNonce();
     expect(nonce).not.toBe(makeNonce());
-    const html = renderShell({ cspSource: 'vscode-webview://x', nonce, scriptUri: 'u/issue.js', styleUri: 'u/common.css', title: 'A"B' });
+    const html = renderShell({ cspSource: 'vscode-webview://x', nonce, scriptUri: 'u/issue.js', styleUri: 'u/common.css', title: 'A"B', l10n: { locale: 'en' } });
     expect(html).toContain(`<script nonce="${nonce}" src="u/issue.js">`);
     expect(html).toContain('href="u/common.css"');
     expect(html).toContain('<title>A&quot;B</title>');
@@ -53,13 +53,13 @@ describe('render карточки', () => {
   });
   it('время: сверх оценки подсвечено, полоска с data-w', () => {
     const html = renderCard(card, 'desc');
-    expect(html).toContain('сверх оценки');
+    expect(html).toContain('over estimate');
     expect(html).toContain('data-w="100"');
   });
   it('пустые вкладки не падают', () => {
-    expect(renderCard(card, 'com')).toContain('Комментариев нет');
-    expect(renderCard(card, 'wl')).toContain('Записей пока нет');
-    expect(renderCard(card, 'hist')).toContain('создал(а) задачу');
+    expect(renderCard(card, 'com')).toContain('No comments');
+    expect(renderCard(card, 'wl')).toContain('No entries yet');
+    expect(renderCard(card, 'hist')).toContain('created the issue');
   });
   it('хелперы', () => {
     expect(esc('<&">')).toBe('&lt;&amp;&quot;&gt;');
@@ -83,9 +83,9 @@ describe('render карточки', () => {
       expect(safeExternalUrl(u)).toBeUndefined();
     }
   });
-  it('журнал не загрузился — текст ошибки экранирован, вместо «Записей пока нет»', () => {
+  it('журнал не загрузился — текст ошибки экранирован, instead of “No entries yet”', () => {
     const html = renderCard({ ...card, worklogError: 'HTTP 500 <x>' }, 'wl');
-    expect(html).toContain('Журнал работ не загрузился: HTTP 500 &lt;x&gt;');
-    expect(html).not.toContain('Записей пока нет');
+    expect(html).toContain('Failed to load the work log: HTTP 500 &lt;x&gt;');
+    expect(html).not.toContain('No entries yet');
   });
 });

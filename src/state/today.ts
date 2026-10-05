@@ -3,6 +3,7 @@ import { formatDuration } from '../duration';
 import { loadToday, localDate, sumToday, type TodayInstance } from '../jira/worklog';
 import type { InstanceStore } from './instances';
 import type { InstanceMeta } from './meta';
+import { t } from '../l10n';
 
 export interface TodayState {
   date: string;
@@ -76,14 +77,14 @@ export class TodayService {
 
 /** Текст строки состояния: `$(clock) Сегодня 3ч 15м / 8ч`; до первой загрузки — «…», ошибка на инстансе — `$(warning)`. */
 export function statusBarText(s: TodayState, workdaySec: number): string {
-  if (!s.loaded) return '$(clock) Сегодня …';
+  if (!s.loaded) return t('$(clock) Today …');
   const warn = s.instances.some((i) => i.error) ? ' $(warning)' : '';
-  return `$(clock) Сегодня ${formatDuration(s.totalSec)} / ${formatDuration(workdaySec)}${warn}`;
+  return t('$(clock) Today {0} / {1}{2}', formatDuration(s.totalSec), formatDuration(workdaySec), warn);
 }
 
 /** Подсказка строки состояния: по инстансам (имена — недоверенный текст, вызывающий экранирует для markdown). */
 export function statusBarLines(s: TodayState): string[] {
-  if (!s.loaded) return ['Загрузка…'];
-  if (!s.instances.length) return ['Нет подключённых инстансов'];
-  return s.instances.map((i) => `${i.name}: ${i.error ? `ошибка — ${i.error}` : formatDuration(i.totalSec)}${i.tempo ? ' · Tempo' : ''}`);
+  if (!s.loaded) return [t('Loading…')];
+  if (!s.instances.length) return [t('No instances connected')];
+  return s.instances.map((i) => `${i.name}: ${i.error ? t('error — {0}', i.error) : formatDuration(i.totalSec)}${i.tempo ? ' · Tempo' : ''}`);
 }

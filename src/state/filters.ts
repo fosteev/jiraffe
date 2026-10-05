@@ -2,6 +2,7 @@
 import type { Memento } from 'vscode';
 import type { StatusCategory } from '../jira/types';
 import { type Mode, type QuickFilters } from '../jql';
+import { t, tn } from '../l10n';
 
 export const STATE_KEY = 'jiraffe.filterState';
 export const SAVED_KEY = 'jiraffe.filters';
@@ -53,13 +54,6 @@ export function sanitizeSnapshot(v: unknown): FilterSnapshot {
   };
 }
 
-export function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10, m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
-}
-
 /** Действует ли выбор инстансов: в режиме «проект» и у JQL из фильтра инстанс один и задан ими. */
 export const instancesApply = (s: FilterSnapshot): boolean => s.mode === 'mine' || (s.mode === 'jql' && !s.jqlScope);
 
@@ -72,10 +66,10 @@ export function activeFilterCount(s: FilterSnapshot): number {
 export function describeFilters(s: FilterSnapshot): string {
   const n = activeFilterCount(s);
   const parts: string[] = [];
-  if (n) parts.push(`${n} ${plural(n, 'фильтр', 'фильтра', 'фильтров')}`);
-  if (s.mode === 'project') parts.push(s.project?.key ?? 'проект не выбран');
-  else if (s.mode === 'jql') parts.push(s.savedName ? `«${s.savedName}»` : 'JQL');
-  else if (!n) parts.push('на мне');
+  if (n) parts.push(tn(n, '{0} filter|{0} filters'));
+  if (s.mode === 'project') parts.push(s.project?.key ?? t('no project selected'));
+  else if (s.mode === 'jql') parts.push(s.savedName ? t('“{0}”', s.savedName) : 'JQL');
+  else if (!n) parts.push(t('assigned to me'));
   return parts.join(' · ');
 }
 

@@ -36,11 +36,11 @@ describe('HttpClient', () => {
   });
 
   it.each([
-    [401, /Не авторизован/],
-    [403, /Доступ запрещён/],
-    [404, /Не найдено/],
+    [401, /Not authorized/],
+    [403, /Access denied/],
+    [404, /Not found/],
     [500, /HTTP 500\): boom/],
-  ])('статус %i → JiraError с русским сообщением', async (status, re) => {
+  ])('статус %i → JiraError с локализованным сообщением', async (status, re) => {
     const http = new HttpClient({ baseUrl: 'https://x.example', kind: 'dc', token: 'SECRET', fetchImpl: mockFetch(status, { errorMessages: ['boom'] }) });
     const err = await fail(http.getJson('/p'));
     expect(err).toBeInstanceOf(JiraError);
@@ -54,7 +54,7 @@ describe('HttpClient', () => {
     const f = (async () => { throw new TypeError('fetch failed'); }) as unknown as typeof fetch;
     const err = await fail(new HttpClient({ baseUrl: 'https://x.example', kind: 'dc', token: 't', fetchImpl: f }).getJson('/p'));
     expect(err.status).toBe(0);
-    expect(err.message).toMatch(/Нет соединения/);
+    expect(err.message).toMatch(/No connection/);
   });
 
   it('не-JSON при 200 → понятная ошибка', async () => {
@@ -85,7 +85,7 @@ describe('HttpClient: безопасность и диагностика', () =>
     await new HttpClient({ baseUrl: 'https://x.example', kind: 'dc', token: 'SECRET123\r\n', fetchImpl: mockFetch(200, {}, calls) }).getJson('/p');
     expect((calls[0].init.headers as Record<string, string>).Authorization).toBe('Bearer SECRET123');
     const err = await fail(new HttpClient({ baseUrl: 'https://x.example', kind: 'dc', token: 'SEC RET123', fetchImpl: mockFetch(200, {}) }).getJson('/p'));
-    expect(err.message).toMatch(/Токен содержит/);
+    expect(err.message).toMatch(/The token contains/);
     expect(err.message).not.toContain('RET123');
   });
 
@@ -112,7 +112,7 @@ describe('HttpClient: безопасность и диагностика', () =>
   it('401: errorMessages и X-Authentication-Denied-Reason в сообщении', async () => {
     const err = await fail(new HttpClient({ baseUrl: 'https://x.example', kind: 'dc', token: 't',
       fetchImpl: fake({ status: 401, ok: false, headers: new Headers({ 'X-Authentication-Denied-Reason': 'CAPTCHA_CHALLENGE' }), body: '{"errorMessages":["nope"]}' }) }).getJson('/p'));
-    expect(err.message).toMatch(/Не авторизован.*nope.*CAPTCHA_CHALLENGE/);
+    expect(err.message).toMatch(/Not authorized.*nope.*CAPTCHA_CHALLENGE/);
   });
 });
 

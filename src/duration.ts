@@ -1,3 +1,4 @@
+import { t } from './l10n';
 const HOUR = 3600;
 const MIN = 60;
 
@@ -50,6 +51,6 @@ export function formatDuration(seconds: number): string {
   const totalMin = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds / MIN)) : 0;
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  if (h === 0) return `${m}м`;
-  return m === 0 ? `${h}ч` : `${h}ч ${m}м`;
+  if (h === 0) return t('{0}m', m);
+  return m === 0 ? t('{0}h', h) : t('{0}h {1}m', h, m);
 }

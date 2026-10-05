@@ -1,7 +1,8 @@
+import { t } from '../l10n';
 import type { InstanceKind } from './types';
 
 /** Хвост сообщения об ошибке записи, после которой запрос мог дойти до Jira (таймаут, обрыв, 5xx прокси, не-JSON 2xx). */
-export const MAYBE_SAVED = 'запись могла сохраниться — проверьте журнал задачи, прежде чем повторять';
+export const maybeSaved = (): string => t('the write may have been saved; check the issue log before retrying');
 
 export class JiraError extends Error {
   constructor(
@@ -79,7 +80,7 @@ export interface BinaryOptions {
 }
 
 const MAX_REDIRECTS = 5;
-const mb = (n: number): string => `${Math.round((n / 1024 / 1024) * 10) / 10} МБ`;
+const mb = (n: number): string => t('{0} MB', Math.round((n / 1024 / 1024) * 10) / 10);
 
 export function authHeader(kind: InstanceKind, token: string, email?: string): string {
   if (kind === 'cloud') {
@@ -105,13 +106,13 @@ export function messageForStatus(status: number, details: string): string {
   const tail = details ? ` (${details})` : '';
   switch (status) {
     case 401:
-      return 'Не авторизован: проверьте токен (для Cloud — и email)' + tail;
+      return t('Not authorized: check the token (and email for Cloud)') + tail;
     case 403:
-      return 'Доступ запрещён: у токена нет прав на этот ресурс' + tail;
+      return t('Access denied: the token has no permission for this resource') + tail;
     case 404:
-      return 'Не найдено: проверьте адрес инстанса и ключ';
+      return t('Not found: check the instance URL and the key');
     default:
-      return `Ошибка Jira (HTTP ${status})${details ? ': ' + details : ''}`;
+      return t('Jira error (HTTP {0})', status) + (details ? ': ' + details : '');
   }
 }
 
@@ -147,7 +148,7 @@ export class HttpClient {
   /** GET с разбором JSON. Токен в сообщения и url не попадает. */
   async getJson<T>(path: string, query?: Query): Promise<T> {
     const url = this.url(path, query);
-    if (this.badToken) throw new JiraError(0, 'Токен содержит пробелы, переводы строк или не-ASCII символы — скопируйте его заново', url, 'format');
+    if (this.badToken) throw new JiraError(0, t('The token contains spaces, line breaks or non-ASCII characters. Copy it again.'), url, 'format');
     let res: Response;
     try {
       res = await this.fetchImpl(url, {
@@ -160,8 +161,8 @@ export class HttpClient {
       throw new JiraError(
         0,
         timeout
-          ? `Нет ответа от ${this.baseUrl}: превышено время ожидания`
-          : `Нет соединения с ${this.baseUrl}: ${this.scrub(networkReason(e))}`,
+          ? t('No response from {0}: timed out', this.baseUrl)
+          : t('No connection to {0}: {1}', this.baseUrl, this.scrub(networkReason(e))),
         url,
         'network',
       );
@@ -169,13 +170,13 @@ export class HttpClient {
     if (res.redirected && res.url && new URL(res.url).origin !== new URL(url).origin) {
       // Authorization на чужой origin fetch не несёт — дальше был бы непонятный 401 или HTML.
       void res.body?.cancel().catch(() => undefined);
-      throw new JiraError(0, `Сервер перенаправил на ${new URL(res.url).origin} — укажите этот адрес инстанса`, url, 'redirect');
+      throw new JiraError(0, t('The server redirected to {0}. Use this instance URL.', new URL(res.url).origin), url, 'redirect');
     }
     let text: string;
     try {
       text = await res.text();
     } catch {
-      throw new JiraError(0, `Ответ от ${this.baseUrl} оборвался (превышено время ожидания или разрыв соединения)`, url, 'network');
+      throw new JiraError(0, t('The response from {0} was cut off (timeout or connection lost)', this.baseUrl), url, 'network');
     }
     if (!res.ok) {
       const denied = res.headers.get('x-authentication-denied-reason'); // DC: CAPTCHA после неудачных входов
@@ -185,7 +186,7 @@ export class HttpClient {
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new JiraError(0, 'Ответ не похож на JSON: проверьте адрес инстанса (возможно, нужен context path, например /jira)', url, 'format');
+      throw new JiraError(0, t('The response is not JSON. Check the instance URL (a context path such as /jira may be needed).'), url, 'format');
     }
   }
 
@@ -199,8 +200,8 @@ export class HttpClient {
    * В сообщения об ошибках не попадают ни токен, ни адреса редиректов (в подписанной ссылке свой токен).
    */
   async getBinary(url: string, opts: BinaryOptions): Promise<BinaryResult> {
-    if (!isOwnUrl(url, this.baseUrl)) throw new JiraError(0, 'Адрес не относится к инстансу — скачивание с авторизацией запрещено', '', 'blocked');
-    if (this.badToken) throw new JiraError(0, 'Токен содержит пробелы, переводы строк или не-ASCII символы — скопируйте его заново', url, 'format');
+    if (!isOwnUrl(url, this.baseUrl)) throw new JiraError(0, t('The URL does not belong to the instance. Authorized download is blocked.'), '', 'blocked');
+    if (this.badToken) throw new JiraError(0, t('The token contains spaces, line breaks or non-ASCII characters. Copy it again.'), url, 'format');
     const signal = AbortSignal.timeout(opts.timeoutMs ?? Math.max(this.timeoutMs, 120_000));
     let current = url;
     // Покинув инстанс, цепочка больше не получает Authorization — даже если чужой хост вернул её на адрес инстанса.
@@ -218,7 +219,7 @@ export class HttpClient {
       } catch (e) {
         const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
         const where = own ? this.baseUrl : safeOrigin(current);
-        throw new JiraError(0, timeout ? `Нет ответа от ${where}: превышено время ожидания` : `Нет соединения с ${where}: ${this.scrub(networkReason(e))}`, url, 'network');
+        throw new JiraError(0, timeout ? t('No response from {0}: timed out', where) : t('No connection to {0}: {1}', where, this.scrub(networkReason(e))), url, 'network');
       }
       if (res.status >= 300 && res.status < 400 && res.status !== 304) {
         void res.body?.cancel().catch(() => undefined);
@@ -227,18 +228,18 @@ export class HttpClient {
         try {
           next = new URL(loc ?? '', current);
         } catch {
-          throw new JiraError(res.status, 'Сервер вернул некорректный редирект', url, 'redirect');
+          throw new JiraError(res.status, t('The server returned an invalid redirect'), url, 'redirect');
         }
-        if (!loc) throw new JiraError(res.status, 'Сервер вернул перенаправление без адреса', url, 'redirect');
-        if (hop >= MAX_REDIRECTS) throw new JiraError(res.status, 'Слишком много перенаправлений при скачивании', url, 'redirect');
-        if (/\/login\.jsp$/i.test(next.pathname)) throw new JiraError(401, 'Jira перенаправила на страницу входа — нет доступа к файлу или токен недействителен', url);
+        if (!loc) throw new JiraError(res.status, t('The server returned a redirect without a location'), url, 'redirect');
+        if (hop >= MAX_REDIRECTS) throw new JiraError(res.status, t('Too many redirects while downloading'), url, 'redirect');
+        if (/\/login\.jsp$/i.test(next.pathname)) throw new JiraError(401, t('Jira redirected to the login page. No access to the file, or the token is invalid.'), url);
         if (!isOwnUrl(next.toString(), this.baseUrl) && next.protocol !== 'https:') {
-          throw new JiraError(0, `Сервер перенаправил скачивание на небезопасный адрес (${next.protocol}//${next.host}) — отменено`, url, 'redirect');
+          throw new JiraError(0, t('The server redirected the download to an insecure address ({0}//{1}). Canceled.', next.protocol, next.host), url, 'redirect');
         }
         const base = new URL(this.baseUrl);
         if (!left && base.protocol === 'http:' && next.protocol === 'https:' && next.hostname === base.hostname) {
           // Инстанс заведён по http, а сервер уводит на https: без токена дальше будет невнятная 401 — говорим прямо.
-          throw new JiraError(res.status, `Сервер перенаправил на https — укажите в настройках инстанса адрес https://${next.host}`, url, 'redirect');
+          throw new JiraError(res.status, t('The server redirected to https. Set the instance URL to https://{0} in settings.', next.host), url, 'redirect');
         }
         if (!isOwnUrl(next.toString(), this.baseUrl)) left = true;
         current = next.toString();
@@ -255,10 +256,10 @@ export class HttpClient {
       const len = Number(res.headers.get('content-length'));
       if (Number.isFinite(len) && len > opts.maxBytes) {
         void res.body?.cancel().catch(() => undefined);
-        throw new JiraError(0, `Файл больше лимита ${mb(opts.maxBytes)} (${mb(len)})`, url, 'limit');
+        throw new JiraError(0, t('File exceeds the {0} limit ({1})', mb(opts.maxBytes), mb(len)), url, 'limit');
       }
-      const bytes = await readLimited(res, opts.maxBytes, () => new JiraError(0, `Файл больше лимита ${mb(opts.maxBytes)}`, url, 'limit'),
-        () => new JiraError(0, `Скачивание с ${this.baseUrl} оборвалось (превышено время ожидания или разрыв соединения)`, url, 'network'));
+      const bytes = await readLimited(res, opts.maxBytes, () => new JiraError(0, t('File exceeds the {0} limit', mb(opts.maxBytes)), url, 'limit'),
+        () => new JiraError(0, t('Download from {0} was cut off (timeout or connection lost)', this.baseUrl), url, 'network'));
       return { bytes, mime: res.headers.get('content-type') ?? '' };
     }
   }
@@ -273,9 +274,9 @@ export class HttpClient {
    */
   async postJson<T>(path: string, body: unknown, query?: Query): Promise<T | undefined> {
     const url = this.url(path, query);
-    if (!isOwnUrl(url, this.baseUrl)) throw new JiraError(0, 'Адрес не относится к инстансу — запрос с авторизацией запрещён', '', 'blocked');
-    if (this.badToken) throw new JiraError(0, 'Токен содержит пробелы, переводы строк или не-ASCII символы — скопируйте его заново', url, 'format');
-    const maybeSaved = MAYBE_SAVED;
+    if (!isOwnUrl(url, this.baseUrl)) throw new JiraError(0, t('The URL does not belong to the instance. Authorized request is blocked.'), '', 'blocked');
+    if (this.badToken) throw new JiraError(0, t('The token contains spaces, line breaks or non-ASCII characters. Copy it again.'), url, 'format');
+    const saved = maybeSaved();
     let res: Response;
     try {
       res = await this.fetchImpl(url, {
@@ -292,8 +293,8 @@ export class HttpClient {
       throw new JiraError(
         0,
         timeout
-          ? `Нет ответа от ${this.baseUrl}: превышено время ожидания; ${maybeSaved}`
-          : `Нет соединения с ${this.baseUrl}: ${this.scrub(networkReason(e))}${notSent ? '' : `; ${maybeSaved}`}`,
+          ? t('No response from {0}: timed out; {1}', this.baseUrl, saved)
+          : t('No connection to {0}: {1}', this.baseUrl, this.scrub(networkReason(e))) + (notSent ? '' : `; ${saved}`),
         url,
         'network',
       );
@@ -301,21 +302,21 @@ export class HttpClient {
     if ((res.status >= 300 && res.status < 400) || res.type === 'opaqueredirect') {
       void res.body?.cancel().catch(() => undefined);
       const loc = res.headers.get('location') ?? '';
-      if (/\/login\.jsp(?:[?#]|$)/i.test(loc)) throw new JiraError(401, 'Jira перенаправила на страницу входа — токен недействителен или нет прав на запись', url);
-      throw new JiraError(res.status, 'Сервер ответил перенаправлением на запись — запрос отменён; проверьте адрес инстанса (https, context path)', url, 'redirect');
+      if (/\/login\.jsp(?:[?#]|$)/i.test(loc)) throw new JiraError(401, t('Jira redirected to the login page. The token is invalid or lacks write access.'), url);
+      throw new JiraError(res.status, t('The server redirected a write request. Request canceled; check the instance URL (https, context path).'), url, 'redirect');
     }
     let text: string;
     try {
       text = await res.text();
     } catch {
-      throw new JiraError(0, `Ответ от ${this.baseUrl} оборвался; ${maybeSaved}`, url, 'network');
+      throw new JiraError(0, t('The response from {0} was cut off; {1}', this.baseUrl, saved), url, 'network');
     }
     if (!res.ok) {
       const denied = res.headers.get('x-authentication-denied-reason');
       const details = [describeBody(text), denied ? `X-Authentication-Denied-Reason: ${denied}` : ''].filter(Boolean).join('; ');
       // 502/503/504 — ответил прокси перед Jira, сама Jira запрос могла дописать: та же неоднозначность, что и таймаут.
       if (res.status === 502 || res.status === 503 || res.status === 504) {
-        throw new JiraError(res.status, `${messageForStatus(res.status, this.scrub(details))}; ${maybeSaved}`, url, 'network');
+        throw new JiraError(res.status, `${messageForStatus(res.status, this.scrub(details))}; ${saved}`, url, 'network');
       }
       throw new JiraError(res.status, messageForStatus(res.status, this.scrub(details)), url);
     }
@@ -324,12 +325,12 @@ export class HttpClient {
       return JSON.parse(text) as T;
     } catch {
       // 2xx, но не JSON: запись, скорее всего, прошла — сообщаем, но не как «не сохранено».
-      throw new JiraError(0, `Ответ на запись не похож на JSON; ${maybeSaved}`, url, 'format');
+      throw new JiraError(0, t('The write response is not JSON; {0}', saved), url, 'format');
     }
   }
 
   private scrub(text: string): string {
-    return this.secrets.reduce((t, x) => t.split(x).join('***'), text);
+    return this.secrets.reduce((acc, x) => acc.split(x).join('***'), text);
   }
 }
 
@@ -337,7 +338,7 @@ function safeOrigin(url: string): string {
   try {
     return new URL(url).origin;
   } catch {
-    return 'сервера';
+    return t('the server');
   }
 }
 
@@ -379,6 +380,6 @@ function networkReason(e: unknown): string {
   const msg = typeof cause?.message === 'string' ? cause.message : '';
   const reason = [e.message, code || msg].filter(Boolean).join(': ');
   return /CERT|SIGNATURE|SELF_SIGNED|UNABLE_TO_VERIFY/i.test(code + msg)
-    ? `${reason} — сертификат сервера не доверен; корпоративный CA можно подключить через NODE_EXTRA_CA_CERTS`
+    ? t('{0}. The server certificate is not trusted. A corporate CA can be added via NODE_EXTRA_CA_CERTS.', reason)
     : reason;
 }

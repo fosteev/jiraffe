@@ -1,3 +1,4 @@
+import { t } from '../l10n';
 // Вложения и картинки: чистые функции без vscode (тестируются в vitest, используются хостом и smoke).
 import * as path from 'node:path';
 import { isOwnUrl, normalizeBaseUrl } from './http';
@@ -191,9 +192,9 @@ export function imageSize(b: Uint8Array, mime: string): { w: number; h: number }
 
 /** Почему картинку нельзя отдавать webview (слишком много пикселей / большой SVG); можно — `undefined`. */
 export function imageRejection(b: Uint8Array, mime: string): string | undefined {
-  if (mime === 'image/svg+xml') return b.length > MAX_SVG_BYTES ? `SVG больше ${fmtMb(MAX_SVG_BYTES)} — скачайте файл` : undefined;
+  if (mime === 'image/svg+xml') return b.length > MAX_SVG_BYTES ? t('SVG is larger than {0}. Download the file.', fmtMb(MAX_SVG_BYTES)) : undefined;
   const d = imageSize(b, mime);
-  return d && d.w * d.h > MAX_IMAGE_PIXELS ? `картинка ${d.w}×${d.h} слишком большая для показа — скачайте файл` : undefined;
+  return d && d.w * d.h > MAX_IMAGE_PIXELS ? t('Image {0}×{1} is too large to preview. Download the file.', d.w, d.h) : undefined;
 }
 
 export const toDataUri = (mime: string, bytes: Uint8Array): string => `data:${mime};base64,${Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64')}`;
@@ -254,14 +255,14 @@ export function resolveAttachmentsRoot(o: AttachmentsRootInput): AttachmentsRoot
   if (path.isAbsolute(raw)) {
     if (!o.fromWorkspace) return { root: path.resolve(raw), inWorkspace: false, isDefault: false, tmp: false };
     const fallback = o.workspaceDir ? path.join(o.workspaceDir, DEFAULT_ATTACHMENTS_DIR) : path.join(o.tmpDir, 'jiraffe');
-    return { root: fallback, inWorkspace: !!o.workspaceDir, isDefault: true, tmp: !o.workspaceDir, warning: 'абсолютный jiraffe.attachmentsDir из настроек рабочей области игнорируется — задайте его в пользовательских настройках' };
+    return { root: fallback, inWorkspace: !!o.workspaceDir, isDefault: true, tmp: !o.workspaceDir, warning: t('The absolute jiraffe.attachmentsDir from workspace settings is ignored. Set it in user settings.') };
   }
   if (!o.workspaceDir) return { root: path.join(o.tmpDir, 'jiraffe'), inWorkspace: false, isDefault: true, tmp: true };
   const ws = path.resolve(o.workspaceDir);
   const root = path.resolve(ws, raw);
   const rel = path.relative(ws, root);
   if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
-    return { root: path.join(ws, DEFAULT_ATTACHMENTS_DIR), inWorkspace: true, isDefault: true, tmp: false, warning: `jiraffe.attachmentsDir «${raw}» выходит за пределы рабочей области — используется ${DEFAULT_ATTACHMENTS_DIR}` };
+    return { root: path.join(ws, DEFAULT_ATTACHMENTS_DIR), inWorkspace: true, isDefault: true, tmp: false, warning: t('jiraffe.attachmentsDir "{0}" is outside the workspace. Using {1}.', raw, DEFAULT_ATTACHMENTS_DIR) };
   }
   return { root, inWorkspace: true, isDefault: path.normalize(raw).replace(/[\\/]+$/, '') === DEFAULT_ATTACHMENTS_DIR, tmp: false };
 }
@@ -347,4 +348,4 @@ export const noticeText = (s: string, max = 160): string => {
   return t.length > max ? `${t.slice(0, max)}…` : t;
 };
 
-export const fmtMb = (bytes: number): string => `${Math.round((bytes / 1024 / 1024) * 10) / 10} МБ`;
+export const fmtMb = (bytes: number): string => t('{0} MB', Math.round((bytes / 1024 / 1024) * 10) / 10);

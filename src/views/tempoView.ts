@@ -1,5 +1,6 @@
 // Раздел «Tempo» (WebviewView): блок «Сегодня» из прототипа (`renderTempo`), без недельной таблицы.
 import * as vscode from 'vscode';
+import { getBundle, locale } from '../l10n';
 import { makeNonce, renderShell } from '../panels/html';
 import { isIssueKey, type HostToTempo, type TempoToHost, type TodayView } from '../panels/protocol';
 import type { InstanceStore } from '../state/instances';
@@ -36,6 +37,7 @@ export class TempoViewProvider implements vscode.WebviewViewProvider, vscode.Dis
       scriptUri: view.webview.asWebviewUri(vscode.Uri.joinPath(root, 'tempo.js')).toString(),
       styleUri: view.webview.asWebviewUri(vscode.Uri.joinPath(root, 'common.css')).toString(),
       title: 'Tempo',
+      l10n: { bundle: getBundle(), locale: locale() },
     });
     view.webview.onDidReceiveMessage((m: TempoToHost) => this.onMessage(m));
     view.onDidDispose(() => {

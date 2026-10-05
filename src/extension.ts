@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { setL10n } from './l10n';
 import { readScope, registerInstanceCommands } from './commands/instances';
 import { registerFilterCommands } from './commands/filters';
 import { registerIssueCommands } from './commands/issue';
@@ -26,6 +27,7 @@ const FOCUS_REFRESH_MS = 5 * 60_000;
 const TIMER_REFRESH_MS = 15 * 60_000;
 
 export function activate(context: vscode.ExtensionContext): void {
+  setL10n(vscode.l10n.bundle, vscode.l10n.bundle ? vscode.env.language : 'en');
   const instances = new InstanceStore(context.globalState, context.secrets);
   instances.setScope(readScope);
   const filters = new FilterState(context.globalState, context.workspaceState);

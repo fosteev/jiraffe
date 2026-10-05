@@ -123,7 +123,7 @@ describe('HttpClient.getBinary', () => {
     const stream = () => new Response(new ReadableStream({ pull(c) { c.enqueue(new Uint8Array(400)); } }), { status: 200 });
     const e2 = await fail(http({ [`${BASE}/a`]: stream }, []).getBinary(`${BASE}/a`, { maxBytes: 1000 }));
     expect(e2.code).toBe('limit');
-    expect(e2.message).toContain('лимита');
+    expect(e2.message).toContain('limit');
   });
 
   it('ошибка HTTP — без токена в сообщении', async () => {
@@ -156,7 +156,7 @@ describe('картинки описания: img src → data-img', () => {
     expect(issue.descriptionHtml).toContain('data-img="i0" title="A"');
     expect(issue.descriptionHtml).toContain('data-img="i1"');
     expect(issue.descriptionHtml).not.toContain('data-src');
-    expect(issue.descriptionHtml).toContain('<a href="https://evil.test/track.png">[внешняя картинка]</a>');
+    expect(issue.descriptionHtml).toContain('<a href="https://evil.test/track.png">[external image]</a>');
     expect(issue.descriptionHtml).not.toMatch(/evil\.test\/track\.png"[^>]*data-img/);
     expect(issue.comments[0].bodyHtml).toContain('data-img="i0"');
     expect((issue.descriptionHtml.match(/data-img=/g) ?? []).length).toBe(2);
@@ -170,9 +170,9 @@ describe('картинки описания: img src → data-img', () => {
   });
 
   it('data-src, ставший чужим (вписан руками в уже санитизированный HTML), не качается', () => {
-    const { urls, issue } = extractInlineImages(detail('<span class="img-ph" data-src="https://evil.test/jira/x.png">[картинка]</span>'), BASE);
+    const { urls, issue } = extractInlineImages(detail('<span class="img-ph" data-src="https://evil.test/jira/x.png">[image]</span>'), BASE);
     expect(urls).toEqual([]);
-    expect(issue.descriptionHtml).toBe('<span class="img-ph">[картинка]</span>');
+    expect(issue.descriptionHtml).toBe('<span class="img-ph">[image]</span>');
   });
 });
 
@@ -323,13 +323,13 @@ describe('протокол и разметка вложений', () => {
     expect(html).toContain('data-act="openAtt" data-id="6"');
     expect(html).not.toContain('data-act="openAtt" data-id="5"');
     expect(html).toContain('data-act="dlAll"');
-    expect(renderAttachments({ attachments: [] } as unknown as Parameters<typeof renderAttachments>[0])).toContain('Вложений нет');
+    expect(renderAttachments({ attachments: [] } as unknown as Parameters<typeof renderAttachments>[0])).toContain('No attachments');
     const lb = renderLightbox('f5', '<b>x</b>', c.attachments[0]);
     expect(lb).toContain('data-img="f5"');
     expect(lb).not.toContain('<b>x');
     expect(lb).not.toMatch(/ style=/);
-    expect(fmtSize(512)).toBe('512 Б');
-    expect(fmtSize(1536 * 1024)).toBe('1,5 МБ');
+    expect(fmtSize(512)).toBe('512 B');
+    expect(fmtSize(1536 * 1024)).toBe('1.5 MB');
   });
 });
 

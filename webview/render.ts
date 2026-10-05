@@ -1,14 +1,20 @@
 // Разметка карточки задачи — чистые функции «данные → HTML-строка» (без DOM), тестируются в vitest.
 // Inline-стили не используем (CSP): цвета и ширины проставляет issue.ts через CSSOM по data-атрибутам.
 import { formatDuration } from '../src/duration';
+import { locale, t, tn } from '../src/l10n';
 import type { WorkAttribute } from '../src/jira/tempo';
 import type { UserRef, Worklog } from '../src/jira/types';
 import { ISSUE_TABS, type AttachmentView, type IssueCard, type IssueTab, type LogFormView } from '../src/panels/protocol';
 
 export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const TAB_LABEL: Record<IssueTab, string> = { desc: 'Описание', att: 'Вложения', com: 'Комментарии', hist: 'История', wl: 'Журнал работ' };
-export const STATUS_LABEL = { new: 'Открыта', indeterminate: 'В работе', done: 'Готово' } as const;
+const tabLabel = (tab: IssueTab): string => ({ desc: t('Description'), att: t('Attachments'), com: t('Comments'), hist: t('History'), wl: t('Work Log') })[tab];
+// Геттеры: подписи переводятся при обращении, а не при загрузке модуля (до setL10n).
+export const STATUS_LABEL = {
+  get new(): string { return t('To Do'); },
+  get indeterminate(): string { return t('In Progress'); },
+  get done(): string { return t('Done'); },
+};
 
 const st = 'fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"';
 export const IC = {
@@ -68,39 +74,39 @@ export const person = (u: UserRef | undefined): string => (u ? `<span class="who
 export function fmtDateTime(iso: string): string {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return iso;
-  return new Date(t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(t).toLocaleString(locale(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 export function fmtDate(iso: string): string {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return iso;
-  return new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(t).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 /** `due` приходит как `YYYY-MM-DD` — без сдвига часового пояса. */
 export function fmtDue(d: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
-  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : d;
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' }) : d;
 }
-const dur = (sec: number): string => (sec > 0 ? formatDuration(sec) : '0м');
+const dur = (sec: number): string => (sec > 0 ? formatDuration(sec) : t('{0}m', 0));
 const dash = '<span class="mut">—</span>';
 const clip = (s: string, n = 300): string => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 export function renderTabs(c: IssueCard, tab: IssueTab): string {
   const counts: Record<IssueTab, number | undefined> = { desc: undefined, att: c.attachments.length, com: c.issue.comments.length, hist: c.issue.history.length + 1, wl: c.worklogs.length };
   return `<div class="subtabs" role="tablist">${ISSUE_TABS.map((t) =>
-    `<button class="${t === tab ? 'on' : ''}" role="tab" aria-selected="${t === tab}" data-act="tab" data-tab="${t}">${TAB_LABEL[t]}${counts[t] != null ? `<span class="cnt">${counts[t]}</span>` : ''}</button>`,
+    `<button class="${t === tab ? 'on' : ''}" role="tab" aria-selected="${t === tab}" data-act="tab" data-tab="${t}">${tabLabel(t)}${counts[t] != null ? `<span class="cnt">${counts[t]}</span>` : ''}</button>`,
   ).join('')}</div>`;
 }
 
 export function renderDescription(c: IssueCard): string {
-  return `<div class="rich">${c.issue.descriptionHtml || '<p class="mut">Описание не заполнено.</p>'}</div>`;
+  return `<div class="rich">${c.issue.descriptionHtml || `<p class="mut">${t('No description.')}</p>`}</div>`;
 }
 
 /** Размер файла по-человечески: `512 Б`, `12 КБ`, `1,4 МБ`. */
 export function fmtSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '—';
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
-  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} МБ`;
+  if (bytes < 1024) return t('{0} B', bytes);
+  if (bytes < 1024 * 1024) return t('{0} KB', Math.round(bytes / 1024));
+  return t('{0} MB', (bytes / 1024 / 1024).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 }
 
 const fileExt = (name: string): string => {
@@ -115,17 +121,17 @@ const attInfo = (a: AttachmentView): string => [fmtSize(a.size), a.author?.name,
  */
 export function renderAttachments(c: IssueCard): string {
   const list = c.attachments;
-  if (!list.length) return '<p class="mut">Вложений нет.</p>';
+  if (!list.length) return `<p class="mut">${t('No attachments.')}</p>`;
   const cards = list.map((a) => {
     const thumb = a.image
-      ? `<button class="th" data-act="img" data-id="${esc(a.id)}" aria-label="Открыть ${esc(a.filename)}"><span class="img-ph" data-img="t${esc(a.id)}">загрузка…</span></button>`
-      : `<div class="th file">${IC.file}<span>${esc(fileExt(a.filename) || 'файл')}</span></div>`;
+      ? `<button class="th" data-act="img" data-id="${esc(a.id)}" aria-label="${esc(t('Open {0}', a.filename))}"><span class="img-ph" data-img="t${esc(a.id)}">${t('loading…')}</span></button>`
+      : `<div class="th file">${IC.file}<span>${esc(fileExt(a.filename) || t('file'))}</span></div>`;
     return `<div class="att">${thumb}<div class="inf"><span class="nm" title="${esc(a.filename)}">${esc(a.filename)}</span><span class="mut">${esc(attInfo(a))}</span></div>`
-      + `<div class="ab">${a.text ? `<button class="btn sm" data-act="openAtt" data-id="${esc(a.id)}">Открыть в редакторе</button>` : ''}`
-      + `<button class="btn sm" data-act="dl" data-id="${esc(a.id)}" aria-label="Скачать ${esc(a.filename)}" title="Скачать">${IC.dl}</button></div></div>`;
+      + `<div class="ab">${a.text ? `<button class="btn sm" data-act="openAtt" data-id="${esc(a.id)}">${t('Open in Editor')}</button>` : ''}`
+      + `<button class="btn sm" data-act="dl" data-id="${esc(a.id)}" aria-label="${esc(t('Download {0}', a.filename))}" title="${t('Download')}">${IC.dl}</button></div></div>`;
   }).join('');
-  return `<div class="toolbar"><span class="mut sm">${list.length} файл(а) · картинки скачиваются расширением с авторизацией и показываются здесь</span><span class="sp"></span>`
-    + `<button class="btn sm" data-act="dlAll">${IC.dl} Скачать все</button></div><div class="att-grid">${cards}</div>`;
+  return `<div class="toolbar"><span class="mut sm">${esc(tn(list.length, '{0} file · images are downloaded by the extension with authorization and shown here|{0} files · images are downloaded by the extension with authorization and shown here'))}</span><span class="sp"></span>`
+    + `<button class="btn sm" data-act="dlAll">${IC.dl} ${t('Download All')}</button></div><div class="att-grid">${cards}</div>`;
 }
 
 /**
@@ -133,23 +139,23 @@ export function renderAttachments(c: IssueCard): string {
  * по `data-img`, пока её нет — «загрузка…».
  */
 export function renderLightbox(imgId: string, name: string, att?: AttachmentView): string {
-  return `<div class="ov" data-act="ov-bg"><div class="lb-box" role="dialog" aria-label="${esc(name)}"><span class="img-ph" data-img="${esc(imgId)}">загрузка…</span>`
+  return `<div class="ov" data-act="ov-bg"><div class="lb-box" role="dialog" aria-label="${esc(name)}"><span class="img-ph" data-img="${esc(imgId)}">${t('loading…')}</span>`
     + `<div class="hrow"><span class="nm">${esc(name)}</span>${att ? `<span class="mut sm">${esc(attInfo(att))}</span>` : ''}<span class="sp"></span>`
-    + `${att ? `<button class="btn sm" data-act="dl" data-id="${esc(att.id)}">${IC.dl} Скачать</button>` : ''}<button class="btn sm" data-act="ov-x">Закрыть</button></div></div></div>`;
+    + `${att ? `<button class="btn sm" data-act="dl" data-id="${esc(att.id)}">${IC.dl} ${t('Download')}</button>` : ''}<button class="btn sm" data-act="ov-x">${t('Close')}</button></div></div></div>`;
 }
 
 export function renderComments(c: IssueCard): string {
   const list = c.issue.comments.length
     ? c.issue.comments.map((m) => `<div class="cm">${avatar(m.author, 28)}<div><div class="who"><b>${esc(m.author?.name ?? '—')}</b><span class="mut sm">${esc(fmtDateTime(m.created))}</span></div><div class="tx rich">${m.bodyHtml}</div></div></div>`).join('')
-    : '<p class="mut">Комментариев нет.</p>';
-  return `${list}<div class="ro-note">В MVP комментарии только читаются. Ответ из VS Code — в следующей версии.</div>`;
+    : `<p class="mut">${t('No comments.')}</p>`;
+  return `${list}<div class="ro-note">${t('Comments are read-only in the MVP. Replying from VS Code is coming in the next version.')}</div>`;
 }
 
 export function renderHistory(c: IssueCard): string {
   const rows = c.issue.history.map((h) => `<div class="hi">${avatar(h.author, 28)}<div><div class="who"><b>${esc(h.author?.name ?? '—')}</b> <span class="mut sm">${esc(fmtDateTime(h.created))}</span></div>${h.items.map((i) =>
-    `<div class="chg"><span class="f">${esc(i.field)}</span>${i.from !== null ? `<span class="val old">${esc(clip(i.from))}</span><span class="arr">→</span>` : ''}<span class="val">${i.to !== null ? esc(clip(i.to)) : '<span class="mut">(пусто)</span>'}</span></div>`).join('')}</div></div>`);
+    `<div class="chg"><span class="f">${esc(i.field)}</span>${i.from !== null ? `<span class="val old">${esc(clip(i.from))}</span><span class="arr">→</span>` : ''}<span class="val">${i.to !== null ? esc(clip(i.to)) : `<span class="mut">${t('(empty)')}</span>`}</span></div>`).join('')}</div></div>`);
   // Создание задачи в changelog Jira не пишет — добавляем сами, как в прототипе.
-  rows.push(`<div class="hi">${avatar(c.issue.reporter, 28)}<div><div class="who"><b>${esc(c.issue.reporter?.name ?? '—')}</b> <span class="mut sm">${esc(fmtDateTime(c.issue.created))}</span></div><div class="chg mut">создал(а) задачу</div></div></div>`);
+  rows.push(`<div class="hi">${avatar(c.issue.reporter, 28)}<div><div class="who"><b>${esc(c.issue.reporter?.name ?? '—')}</b> <span class="mut sm">${esc(fmtDateTime(c.issue.created))}</span></div><div class="chg mut">${t('created the issue')}</div></div></div>`);
   return rows.join('');
 }
 
@@ -169,21 +175,21 @@ export function attrColumns(c: IssueCard): WorkAttribute[] {
   return cols;
 }
 
-const numberRu = (n: number): string => n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+const formatNumber = (n: number): string => n.toLocaleString(locale(), { maximumFractionDigits: 2 });
 
 /** Значение атрибута для таблицы: список — название значения, флажок — «да», число — с разрядами. */
 export function attrValue(a: WorkAttribute, v: string | undefined): string {
   if (v === undefined || v === '') return dash;
   if (a.kind === 'list') return esc(a.values?.find((x) => x.value === v)?.name ?? v);
-  if (a.kind === 'checkbox') return v === 'true' ? 'да' : 'нет';
-  if (a.kind === 'number' && Number.isFinite(Number(v))) return esc(numberRu(Number(v)));
+  if (a.kind === 'checkbox') return v === 'true' ? t('yes') : t('no');
+  if (a.kind === 'number' && Number.isFinite(Number(v))) return esc(formatNumber(Number(v)));
   return esc(v);
 }
 
 const attrSum = (a: WorkAttribute, logs: readonly Worklog[]): string => {
   if (a.kind !== 'number') return '';
   const vals = logs.map((l) => Number(l.attributes?.[a.key])).filter((n) => Number.isFinite(n));
-  return vals.length ? esc(numberRu(vals.reduce((s, n) => s + n, 0))) : '';
+  return vals.length ? esc(formatNumber(vals.reduce((s, n) => s + n, 0))) : '';
 };
 
 export function renderWorklog(c: IssueCard): string {
@@ -191,14 +197,14 @@ export function renderWorklog(c: IssueCard): string {
   const total = logs.reduce((s, l) => s + l.timeSpentSec, 0);
   const cols = attrColumns(c);
   const src = c.tempo
-    ? `${IC.clock} Tempo Timesheets${cols.length ? ` · атрибуты ${cols.map((a) => `«${esc(a.name)}»`).join(', ')}` : ''}`
-    : `${IC.info} Tempo на ${esc(c.instanceName)} нет — стандартный журнал работ Jira`;
+    ? `${IC.clock} Tempo Timesheets${cols.length ? ` · ${t('attributes {0}', cols.map((a) => t('"{0}"', esc(a.name))).join(', '))}` : ''}`
+    : `${IC.info} ${t('No Tempo on {0} — using the standard Jira work log', esc(c.instanceName))}`;
   const num = (a: WorkAttribute): string => (a.kind === 'number' ? ' class="num"' : '');
   const table = logs.length
-    ? `<div class="tw-wrap"><table class="t"><thead><tr><th>Кто</th><th>Дата</th><th class="num">Время</th><th>Комментарий</th>${cols.map((a) => `<th${num(a)}>${esc(a.name)}</th>`).join('')}</tr></thead><tbody>${logs.map((l) =>
-      `<tr><td>${person(l.author)}</td><td class="left num">${esc(fmtDate(l.started))}</td><td class="num">${esc(dur(l.timeSpentSec))}</td><td>${esc(l.comment)}</td>${cols.map((a) => `<td${num(a)}>${attrValue(a, l.attributes?.[a.key])}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td>Итого</td><td></td><td class="num">${esc(dur(total))}</td><td></td>${cols.map((a) => `<td${num(a)}>${attrSum(a, logs)}</td>`).join('')}</tr></tfoot></table></div>`
-    : c.worklogError ? `<p class="mut">Журнал работ не загрузился: ${esc(c.worklogError)}</p>` : '<p class="mut">Записей пока нет.</p>';
-  return `<div class="toolbar"><span class="src">${src}</span><span class="sp"></span><button class="btn sm pri" data-act="logWork">${IC.clock} Залогать время</button></div>${table}`;
+    ? `<div class="tw-wrap"><table class="t"><thead><tr><th>${t('Who')}</th><th>${t('Date')}</th><th class="num">${t('Time')}</th><th>${t('Comment')}</th>${cols.map((a) => `<th${num(a)}>${esc(a.name)}</th>`).join('')}</tr></thead><tbody>${logs.map((l) =>
+      `<tr><td>${person(l.author)}</td><td class="left num">${esc(fmtDate(l.started))}</td><td class="num">${esc(dur(l.timeSpentSec))}</td><td>${esc(l.comment)}</td>${cols.map((a) => `<td${num(a)}>${attrValue(a, l.attributes?.[a.key])}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td>${t('Total')}</td><td></td><td class="num">${esc(dur(total))}</td><td></td>${cols.map((a) => `<td${num(a)}>${attrSum(a, logs)}</td>`).join('')}</tr></tfoot></table></div>`
+    : c.worklogError ? `<p class="mut">${esc(t('Failed to load the work log: {0}', c.worklogError))}</p>` : `<p class="mut">${t('No entries yet.')}</p>`;
+  return `<div class="toolbar"><span class="src">${src}</span><span class="sp"></span><button class="btn sm pri" data-act="logWork">${IC.clock} ${t('Log Work')}</button></div>${table}`;
 }
 
 /** Поле атрибута Tempo в диалоге. AI Tokens рисуется отдельно (`#lg-tok`). */
@@ -207,7 +213,7 @@ function attrField(a: WorkAttribute): string {
   const label = `${esc(a.name)}${a.required ? ' *' : ''}`;
   const data = `data-attr="${esc(a.key)}"`;
   if (a.kind === 'list') {
-    return `<div class="fld"><label for="${esc(id)}">${label}</label><select id="${esc(id)}" ${data}>${a.required ? '<option value="" disabled selected>— выберите —</option>' : '<option value="">—</option>'}${(a.values ?? []).map((v) => `<option value="${esc(v.value)}">${esc(v.name)}</option>`).join('')}</select></div>`;
+    return `<div class="fld"><label for="${esc(id)}">${label}</label><select id="${esc(id)}" ${data}>${a.required ? `<option value="" disabled selected>${t('— select —')}</option>` : '<option value="">—</option>'}${(a.values ?? []).map((v) => `<option value="${esc(v.value)}">${esc(v.name)}</option>`).join('')}</select></div>`;
   }
   if (a.kind === 'checkbox') {
     return `<div class="fld"><span class="lb">&nbsp;</span><label class="chk"><input type="checkbox" id="${esc(id)}" ${data} value="true"> ${label}</label></div>`;
@@ -218,23 +224,23 @@ function attrField(a: WorkAttribute): string {
 /** Диалог «Залогать время» (prototype: `logHtml`). Поля атрибутов — по ответу `work-attribute` инстанса. */
 export function renderLogDialog(key: string, f: LogFormView): string {
   const ai = f.attributes.find((a) => a.key === f.aiTokensAttr);
-  const tok = `<div class="fld"><label for="lg-tok">${esc(ai?.name ?? 'AI Tokens')}${ai?.required ? ' *' : ''}</label><input id="lg-tok" inputmode="numeric" placeholder="например, 120000" maxlength="32" autocomplete="off"></div>`;
+  const tok = `<div class="fld"><label for="lg-tok">${esc(ai?.name ?? 'AI Tokens')}${ai?.required ? ' *' : ''}</label><input id="lg-tok" inputmode="numeric" placeholder="${t('e.g. 120000')}" maxlength="32" autocomplete="off"></div>`;
   const rest = f.attributes.filter((a) => a.key !== f.aiTokensAttr);
   const tempo = f.tempo
-    ? `<fieldset class="tempo"><legend>Tempo · рабочие атрибуты</legend><div class="g2">${rest.map(attrField).join('')}${tok}</div>${f.aiTokensAttr ? '' : '<div class="note">Атрибута AI Tokens на инстансе нет — значение допишется в комментарий.</div>'}${f.unsupportedRequired.length ? `<div class="note">Обязательные атрибуты ${f.unsupportedRequired.map((n) => `«${esc(n)}»`).join(', ')} форма заполнить не умеет — Tempo может отклонить запись.</div>` : ''}</fieldset>`
-    : `${tok}<div class="note">На ${esc(f.instanceName)} нет Tempo — запись уйдёт в стандартный журнал работ задачи, AI Tokens допишутся в комментарий.</div>`;
-  return `<div class="ov" data-act="dlg-bg"><div class="dlg" role="dialog" aria-modal="true" aria-label="Залогать время">
-    <div class="dlg-h">${IC.clock} Залогать время<button class="ib" data-act="dlg-x" aria-label="Закрыть">${IC.x}</button></div>
+    ? `<fieldset class="tempo"><legend>${t('Tempo · work attributes')}</legend><div class="g2">${rest.map(attrField).join('')}${tok}</div>${f.aiTokensAttr ? '' : `<div class="note">${t('The AI Tokens attribute is missing on the instance — the value will be appended to the comment.')}</div>`}${f.unsupportedRequired.length ? `<div class="note">${t('Required attributes {0} cannot be filled in by the form — Tempo may reject the entry.', f.unsupportedRequired.map((n) => t('"{0}"', esc(n))).join(', '))}</div>` : ''}</fieldset>`
+    : `${tok}<div class="note">${t('No Tempo on {0} — the entry goes to the issue’s standard work log, AI Tokens are appended to the comment.', esc(f.instanceName))}</div>`;
+  return `<div class="ov" data-act="dlg-bg"><div class="dlg" role="dialog" aria-modal="true" aria-label="${t('Log Work')}">
+    <div class="dlg-h">${IC.clock} ${t('Log Work')}<button class="ib" data-act="dlg-x" aria-label="${t('Close')}">${IC.x}</button></div>
     <form class="dlg-b" id="lg-form" novalidate>
-      <div class="fld"><span class="lb">Задача</span><div class="ro"><span class="k">${esc(key)}</span><span class="ell">${esc(f.summary)}</span></div></div>
-      <div class="g2"><div class="fld"><label for="lg-dur">Потрачено</label><input id="lg-dur" placeholder="1ч 30м" maxlength="64" autocomplete="off"><small>1ч 30м · 1h30m · 90m · 1.5h</small></div>
-      <div class="fld"><label for="lg-date">Дата</label><input type="date" id="lg-date" value="${esc(f.today)}" min="2000-01-01" max="${esc(f.today)}"></div></div>
-      <div class="fld"><label for="lg-c">Комментарий</label><textarea id="lg-c" rows="3" placeholder="Что сделано" maxlength="30000"></textarea></div>
+      <div class="fld"><span class="lb">${t('Issue')}</span><div class="ro"><span class="k">${esc(key)}</span><span class="ell">${esc(f.summary)}</span></div></div>
+      <div class="g2"><div class="fld"><label for="lg-dur">${t('Time spent')}</label><input id="lg-dur" placeholder="${t('1h 30m')}" maxlength="64" autocomplete="off"><small>${t('1h 30m · 1h30m · 90m · 1.5h')}</small></div>
+      <div class="fld"><label for="lg-date">${t('Date')}</label><input type="date" id="lg-date" value="${esc(f.today)}" min="2000-01-01" max="${esc(f.today)}"></div></div>
+      <div class="fld"><label for="lg-c">${t('Comment')}</label><textarea id="lg-c" rows="3" placeholder="${t('What was done')}" maxlength="30000"></textarea></div>
       ${tempo}
       <div class="err" id="lg-err" role="alert" hidden></div>
       <button type="submit" hidden></button>
     </form>
-    <div class="dlg-f"><button class="btn" data-act="dlg-x">Отмена</button><button class="btn pri" data-act="log-save">Залогать</button></div>
+    <div class="dlg-f"><button class="btn" data-act="dlg-x">${t('Cancel')}</button><button class="btn pri" data-act="log-save">${t('Log')}</button></div>
   </div></div>`;
 }
 
@@ -249,10 +255,10 @@ export function renderMeta(c: IssueCard): string {
   const epic = i.epic ? `<button class="ln" data-act="epic" data-key="${esc(i.epic.key)}" title="${esc(i.epic.key)}">${esc(i.epic.summary ?? i.epic.key)}</button>` : dash;
   const rel = i.fixVersions.length ? i.fixVersions.map((v) => `<button class="ln" data-act="release" data-id="${esc(v.id)}">${esc(v.name)}</button>`).join(', ') : dash;
   return `<aside class="meta">
-    <div class="mg"><h5>Люди</h5>${row('Исполнитель', person(i.assignee))}${row('Автор', person(i.reporter))}${row('Наблюдатели', watchers)}</div>
-    <div class="mg"><h5>Детали</h5>${row('Эпик', epic)}${row('Релиз', rel)}${row('Метки', i.labels.length ? i.labels.map((l) => `<span class="tag">${esc(l)}</span>`).join('') : dash)}${row('Компоненты', i.components.length ? esc(i.components.join(', ')) : dash)}</div>
-    <div class="mg"><h5>Время</h5>${row('Оценка', orig ? esc(dur(orig)) : dash)}${row('Залогано', `${esc(dur(spent))}${over ? ' <span class="under">· сверх оценки</span>' : ''}`)}${row('Осталось', rem !== undefined ? esc(dur(rem)) : dash)}${orig ? `<div class="bar"><i class="${over ? 'b-over' : 'b-acc'}" data-w="${Math.min(100, Math.round((spent / orig) * 100))}"></i></div>` : ''}</div>
-    <div class="mg"><h5>Даты</h5>${row('Создана', esc(fmtDateTime(i.created)))}${row('Обновлена', esc(fmtDateTime(i.updated)))}${row('Срок', i.due ? esc(fmtDue(i.due)) : dash)}</div>
+    <div class="mg"><h5>${t('People')}</h5>${row(t('Assignee'), person(i.assignee))}${row(t('Reporter'), person(i.reporter))}${row(t('Watchers'), watchers)}</div>
+    <div class="mg"><h5>${t('Details')}</h5>${row(t('Epic'), epic)}${row(t('Release'), rel)}${row(t('Labels'), i.labels.length ? i.labels.map((l) => `<span class="tag">${esc(l)}</span>`).join('') : dash)}${row(t('Components'), i.components.length ? esc(i.components.join(', ')) : dash)}</div>
+    <div class="mg"><h5>${t('Time')}</h5>${row(t('Estimate'), orig ? esc(dur(orig)) : dash)}${row(t('Logged'), `${esc(dur(spent))}${over ? ` <span class="under">· ${t('over estimate')}</span>` : ''}`)}${row(t('Remaining'), rem !== undefined ? esc(dur(rem)) : dash)}${orig ? `<div class="bar"><i class="${over ? 'b-over' : 'b-acc'}" data-w="${Math.min(100, Math.round((spent / orig) * 100))}"></i></div>` : ''}</div>
+    <div class="mg"><h5>${t('Dates')}</h5>${row(t('Created'), esc(fmtDateTime(i.created)))}${row(t('Updated'), esc(fmtDateTime(i.updated)))}${row(t('Due'), i.due ? esc(fmtDue(i.due)) : dash)}</div>
   </aside>`;
 }
 
@@ -264,11 +270,11 @@ export function renderCard(c: IssueCard, tab: IssueTab): string {
     <div class="iv-head">
       <div class="crumbs">${IC.server} ${esc(c.instanceName)}<span>›</span>${esc(project)}${i.epic ? `<span>›</span><button class="ln" data-act="epic" data-key="${esc(i.epic.key)}">${esc(i.epic.key)}</button>` : ''}<span>›</span>${typeIcon(i.type)}<span class="k">${esc(i.key)}</span></div>
       <h1>${esc(i.summary)}</h1>
-      <div class="hrow"><button class="pill pill-btn s-${i.statusCategory}" data-act="transition" title="Сменить статус">${esc(i.status || STATUS_LABEL[i.statusCategory])} ▾</button>${i.priority ? `<span class="prio">${priorityIcon(i.priority)}${esc(i.priority)}</span>` : ''}<span class="mut sm">${esc(i.type)}</span><span class="sp"></span>
-        <button class="btn" data-act="copyKey">${IC.copy} Ключ</button>
-        <button class="btn" data-act="openInBrowser">${IC.ext} Открыть в Jira</button>
-        <button class="btn" data-act="pin"${c.pinned ? ' disabled' : ''}>${IC.pin} ${c.pinned ? 'Закреплена' : 'Закрепить'}</button>
-        <button class="btn pri" data-act="logWork">${IC.clock} Залогать время</button></div>
+      <div class="hrow"><button class="pill pill-btn s-${i.statusCategory}" data-act="transition" title="${t('Change Status')}">${esc(i.status || STATUS_LABEL[i.statusCategory])} ▾</button>${i.priority ? `<span class="prio">${priorityIcon(i.priority)}${esc(i.priority)}</span>` : ''}<span class="mut sm">${esc(i.type)}</span><span class="sp"></span>
+        <button class="btn" data-act="copyKey">${IC.copy} ${t('Key')}</button>
+        <button class="btn" data-act="openInBrowser">${IC.ext} ${t('Open in Jira')}</button>
+        <button class="btn" data-act="pin"${c.pinned ? ' disabled' : ''}>${IC.pin} ${c.pinned ? t('Pinned') : t('Pin')}</button>
+        <button class="btn pri" data-act="logWork">${IC.clock} ${t('Log Work')}</button></div>
     </div>
     <div class="main">${renderTabs(c, tab)}${body}</div>
     ${renderMeta(c)}

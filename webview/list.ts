@@ -1,4 +1,6 @@
 // Webview вкладок эпика и релиза: слушает хост, рисует listRender.ts, шлёт действия обратно (всё валидируется в хосте).
+import './l10nInit';
+import { t } from '../src/l10n';
 import type { HostToList, ListPage, ListToHost } from '../src/panels/protocol';
 import { esc } from './render';
 import { renderListPage } from './listRender';
@@ -30,10 +32,10 @@ function note(html: string, cls = ''): void {
 window.addEventListener('message', (ev: MessageEvent<HostToList>) => {
   const m = ev.data;
   if (m?.type === 'loading') {
-    if (!current || current.type !== m.kind || current.instanceId !== m.instanceId || idOf(current) !== m.id) note('Загрузка…');
+    if (!current || current.type !== m.kind || current.instanceId !== m.instanceId || idOf(current) !== m.id) note(t('Loading…'));
   } else if (m?.type === 'error') {
     const target = `data-instance="${esc(m.instanceId)}" data-kind="${m.kind}" data-id="${esc(m.id)}"`;
-    note(`${esc(m.message)}<br><button class="btn" data-act="refresh" ${target}>Повторить</button>`, 'err');
+    note(`${esc(m.message)}<br><button class="btn" data-act="refresh" ${target}>${t('Retry')}</button>`, 'err');
   } else if (m?.type === 'page') {
     current = m.data;
     app.className = '';
