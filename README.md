@@ -4,7 +4,7 @@ Jira inside VS Code: your issues, the full issue card, attachments, time logging
 
 It covers the daily routine, not all of Jira. Creating and editing issues is not there yet.
 
-> The UI is in Russian for now. [Русская версия README](README.ru.md)
+> The UI follows the VS Code display language: English or Russian. [Русская версия README](README.ru.md)
 
 ![Issue card next to the issue tree](docs/screenshots/card.png)
 
@@ -12,13 +12,19 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 
 **Issues.** Assigned to me, by project, or any JQL. Quick filters by status category, type, priority and instance. Search by key (`ABC-123`) or text. Your saved filters and Jira favourite filters in a separate view.
 
+![Quick filters over a JQL query](docs/screenshots/filters.png)
+
 **Issue card.** Description, comments, change history, work log, people, epic and fix versions. Clicking the status opens the transitions available to you; required fields with a list of values (resolution, etc.) are asked for in a picker.
+
+![Change status picker](docs/screenshots/change-status.png)
 
 **Attachments.** Image previews in the description, comments and attachments tab, with a lightbox. Download one or all, open text files in the editor. Files go to `.jiraffe/<KEY>/` in the workspace (git-ignored automatically).
 
 ![Attachments tab](docs/screenshots/attachments.png)
 
 **Time logging.** From the card or the tree. Uses Tempo where it is installed (including work attributes), the standard Jira worklog otherwise. The status bar shows how much you've logged today against your workday.
+
+![Tempo section with today's entries](docs/screenshots/tempo.png)
 
 ![Log work dialog](docs/screenshots/log-work.png)
 
@@ -49,7 +55,7 @@ Requires VS Code 1.90+.
 
 ## Adding an instance
 
-Command Palette → **Jiraffe: Добавить инстанс** (Add instance), or the button in an empty view. Enter the URL, type and token. You can paste an issue link instead of the URL — the base address is taken from it. The connection is checked right away; a failing instance is not saved.
+Command Palette → **Jiraffe: Add Instance**, or the button in an empty view. Enter the URL, type and token. You can paste an issue link instead of the URL — the base address is taken from it. The connection is checked right away; a failing instance is not saved.
 
 - **Server / Data Center:** Jira → avatar → Profile → Personal Access Tokens → Create token.
 - **Cloud:** create a token at <https://id.atlassian.com/manage-profile/security/api-tokens>; use `https://your-domain.atlassian.net` and your Atlassian account email.

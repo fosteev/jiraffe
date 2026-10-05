@@ -1,0 +1,886 @@
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jiraffe prototype</title>
+<style>
+/* Layout: replica of a VS Code window — activity bar · sidebar with tree views · editor tabs with webview card · status bar */
+:root{
+  --page:#e9ecf0; --title:#f8f8f8; --act:#f8f8f8; --side:#f8f8f8; --ed:#ffffff; --tabs:#f8f8f8; --tab-on:#ffffff;
+  --bd:#e5e5e5; --fg:#3b3b3b; --fg2:#1f1f1f; --mut:#6e7681; --acc:#005fb8; --acc-fg:#ffffff; --link:#005fb8;
+  --hov:#ececec; --sel:#dbe6f6; --in:#ffffff; --in-bd:#cecece; --badge:#d6d8db; --badge-fg:#1f1f1f; --shadow:rgba(20,30,50,.18);
+  --todo-bg:#e9eaec; --todo:#4a4f57; --prog-bg:#dbeafe; --prog:#0b5cad; --rev-bg:#fbefd0; --rev:#7f5300; --done-bg:#dcf2e3; --done:#1f7a3d;
+  --red:#d1242f; --orange:#c96a0a; --green:#1f8a3d; --blue:#2f6fd6; --purple:#8250df; --warn:#bf8700; --track:#e3e6ea;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Ubuntu,sans-serif;
+  --mono:"SF Mono",Menlo,Consolas,"JetBrains Mono",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --page:#0e0f11; --title:#1f1f1f; --act:#181818; --side:#181818; --ed:#1f1f1f; --tabs:#181818; --tab-on:#1f1f1f;
+  --bd:#2b2b2b; --fg:#cccccc; --fg2:#ececec; --mut:#9d9d9d; --acc:#0078d4; --acc-fg:#ffffff; --link:#4daafc;
+  --hov:#2a2d2e; --sel:#04395e; --in:#2a2a2a; --in-bd:#3c3c3c; --badge:#4d4d4d; --badge-fg:#f0f0f0; --shadow:rgba(0,0,0,.55);
+  --todo-bg:#33363b; --todo:#c3c7cd; --prog-bg:#0d3352; --prog:#7cc0ff; --rev-bg:#3d300f; --rev:#e6c27a; --done-bg:#183623; --done:#7ad19a;
+  --red:#f47067; --orange:#f0883e; --green:#57ab5a; --blue:#539bf5; --purple:#b083f0; --warn:#d29922; --track:#2f3236;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#0e0f11; --title:#1f1f1f; --act:#181818; --side:#181818; --ed:#1f1f1f; --tabs:#181818; --tab-on:#1f1f1f;
+  --bd:#2b2b2b; --fg:#cccccc; --fg2:#ececec; --mut:#9d9d9d; --acc:#0078d4; --acc-fg:#ffffff; --link:#4daafc;
+  --hov:#2a2d2e; --sel:#04395e; --in:#2a2a2a; --in-bd:#3c3c3c; --badge:#4d4d4d; --badge-fg:#f0f0f0; --shadow:rgba(0,0,0,.55);
+  --todo-bg:#33363b; --todo:#c3c7cd; --prog-bg:#0d3352; --prog:#7cc0ff; --rev-bg:#3d300f; --rev:#e6c27a; --done-bg:#183623; --done:#7ad19a;
+  --red:#f47067; --orange:#f0883e; --green:#57ab5a; --blue:#539bf5; --purple:#b083f0; --warn:#d29922; --track:#2f3236;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--fg);font:13px/1.4 var(--ui);padding:20px 16px 32px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:1px solid var(--acc);outline-offset:-1px}
+.cap{max-width:1360px;margin:0 auto 12px;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.cap b{font-size:15px;color:var(--fg2)} .cap span{color:var(--mut)}
+.win{max-width:1360px;margin:0 auto;height:820px;display:flex;flex-direction:column;border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:var(--ed);box-shadow:0 14px 44px var(--shadow);position:relative}
+svg{flex:none}
+.titlebar{height:34px;flex:none;background:var(--title);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:12px;padding:0 12px}
+.lights{display:flex;gap:8px;width:120px}.lights i{width:12px;height:12px;border-radius:50%;display:block}
+.tb-search{flex:1;max-width:460px;margin:0 auto;height:22px;border:1px solid var(--in-bd);background:var(--in);border-radius:6px;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--mut);font-size:12px}
+.tb-search svg{width:14px;height:14px}
+.tb-r{width:120px}
+.main{flex:1;display:flex;min-height:0}
+.act{width:48px;flex:none;background:var(--act);border-right:1px solid var(--bd);display:flex;flex-direction:column}
+.act button{width:48px;height:48px;border:0;background:none;color:var(--mut);display:grid;place-items:center;position:relative;cursor:pointer}
+.act button.on{color:var(--fg2)}.act button.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--acc)}
+.act svg{width:24px;height:24px}
+.side{width:320px;flex:none;background:var(--side);border-right:1px solid var(--bd);display:flex;flex-direction:column;min-height:0}
+.side-h{height:35px;display:flex;align-items:center;padding:0 8px 0 20px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;flex:none}
+.side-h .acts{margin-left:auto;display:flex;gap:2px}
+.side-scroll{flex:1;overflow:auto}
+.view-h{height:22px;display:flex;align-items:center;padding-right:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;border-top:1px solid var(--bd);user-select:none;position:sticky;top:0;background:var(--side);z-index:2}
+.view-h .acts{margin-left:auto;display:flex;gap:1px;opacity:.8}
+.tw{width:18px;height:22px;display:grid;place-items:center;flex:none;color:var(--fg)}
+.tw svg{width:14px;height:14px;transition:transform .12s}
+.tw.open svg,.view:not(.collapsed)>.view-h .tw svg{transform:rotate(90deg)}
+.view.collapsed>.view-b{display:none}
+.view-b{padding-bottom:8px}
+.ib{width:22px;height:22px;border:0;background:none;color:var(--fg);border-radius:4px;display:grid;place-items:center;cursor:pointer;flex:none}
+.ib:hover{background:var(--hov)}.ib svg{width:16px;height:16px}
+.row{height:22px;display:flex;align-items:center;gap:6px;padding-right:10px;cursor:pointer;white-space:nowrap;overflow:hidden}
+.row:hover{background:var(--hov)}.row.on{background:var(--sel)}
+.row .lbl{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.row .desc{color:var(--mut);font-size:12px}
+.row.inst{font-weight:600}.row.inst .desc{font-weight:400}
+.row svg.s16{width:16px;height:16px;color:var(--mut)}
+.grp{font-size:11px;color:var(--mut);padding:6px 0 2px 22px;text-transform:uppercase;letter-spacing:.05em}
+.empty{color:var(--mut);font-size:12px;padding:4px 10px 4px 40px;white-space:normal}
+.k{font-family:var(--mono);font-size:12px;color:var(--fg2)}
+.badge{min-width:18px;height:16px;padding:0 5px;border-radius:8px;background:var(--badge);color:var(--badge-fg);font-size:11px;display:grid;place-items:center;font-variant-numeric:tabular-nums;font-weight:400}
+.tg{font-size:10px;border:1px solid var(--in-bd);color:var(--mut);border-radius:3px;padding:0 4px;font-weight:400;letter-spacing:.02em}
+.ti{width:14px;height:14px}.pi{width:14px;height:14px}
+.av{border-radius:50%;color:#fff;display:inline-grid;place-items:center;font-weight:600;flex:none;letter-spacing:0;line-height:1}
+.pill{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;flex:none}
+.pill.sm{height:15px;font-size:9.5px;padding:0 5px}
+.s-todo{background:var(--todo-bg);color:var(--todo)}.s-prog{background:var(--prog-bg);color:var(--prog)}.s-review{background:var(--rev-bg);color:var(--rev)}.s-done{background:var(--done-bg);color:var(--done)}.s-canc{background:var(--todo-bg);color:var(--todo)}
+.pill-btn{border:0;cursor:pointer}.pill-btn:hover{filter:brightness(1.15)}
+
+/* issues view controls */
+.ctl{padding:6px 12px 6px 20px;display:flex;flex-direction:column;gap:6px}
+.seg{display:flex;border:1px solid var(--in-bd);border-radius:4px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--in);padding:3px 0;cursor:pointer;color:var(--mut);font-size:12px}
+.seg button+button{border-left:1px solid var(--in-bd)}
+.seg button.on{background:var(--acc);color:var(--acc-fg)}
+.inp{height:24px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;padding:0 6px;display:flex;align-items:center;gap:6px;width:100%}
+.inp input{border:0;background:none;outline:0;flex:1;min-width:0;font-size:12.5px}
+.inp svg{width:14px;height:14px;color:var(--mut)}
+.inp:focus-within{border-color:var(--acc)}
+select.sel{height:24px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;padding:0 4px;width:100%;font-size:12.5px}
+textarea.jql{width:100%;min-height:64px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;padding:5px 6px;font:12px/1.45 var(--mono);resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 4px 0 7px;border-radius:10px;background:var(--sel);color:var(--fg2);font-size:11.5px;border:0;cursor:pointer}
+.chip svg{width:12px;height:12px}
+.lnk{border:0;background:none;color:var(--link);cursor:pointer;padding:0;font-size:12px}
+.lnk:hover{text-decoration:underline}
+.row-btns{display:flex;gap:6px;flex-wrap:wrap}
+.btn{height:26px;padding:0 11px;border-radius:4px;border:1px solid var(--in-bd);background:var(--in);color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap;font-size:12.5px}
+.btn:hover{background:var(--hov)}
+.btn svg{width:14px;height:14px}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--acc-fg)}
+.btn.pri:hover{filter:brightness(1.08);background:var(--acc)}
+.btn.sm{height:22px;padding:0 8px;font-size:12px}
+.btn.wide{width:100%;justify-content:center}
+.mini{width:44px;height:4px;border-radius:2px;background:var(--track);overflow:hidden;display:flex;flex:none}
+.mini i,.bar i{display:block;height:100%}
+.b-done{background:var(--green)}.b-prog{background:var(--blue)}.b-rev{background:var(--warn)}.b-acc{background:var(--acc)}.b-over{background:var(--red)}
+
+/* tempo sidebar */
+.tp{padding:6px 14px 4px 20px;display:flex;flex-direction:column;gap:10px}
+.tp-top{display:flex;align-items:flex-end;justify-content:space-between}
+.big{font-size:22px;font-weight:600;color:var(--fg2);font-variant-numeric:tabular-nums;line-height:1.1}
+.sm{font-size:12px}.mut{color:var(--mut)}
+.bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--track)}
+.wk{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-items:end}
+.wk div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+.wk .col{width:100%;height:50px;background:var(--track);border-radius:3px;display:flex;align-items:flex-end;overflow:hidden}
+.wk .col i{display:block;width:100%}
+.wk .today{color:var(--fg2);font-weight:600}
+.tl{display:flex;flex-direction:column}
+.tl .row{padding-left:0;gap:8px}
+.tl .row .t{font-variant-numeric:tabular-nums;color:var(--fg2)}
+
+/* editor */
+.editor{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--ed)}
+.tabs{height:35px;flex:none;background:var(--tabs);display:flex;overflow-x:auto;overflow-y:hidden;border-bottom:1px solid var(--bd)}
+.tab{display:flex;align-items:center;gap:6px;padding:0 4px 0 12px;border-right:1px solid var(--bd);cursor:pointer;color:var(--mut);white-space:nowrap;position:relative;flex:none;margin-bottom:-1px}
+.tab.on{background:var(--tab-on);color:var(--fg2)}
+.tab.on::after{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--acc)}
+.tab .ib{width:20px;height:20px;visibility:hidden}.tab.on .ib,.tab:hover .ib{visibility:visible}
+.tab .ib svg{width:14px;height:14px}
+.tab svg.s16{width:16px;height:16px}
+.pane{flex:1;overflow:auto;background:var(--ed);min-height:0}
+.iv{padding:18px 28px 48px;display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:12px 32px;max-width:1120px}
+.iv-head{grid-column:1/-1}
+.crumbs{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:12px;flex-wrap:wrap}
+.crumbs svg{width:14px;height:14px}
+h1{font-size:20px;line-height:1.3;font-weight:600;color:var(--fg2);margin:8px 0 10px;text-wrap:balance}
+.hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hrow .sp{flex:1}
+.prio{display:inline-flex;align-items:center;gap:4px;font-size:12.5px}
+.subtabs{display:flex;gap:20px;border-bottom:1px solid var(--bd);margin-bottom:16px;overflow-x:auto}
+.subtabs button{border:0;background:none;color:var(--mut);padding:8px 0 7px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.subtabs button.on{color:var(--fg2);border-color:var(--acc)}
+.cnt{background:var(--badge);color:var(--badge-fg);border-radius:9px;padding:0 6px;font-size:11px;font-variant-numeric:tabular-nums}
+.rich{max-width:72ch;line-height:1.6}
+.rich h4{margin:16px 0 4px;font-size:13px;color:var(--fg2)}
+.rich p{margin:0 0 8px}.rich ol{margin:0 0 8px;padding-left:22px}
+code{font-family:var(--mono);font-size:12px;background:var(--hov);padding:1px 4px;border-radius:3px}
+pre{font:12px/1.5 var(--mono);background:var(--side);border:1px solid var(--bd);border-radius:4px;padding:10px 12px;overflow-x:auto;margin:0 0 8px}
+.att-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.att{border:1px solid var(--bd);border-radius:6px;overflow:hidden;background:var(--side);display:flex;flex-direction:column;min-width:0}
+.att .th{height:160px;display:grid;place-items:center;background:var(--hov);cursor:zoom-in;overflow:hidden;border:0;padding:0;width:100%}
+.att .th svg{height:148px;width:auto}
+.att .th.file{cursor:default;color:var(--mut);gap:4px;align-content:center;font:600 13px var(--mono)}
+.att .th.file svg{height:40px;width:40px}
+.att .inf{padding:8px 10px;font-size:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.att .nm{color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att .ab{display:flex;gap:6px;padding:0 10px 10px}
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.toolbar .sp{flex:1}
+.cm{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;padding:12px 0;border-bottom:1px solid var(--bd)}
+.cm:last-child{border-bottom:0}
+.cm .who{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:3px}
+.cm .who b{color:var(--fg2);font-weight:600}
+.cm .tx{line-height:1.55;max-width:72ch}
+.ro-note{margin-top:12px;border:1px dashed var(--in-bd);border-radius:4px;padding:8px 10px;color:var(--mut);font-size:12px}
+.hi{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px solid var(--bd)}
+.hi .who{margin-bottom:3px}.hi .who b{color:var(--fg2);font-weight:600}
+.chg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px}
+.chg .f{color:var(--mut);min-width:90px}
+.old{text-decoration:line-through;color:var(--mut)}
+.arr{color:var(--mut)}
+.tw-wrap{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{text-align:left;font-weight:600;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--bd);white-space:nowrap}
+table.t td{padding:7px 8px;border-bottom:1px solid var(--bd);vertical-align:middle}
+table.t tr.click{cursor:pointer}table.t tr.click:hover td{background:var(--hov)}
+table.t tfoot td{font-weight:600;color:var(--fg2);border-bottom:0}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.who-c{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.cell{cursor:pointer;border-radius:3px}
+.cell:hover{background:var(--sel)}
+.under{color:var(--warn)}
+.src{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.meta{font-size:12.5px;min-width:0}
+.meta h5{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600}
+.mg{padding:0 0 14px;margin-bottom:14px;border-bottom:1px solid var(--bd)}
+.mg:last-child{border-bottom:0}
+.mr{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;padding:3px 0;align-items:center}
+.mr .l{color:var(--mut)}
+.mr .v{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.stack{display:flex}.stack .av{border:2px solid var(--ed);margin-left:-5px}.stack .av:first-child{margin-left:0}
+.tag{font-size:11.5px;background:var(--hov);border-radius:3px;padding:1px 6px}
+a.ln,button.ln{color:var(--link);text-decoration:none;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+a.ln:hover,button.ln:hover{text-decoration:underline}
+.sum{display:flex;gap:28px;flex-wrap:wrap;margin:4px 0 14px}
+.sum div{display:flex;flex-direction:column}
+.sum b{font-size:18px;color:var(--fg2);font-variant-numeric:tabular-nums;font-weight:600}
+.sum span{font-size:11.5px;color:var(--mut)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:8px 0 18px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.wide-pad{padding:18px 28px 48px;max-width:1120px}
+.foot{margin-top:14px;font-size:12px;color:var(--mut)}
+.code{font:12.5px/20px var(--mono);padding:8px 0 40px;white-space:pre;counter-reset:ln;min-width:max-content}
+.code div{padding:0 24px 0 64px;position:relative}
+.code div::before{counter-increment:ln;content:counter(ln);position:absolute;left:0;width:42px;text-align:right;color:var(--mut)}
+.code .cmt{color:var(--green)}
+
+/* overlays */
+.ov{position:absolute;inset:0;background:rgba(0,0,0,.32);display:flex;justify-content:center;align-items:flex-start;padding:56px 16px 16px;z-index:30}
+.dlg{background:var(--side);border:1px solid var(--bd);border-radius:8px;box-shadow:0 12px 34px var(--shadow);width:min(540px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column}
+.dlg-h{display:flex;align-items:center;gap:8px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--bd);font-weight:600;color:var(--fg2)}
+.dlg-h .ib{margin-left:auto}
+.dlg-b{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.dlg-f{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid var(--bd)}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label,.fld .lb{font-size:12px;color:var(--mut)}
+.fld input,.fld select,.fld textarea{height:28px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;padding:0 8px;width:100%}
+.fld textarea{height:auto;padding:6px 8px;resize:vertical}
+.fld small{font-size:11.5px;color:var(--mut)}
+.ro{min-height:28px;display:flex;align-items:center;gap:6px;color:var(--fg2)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+fieldset.tempo{border:1px solid var(--bd);border-radius:6px;padding:10px 12px 12px;margin:0;display:flex;flex-direction:column;gap:10px}
+fieldset.tempo legend{font-size:12px;color:var(--fg2);padding:0 4px;font-weight:600}
+.note{font-size:12px;color:var(--mut);border-left:2px solid var(--in-bd);padding:2px 0 2px 10px}
+.err{color:var(--red);font-size:12px}
+.ok{color:var(--green);font-size:12px}
+.radios{display:flex;gap:16px;flex-wrap:wrap}
+.radios label{display:flex;align-items:center;gap:6px;color:var(--fg);font-size:12.5px}
+.radios input{width:auto;height:auto}
+.qp{width:min(600px,100%)}
+.qp-g{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);padding:10px 14px 4px}
+.qp-i{display:flex;align-items:center;gap:8px;padding:4px 14px;cursor:pointer}
+.qp-i:hover{background:var(--hov)}
+.qp-i .desc{margin-left:auto;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.qp-i svg.s16{width:16px;height:16px}
+.qp-i.on{background:var(--sel)}
+.cb{width:14px;height:14px;border:1px solid var(--in-bd);border-radius:3px;display:grid;place-items:center;background:var(--in);flex:none}
+.cb svg{width:11px;height:11px;visibility:hidden}
+.cb.on{background:var(--acc);border-color:var(--acc);color:var(--acc-fg)}.cb.on svg{visibility:visible}
+.lb-box{background:var(--side);border:1px solid var(--bd);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:center;max-height:100%;overflow:auto}
+.lb-box svg{height:min(560px,62vh);width:auto;max-width:100%}
+.toast{position:absolute;right:14px;bottom:34px;z-index:40;background:var(--side);border:1px solid var(--bd);box-shadow:0 6px 22px var(--shadow);border-radius:6px;padding:10px 14px;max-width:min(420px,calc(100% - 28px));display:flex;gap:8px;align-items:flex-start;font-size:12.5px}
+.toast[hidden]{display:none}
+.toast svg{width:16px;height:16px;color:var(--acc);margin-top:1px}
+.sb{height:22px;flex:none;background:var(--title);border-top:1px solid var(--bd);display:flex;align-items:stretch;font-size:12px;overflow:hidden}
+.sb .it{padding:0 8px;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+.sb .it:hover{background:var(--hov)}
+.sb .it svg{width:14px;height:14px}
+.sb .rem{background:var(--acc);color:var(--acc-fg)}.sb .rem:hover{background:var(--acc)}
+.sb .sp{flex:1}
+@media (max-width:820px){
+  .win{height:auto}
+  .main{flex-direction:column}
+  .act,.tb-search,.tb-r{display:none}
+  .side{width:auto;max-height:520px;border-right:0;border-bottom:1px solid var(--bd)}
+  .editor{min-height:700px}
+  .iv{grid-template-columns:minmax(0,1fr);padding:16px}
+  .wide-pad{padding:16px}
+  .g2{grid-template-columns:1fr}
+  .sb .opt{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="cap"><b>Jiraffe</b><span>VS Code extension prototype · sample data, everything is clickable: issue tree, filters, issue card, epics, releases, Tempo</span></div>
+
+<div class="win" id="win">
+  <div class="titlebar">
+    <div class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+    <div class="tb-search" id="tbs"></div>
+    <div class="tb-r"></div>
+  </div>
+  <div class="main">
+    <nav class="act" id="act" aria-label="Activity bar"></nav>
+    <aside class="side">
+      <div class="side-h">Jiraffe<div class="acts" id="side-acts"></div></div>
+      <div class="side-scroll">
+        <section class="view" id="view-issues">
+          <div class="view-h" data-act="view" data-v="issues"><span class="tw"></span>Issues<div class="acts" id="issues-acts"></div></div>
+          <div class="view-b">
+            <div class="ctl">
+              <div class="seg" role="tablist">
+                <button data-act="mode" data-m="mine" role="tab">Assigned to Me</button>
+                <button data-act="mode" data-m="proj" role="tab">Project</button>
+                <button data-act="mode" data-m="jql" role="tab">JQL</button>
+              </div>
+              <div id="mode-extra"></div>
+              <label class="inp" for="q"><span id="q-ic"></span><input id="q" placeholder="Key or text: HOME-710, archive…" autocomplete="off"></label>
+              <div class="chips" id="chips"></div>
+            </div>
+            <div id="tree"></div>
+          </div>
+        </section>
+        <section class="view" id="view-filters">
+          <div class="view-h" data-act="view" data-v="filters"><span class="tw"></span>Filters</div>
+          <div class="view-b" id="filters"></div>
+        </section>
+        <section class="view" id="view-epics">
+          <div class="view-h" data-act="view" data-v="epics"><span class="tw"></span>Epics</div>
+          <div class="view-b" id="epics"></div>
+        </section>
+        <section class="view" id="view-rel">
+          <div class="view-h" data-act="view" data-v="rel"><span class="tw"></span>Releases</div>
+          <div class="view-b" id="rels"></div>
+        </section>
+        <section class="view" id="view-tempo">
+          <div class="view-h" data-act="view" data-v="tempo"><span class="tw"></span>Tempo</div>
+          <div class="view-b" id="tempo"></div>
+        </section>
+      </div>
+    </aside>
+    <div class="editor">
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="pane" id="pane"></div>
+    </div>
+  </div>
+  <div class="sb" id="sb"></div>
+  <div id="ovl"></div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const sv=(p,v='0 0 16 16',cls='')=>`<svg viewBox="${v}" class="${cls}" aria-hidden="true">${p}</svg>`;
+const st='style="fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round"';
+const IC={
+  chev:sv(`<path d="M6 4l4 4-4 4" ${st}/>`),
+  filter:sv(`<path d="M2.5 3h11l-4.2 5.2V13l-2.6 1.3V8.2z" ${st}/>`),
+  refresh:sv(`<path d="M13 8a5 5 0 1 1-1.4-3.5M13 2.5v2.8h-2.8" ${st}/>`),
+  plus:sv(`<path d="M8 3v10M3 8h10" ${st}/>`),
+  search:sv(`<circle cx="7" cy="7" r="4.3" ${st}/><path d="M10.3 10.3L14 14" ${st}/>`),
+  ext:sv(`<path d="M9.5 2.5h4v4M13.5 2.5l-6 6M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" ${st}/>`),
+  clock:sv(`<circle cx="8" cy="8" r="5.8" ${st}/><path d="M8 4.6V8l2.4 1.5" ${st}/>`),
+  x:sv(`<path d="M4.5 4.5l7 7M11.5 4.5l-7 7" ${st}/>`),
+  server:sv(`<rect x="2.5" y="2.5" width="11" height="4.5" rx="1" ${st}/><rect x="2.5" y="9" width="11" height="4.5" rx="1" ${st}/><circle cx="5" cy="4.75" r=".8" style="fill:currentColor"/><circle cx="5" cy="11.25" r=".8" style="fill:currentColor"/>`,'0 0 16 16','s16'),
+  tag:sv(`<path d="M2.5 2.5h5l6 6-5 5-6-6z" ${st}/><circle cx="5.3" cy="5.3" r="1" style="fill:currentColor"/>`,'0 0 16 16','s16'),
+  ok:sv(`<circle cx="8" cy="8" r="5.8" ${st}/><path d="M5.3 8.2l1.9 1.9 3.5-3.8" ${st}/>`,'0 0 16 16','s16'),
+  pend:sv(`<circle cx="8" cy="8" r="5.8" style="fill:none;stroke:currentColor;stroke-width:1.3;stroke-dasharray:2.4 2"/>`,'0 0 16 16','s16'),
+  pin:sv(`<path d="M9.5 2.2l4.3 4.3-2 .6-2.3 2.6.3 2.4-.9.9-2.9-2.9-3.7 3.7-.7-.7 3.7-3.7-2.9-2.9.9-.9 2.4.3 2.6-2.3z" ${st}/>`),
+  copy:sv(`<rect x="5" y="5" width="8.5" height="8.5" rx="1.2" ${st}/><path d="M3 10.5V3.8C3 3.3 3.3 3 3.8 3h6.7" ${st}/>`),
+  dl:sv(`<path d="M8 2.5v8M4.6 7.2L8 10.6l3.4-3.4M3 13.5h10" ${st}/>`),
+  file:sv(`<path d="M4 1.8h5l3.2 3.2v9.2H4zM9 1.8V5h3.2" ${st}/>`,'0 0 16 16','s16'),
+  php:sv(`<rect x="1.5" y="4" width="13" height="8" rx="4" style="fill:var(--purple)"/><text x="8" y="10.2" text-anchor="middle" style="fill:#fff;font:700 5px sans-serif">php</text>`,'0 0 16 16','s16'),
+  star:sv(`<path d="M8 2.3l1.7 3.6 3.9.5-2.9 2.7.8 3.9L8 11.1 4.5 13l.8-3.9-2.9-2.7 3.9-.5z" ${st}/>`,'0 0 16 16','s16'),
+  funnel:sv(`<path d="M2.5 3h11l-4.2 5.2V13l-2.6 1.3V8.2z" ${st}/>`,'0 0 16 16','s16'),
+  check:sv(`<path d="M3 8.5l3.2 3L13 4.5" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>`),
+  info:sv(`<circle cx="8" cy="8" r="6" ${st}/><path d="M8 7.3v4M8 4.9v.1" ${st}/>`),
+  branch:sv(`<circle cx="4.5" cy="3.5" r="1.5" ${st}/><circle cx="4.5" cy="12.5" r="1.5" ${st}/><circle cx="11.5" cy="5" r="1.5" ${st}/><path d="M4.5 5v6M11.5 6.5c0 3-7 2-7 4.5" ${st}/>`),
+  bell:sv(`<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3zM6.5 14h3" ${st}/>`),
+  cal:sv(`<rect x="2.5" y="3.5" width="11" height="10" rx="1.2" ${st}/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" ${st}/>`,'0 0 16 16','s16'),
+  giraffe:sv(`<path d="M15.5 3.5l2-1.5M18.5 3.5l1-1.5M14.5 4.5h6.5a1.5 1.5 0 0 1 0 3h-3v12.5a4 4 0 0 1-8 0V17" style="fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"/><circle cx="16" cy="10.5" r="1.1" style="fill:currentColor"/><circle cx="16" cy="15" r="1.1" style="fill:currentColor"/><circle cx="13.2" cy="19.6" r="1.1" style="fill:currentColor"/>`,'0 0 24 24'),
+};
+const AIC={
+  files:sv(`<path d="M8 3h7l4 4v11H8zM15 3v4h4M5 7v14h11" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round"/>`,'0 0 24 24'),
+  search:sv(`<circle cx="10.5" cy="10.5" r="6" style="fill:none;stroke:currentColor;stroke-width:1.5"/><path d="M15 15l5.5 5.5" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round"/>`,'0 0 24 24'),
+  scm:sv(`<circle cx="7" cy="5.5" r="2" style="fill:none;stroke:currentColor;stroke-width:1.5"/><circle cx="7" cy="18.5" r="2" style="fill:none;stroke:currentColor;stroke-width:1.5"/><circle cx="17" cy="7.5" r="2" style="fill:none;stroke:currentColor;stroke-width:1.5"/><path d="M7 7.5v9M17 9.5c0 4.5-10 3-10 7" style="fill:none;stroke:currentColor;stroke-width:1.5"/>`,'0 0 24 24'),
+  ext:sv(`<rect x="4" y="4" width="7" height="7" style="fill:none;stroke:currentColor;stroke-width:1.5"/><rect x="4" y="13" width="7" height="7" style="fill:none;stroke:currentColor;stroke-width:1.5"/><rect x="13" y="13" width="7" height="7" style="fill:none;stroke:currentColor;stroke-width:1.5"/><rect x="14.5" y="2.5" width="7" height="7" transform="rotate(12 18 6)" style="fill:none;stroke:currentColor;stroke-width:1.5"/>`,'0 0 24 24'),
+};
+const sq=(c,inner)=>`<svg class="ti" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="3" style="fill:var(${c})"/>${inner}</svg>`;
+const TI={
+  bug:sq('--red','<circle cx="8" cy="8" r="3.2" style="fill:#fff"/>'),
+  story:sq('--green','<path d="M5 3.5h6v9l-3-2.2-3 2.2z" style="fill:#fff"/>'),
+  task:sq('--blue','<path d="M4.5 8.2l2.3 2.3 4.7-5" style="fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"/>'),
+  epic:sq('--purple','<path d="M9.2 2.5L4.6 9h3.1l-1 4.5L11.4 7H8.3z" style="fill:#fff"/>'),
+};
+const pst=c=>`style="fill:none;stroke:var(${c});stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"`;
+const PI={
+  highest:`<svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5L8 5l4.5 3.5M3.5 12.5L8 9l4.5 3.5" ${pst('--red')}/></svg>`,
+  high:`<svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10.5L8 6l4.5 4.5" ${pst('--red')}/></svg>`,
+  medium:`<svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6h9M3.5 10h9" ${pst('--orange')}/></svg>`,
+  low:`<svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 5.5L8 10l4.5-4.5" ${pst('--blue')}/></svg>`,
+};
+const SL={todo:'To Do',prog:'In Progress',review:'In Review',done:'Done',canc:'Cancelled'};
+const TL={bug:'Bug',story:'Story',task:'Task',epic:'Epic'};
+const PL={highest:'Highest',high:'High',medium:'Medium',low:'Low'};
+
+/* ---------- sample data ---------- */
+const ME='af';
+const U={af:['Andrew Foster','#2f6fd6'],mk:['Maria Kelly','#b4459b'],is:['Ian Sawyer','#b8650f'],dl:['Dana Lewis','#1d8a5a'],oc:['Owen Cooper','#c2413b'],vs:['Vera Stone','#7a52c7'],np:['Nina Patel','#3f7f8f']};
+const INST=[
+  {id:'northwind',name:'Northwind',host:'jira.northwind.io',kind:'Server/DC',tempo:true,projects:['HOME','TRK']},
+  {id:'globex',name:'Globex',host:'jira.globex.dev',kind:'Server/DC',tempo:false,projects:['CRM','PORT']},
+  {id:'initech',name:'Initech',host:'tracker.initech.net/jira',kind:'Server/DC',tempo:false,projects:['OPS','DESK']},
+];
+const instOf=p=>INST.find(x=>x.projects.includes(p));
+const I={};
+function mk(key,type,status,prio,sum,asg,x){
+  const proj=key.split('-')[0];
+  I[key]=Object.assign({key,proj,inst:instOf(proj).id,type,status,prio,sum,asg,rep:'dl',epic:null,fix:null,labels:[],comps:[],est:0,created:'Sep 14, 2026',updated:'Sep 30, 2026',due:null,watchers:[],desc:null,att:[],com:[],hist:null},x||{});
+}
+mk('HOME-710','bug','prog','high','CamCloud: event archive stops loading past 30 days','af',{
+  rep:'mk',epic:'HOME-600',fix:'v214',labels:['camcloud','archive'],comps:['Backend API'],est:480,created:'Sep 25, 2026',updated:'Oct 1, 2026',due:'Oct 14, 2026',watchers:['mk','is','dl'],
+  desc:`<p>In Orbit, when you scroll a camera's archive further back than 30 days, the event feed just stops: no new events load and the spinner keeps spinning forever.</p>
+<h4>Steps</h4><ol><li>Open the "Entrance 2" camera in the test account <code>demo-orbit</code></li><li>Archive → scroll the timeline back 31+ days</li><li>Wait for events to load</li></ol>
+<h4>Expected</h4><p>Events load in batches of 50.</p>
+<h4>Actual</h4><p><code>get_camera_events</code> returns an empty <code>items</code> for <code>offset ≥ 1000</code>, although <code>total</code> = 1342.</p>
+<pre>{ "result": { "items": [], "total": 1342, "offset": 1000, "limit": 50 } }</pre>
+<p>Android logs and the full API response are attached.</p>`,
+  att:[{n:'archive-timeline.png',size:'412 KB',who:'mk',at:'Sep 25, 2026',img:1},{n:'events-spinner.png',size:'268 KB',who:'mk',at:'Sep 25, 2026',img:2},{n:'camcloud-response.json',size:'14 KB',who:'mk',at:'Sep 25, 2026'},{n:'orbit-android-2.13.2.log',size:'220 KB',who:'mk',at:'Sep 25, 2026'}],
+  com:[
+    {who:'mk',at:'Sep 25, 2026 11:20',t:'Reproduces on both Android and iOS. The web console scrolls the archive fine: it uses a different request.'},
+    {who:'is',at:'Sep 28, 2026 16:05',t:'CamCloud returns at most 1000 records by <code>offset</code>; beyond that you need the <code>next_page_token</code> cursor. It is described in the archive_timeline section of their docs.'},
+    {who:'af',at:'Sep 29, 2026 10:42',t:'Confirmed. I am switching pagination in <code>utils/CamCloud.php</code> to the cursor, no mobile changes needed.'},
+    {who:'dl',at:'Oct 1, 2026 09:15',t:'Putting it into 2.14.0. Store builds go out on October 16.'},
+  ],
+  hist:[
+    {who:'dl',at:'Oct 1, 2026 09:14',ch:[['Fix Version','—','Orbit 2.14.0']]},
+    {who:'af',at:'Sep 29, 2026 10:40',ch:[['Status','To Do','In Progress']]},
+    {who:'is',at:'Sep 28, 2026 16:10',ch:[['Assignee','Ian Sawyer','Andrew Foster'],['Priority','Medium','High']]},
+    {who:'is',at:'Sep 28, 2026 16:02',ch:[['Epic','—','HOME-600 CamCloud video surveillance'],['Labels','camcloud','camcloud, archive']]},
+    {who:'mk',at:'Sep 25, 2026 11:22',ch:[['Attachment','—','camcloud-response.json, orbit-android-2.13.2.log']]},
+    {who:'mk',at:'Sep 25, 2026 11:02',created:true},
+  ]});
+mk('HOME-715','task','todo','low','Update CamCloud SDK to 3.2','af',{epic:'HOME-600',fix:'v214',labels:['camcloud'],est:240,rep:'is'});
+mk('HOME-702','bug','todo','medium','Leak alert push notifications arrive twice','af',{epic:'HOME-655',fix:'v214',rep:'mk',est:180});
+mk('HOME-688','story','review','medium','Scenes screen in the new design','af',{epic:'HOME-640',fix:'v214',est:960,comps:['Mobile']});
+mk('HOME-709','bug','done','high','Crash when opening the archive without internet','af',{epic:'HOME-600',fix:'v214',rep:'mk'});
+mk('HOME-698','bug','prog','high','CamCloud: timeline shifts when the time zone changes','oc',{epic:'HOME-600',fix:'v214',labels:['camcloud'],rep:'mk'});
+mk('HOME-706','story','todo','medium','Camera events in the shared notification feed','vs',{epic:'HOME-655',fix:'v214'});
+mk('HOME-693','story','prog','medium','Home screen: new device cards','vs',{epic:'HOME-640',fix:'v214'});
+mk('HOME-603','story','done','medium','Live camera stream in the device card','is',{epic:'HOME-600',fix:'v2132'});
+mk('HOME-611','task','done','medium','CamCloud OAuth: token refresh','is',{epic:'HOME-600',fix:'v2132'});
+mk('HOME-624','story','done','medium','Camera list with previews','oc',{epic:'HOME-600',fix:'v2132'});
+mk('HOME-660','task','done','medium','Notification channels: per-home settings','vs',{epic:'HOME-655',fix:'v2132'});
+mk('HOME-646','story','done','low','Navigation: bottom menu','oc',{epic:'HOME-640',fix:'v2132'});
+mk('HOME-650','task','done','medium','Design tokens in Flutter','af',{epic:'HOME-640',fix:'v2132'});
+mk('TRK-1423','task','prog','medium','Fuel report: export to XLSX','af',{est:600,rep:'np'});
+mk('TRK-1431','bug','todo','high','Vehicle track breaks when GPS is lost for more than 5 minutes','af',{rep:'np'});
+mk('CRM-123','bug','todo','highest','Queue kiosk: ticket is not printed on repeat booking','af',{rep:'np',epic:'CRM-90',fix:'m47',est:240,due:'Oct 7, 2026',watchers:['np'],
+  desc:`<p>If a customer books the same service a second time on the same day, the terminal shows "Ticket issued", but the printer prints nothing.</p><h4>Where</h4><p>Support center "Central", terminal #3, kiosk firmware 4.6.2.</p><p>A photo of the terminal screen is attached.</p>`,
+  att:[{n:'terminal-3.jpg',size:'1.2 MB',who:'np',at:'Sep 30, 2026',img:3}],
+  com:[{who:'np',at:'Sep 30, 2026 14:48',t:'Complaints from operators since the morning, about 15–20 repeat bookings a day.'}]});
+mk('CRM-131','task','prog','medium','Operator window: service timer','af',{epic:'CRM-90',fix:'m47',est:480,rep:'np'});
+mk('CRM-118','story','done','medium','Display board: voice ticket call','oc',{epic:'CRM-90',fix:'m46'});
+mk('PORT-58','story','todo','low','Appointment booking: address suggestions','af',{rep:'np'});
+mk('OPS-12','task','prog','medium','Gateway: application statuses in the customer portal','af',{est:720});
+mk('DESK-3','bug','review','high','Dashboard: wrong ticket count for the week','af',{rep:'vs'});
+
+const EPICS={
+  'HOME-600':{sum:'CamCloud video surveillance',status:'prog'},
+  'HOME-655':{sum:'Notifications 2.0',status:'prog'},
+  'HOME-640':{sum:'App redesign',status:'prog'},
+  'CRM-90':{sum:'Queue system v4',status:'prog'},
+};
+const REL=[
+  {id:'v215',proj:'HOME',name:'Orbit 2.15.0',released:false,start:null,date:null},
+  {id:'v214',proj:'HOME',name:'Orbit 2.14.0',released:false,start:'2026-09-21',date:'2026-10-16',desc:'Build for Google Play and the App Store'},
+  {id:'v2132',proj:'HOME',name:'Orbit 2.13.2',released:true,start:'2026-09-01',date:'2026-09-22'},
+  {id:'m47',proj:'CRM',name:'Support 4.7',released:false,start:'2026-09-28',date:'2026-10-30'},
+  {id:'m46',proj:'CRM',name:'Support 4.6',released:true,start:'2026-08-25',date:'2026-09-15'},
+];
+const FILTERS=[
+  {id:'f1',own:true,name:'My High+ bugs',jql:'assignee = currentUser() AND type = Bug AND priority in (Highest, High) AND resolution = Unresolved',p:i=>i.asg==ME&&i.type=='bug'&&(i.prio=='highest'||i.prio=='high')&&i.status!='done'},
+  {id:'f2',own:true,name:'Waiting for review',jql:'assignee = currentUser() AND status = "In Review"',p:i=>i.asg==ME&&i.status=='review'},
+  {id:'f3',inst:'northwind',name:'HOME: release 2.14.0',jql:'project = HOME AND fixVersion = "Orbit 2.14.0" ORDER BY status',p:i=>i.fix=='v214'},
+  {id:'f4',inst:'northwind',name:'CamCloud — all open',jql:'labels = camcloud AND resolution = Unresolved',p:i=>i.labels.includes('camcloud')&&i.status!='done'},
+  {id:'f5',inst:'globex',name:'Support — on fire',jql:'project = CRM AND priority = Highest AND resolution = Unresolved',p:i=>i.proj=='CRM'&&i.prio=='highest'&&i.status!='done'},
+];
+const TODAY='2026-10-02';
+const WEEK=['2026-09-28','2026-09-29','2026-09-30','2026-10-01','2026-10-02'];
+const WD=['Mon','Tue','Wed','Thu','Fri'];
+const L=(key,who,date,m,c,tok,wt)=>({key,who,date,m,c,tok:tok||null,wt:wt||'Development'});
+const LOG=[
+  L('HOME-710','mk','2026-09-25',30,'Reproduced on the test stand, collected logs',null,'Testing'),
+  L('HOME-688','vs','2026-09-24',120,'Mockups, review fixes',null,'Design'),
+  L('HOME-688','af','2026-09-28',240,'Scenes screen layout',312000),
+  L('HOME-702','af','2026-09-28',90,'Duplicate push analysis, FCM logs',95000),
+  L('CRM-131','af','2026-09-28',120,'Timer: model and API'),
+  L('HOME-688','af','2026-09-29',180,'Animations and empty states',204000),
+  L('HOME-710','af','2026-09-29',120,'Reproduction, CamCloud log analysis',148000),
+  L('TRK-1423','af','2026-09-29',180,'XLSX template, grouping by vehicle',121000),
+  L('HOME-710','af','2026-09-30',105,'Analysis of the get_camera_events response',186000),
+  L('OPS-12','af','2026-09-30',150,'Gateway status mapping',77000),
+  L('DESK-3','af','2026-09-30',120,'Tracking down the weekly aggregation bug',54000),
+  L('TRK-1423','af','2026-10-01',240,'Export: styles, totals, tests',166000),
+  L('CRM-123','af','2026-10-01',120,'Reproduction on the test stand, kiosk logs'),
+  L('HOME-688','af','2026-10-01',120,'Review fixes',98000,'Code Review'),
+  L('HOME-710','af','2026-10-02',120,'Archive pagination: switch to next_page_token',231000),
+  L('TRK-1423','af','2026-10-02',45,'Answering QA remarks',22000),
+  L('CRM-131','af','2026-10-02',30,'Call with the analyst',null,'Call'),
+];
+const FILES={
+  'CamCloud.php':['<?php','// utils/CamCloud.php','','public function getCameraEvents(string $cameraId, int $offset = 0, int $limit = 50): array','{','    // HOME-710: CamCloud returns at most 1000 records by offset,','    // beyond that you need the next_page_token cursor','    $response = $this->request(\'GET\', \'/cameras/\' . $cameraId . \'/events\', [','        \'offset\' => $offset,','        \'limit\'  => $limit,','    ]);','','    return $response[\'result\'][\'items\'] ?? [];','}'],
+  'camcloud-response.json':['{','  "success": true,','  "result": {','    "items": [],','    "total": 1342,','    "offset": 1000,','    "limit": 50,','    "next_page_token": "eyJ0cyI6MTcyNjk5MjAwMCwiaWQiOiI4ZjNhIn0"','  }','}'],
+  'orbit-android-2.13.2.log':['2026-09-25 10:58:12.402 I/ArchiveRepo: load events camera=cam_8f3a offset=950 limit=50','2026-09-25 10:58:12.871 I/ArchiveRepo: got 50 items (total=1342)','2026-09-25 10:58:19.115 I/ArchiveRepo: load events camera=cam_8f3a offset=1000 limit=50','2026-09-25 10:58:19.530 W/ArchiveRepo: got 0 items (total=1342) — retry in 2s','2026-09-25 10:58:21.533 I/ArchiveRepo: load events camera=cam_8f3a offset=1000 limit=50','2026-09-25 10:58:21.902 W/ArchiveRepo: got 0 items (total=1342) — retry in 4s','2026-09-25 10:58:25.904 E/ArchiveRepo: give up after 2 retries, keep spinner'],
+};
+
+/* ---------- helpers ---------- */
+const ALL=()=>Object.values(I);
+const ins=id=>INST.find(x=>x.id==id);
+const ini=u=>U[u][0].split(' ').map(s=>s[0]).join('');
+const av=(u,s)=>{s=s||20;return `<span class="av" style="width:${s}px;height:${s}px;background:${U[u][1]};font-size:${Math.round(s*.42)}px" title="${U[u][0]}">${ini(u)}</span>`};
+const person=(u,s)=>`<span class="who-c">${av(u,s||18)}${U[u][0]}</span>`;
+const pill=(s,sm)=>`<span class="pill s-${s}${sm?' sm':''}">${SL[s]}</span>`;
+const fmt=m=>{const h=Math.floor(m/60),r=m%60;return h&&r?`${h}h ${r}m`:h?`${h}h`:`${r}m`};
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dd=s=>{const [y,m,d]=s.split('-');return `${MON[+m-1]} ${+d}, ${y}`};
+const dshort=s=>{const [,m,d]=s.split('-');return `${MON[+m-1]} ${+d}`};
+const tok=n=>n?n.toLocaleString('en-US'):'—';
+const ORD={prog:0,review:1,todo:2,done:3,canc:3},PORD={highest:0,high:1,medium:2,low:3};
+const sortI=a=>a.sort((x,y)=>ORD[x.status]-ORD[y.status]||PORD[x.prio]-PORD[y.prio]||x.key.localeCompare(y.key));
+const stats=l=>({total:l.length,done:l.filter(i=>i.status=='done').length,rev:l.filter(i=>i.status=='review').length,prog:l.filter(i=>i.status=='prog').length,todo:l.filter(i=>i.status=='todo').length});
+const segBar=(s,cls)=>{const w=n=>s.total?(n/s.total*100).toFixed(1):0;return `<div class="${cls||'bar'}"><i class="b-done" style="width:${w(s.done)}%"></i><i class="b-rev" style="width:${w(s.rev)}%"></i><i class="b-prog" style="width:${w(s.prog)}%"></i></div>`};
+const logsOf=k=>LOG.filter(l=>l.key==k).sort((a,b)=>b.date.localeCompare(a.date));
+const myDay=d=>LOG.filter(l=>l.who==ME&&l.date==d).reduce((s,l)=>s+l.m,0);
+const daysBetween=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
+
+/* ---------- state ---------- */
+const S={mode:'mine',proj:'HOME',q:'',f:{status:new Set(),type:new Set(),prio:new Set(),inst:new Set()},
+  jql:'assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC',saved:null,
+  closedInst:{},collapsed:{},epicProj:'HOME',relProj:'HOME',sub:{},
+  tabs:[{kind:'file',id:'CamCloud.php'},{kind:'issue',id:'HOME-710'}],active:1,ov:null};
+const cur=()=>S.tabs[S.active];
+
+/* ---------- sidebar ---------- */
+function filt(list){
+  const q=S.q.trim().toLowerCase(),f=S.f;
+  return list.filter(i=>(!q||i.key.toLowerCase().includes(q)||i.sum.toLowerCase().includes(q))
+    &&(!f.status.size||f.status.has(i.status))&&(!f.type.size||f.type.has(i.type))
+    &&(!f.prio.size||f.prio.has(i.prio))&&(!f.inst.size||f.inst.has(i.inst)));
+}
+function jqlPred(j){
+  const t=j.toLowerCase(),ps=[];
+  if(t.includes('currentuser()'))ps.push(i=>i.asg==ME);
+  const pm=t.match(/project\s*=\s*"?([a-z0-9]+)/);if(pm)ps.push(i=>i.proj.toLowerCase()==pm[1]);
+  const ty=t.match(/type\s*=\s*(bug|story|task)/);if(ty)ps.push(i=>i.type==ty[1]);
+  if(/resolution\s*(=\s*unresolved|is\s+empty)/.test(t))ps.push(i=>i.status!='done');
+  const sm=t.match(/status\s*=\s*"?(review|done|"?in progress)/);if(sm)ps.push(i=>i.status==({review:'review',done:'done'}[sm[1]]||'prog'));
+  const lm=t.match(/labels\s*=\s*"?([a-z0-9-]+)/);if(lm)ps.push(i=>i.labels.includes(lm[1]));
+  const tx=t.match(/text\s*~\s*"([^"]+)"/);if(tx)ps.push(i=>i.sum.toLowerCase().includes(tx[1]));
+  return i=>ps.every(p=>p(i));
+}
+function issueRow(i,depth,showAv){
+  const c=cur(),on=c&&c.kind=='issue'&&c.id==i.key;
+  return `<div class="row${on?' on':''}" style="padding-left:${6+depth*14}px" data-act="open" data-k="${i.key}" title="${esc(i.key+' · '+i.sum+' · '+SL[i.status])}" tabindex="0"><span class="tw"></span>${TI[i.type]}<span class="lbl"><span class="k">${i.key}</span> ${esc(i.sum)}</span>${showAv?av(i.asg,16):''}${pill(i.status,1)}</div>`;
+}
+function renderExtra(){
+  document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.m==S.mode));
+  let h='';
+  if(S.mode=='proj'){
+    h=`<select class="sel" id="proj-sel" data-chg="proj" aria-label="Project">${INST.map(x=>`<optgroup label="${x.name}">${x.projects.map(p=>`<option value="${p}"${p==S.proj?' selected':''}>${p}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  } else if(S.mode=='jql'){
+    const sf=FILTERS.find(f=>f.id==S.saved);
+    h=`<textarea class="jql" id="jql" spellcheck="false" aria-label="JQL">${esc(S.jql)}</textarea>
+    <div class="row-btns"><button class="btn sm pri" data-act="run-jql">Run</button><button class="btn sm" data-act="save-jql">Save as Filter</button>${sf?`<span class="sm mut" style="align-self:center">filter “${esc(sf.name)}”</span>`:''}</div>`;
+  }
+  $('#mode-extra').innerHTML=h;
+  $('#mode-extra').hidden=!h;
+}
+function renderChips(){
+  const f=S.f,names={status:SL,type:TL,prio:PL,inst:Object.fromEntries(INST.map(x=>[x.id,x.name]))};
+  const ch=[];
+  for(const g of ['status','type','prio','inst'])for(const v of f[g])ch.push(`<button class="chip" data-act="chip-x" data-g="${g}" data-v="${v}" title="Remove">${names[g][v]}${IC.x}</button>`);
+  $('#chips').innerHTML=ch.length?ch.join('')+`<button class="lnk" data-act="qp-reset">Reset</button>`:'';
+  $('#chips').hidden=!ch.length;
+}
+function renderTree(){
+  let h='';
+  if(S.mode=='mine'){
+    h=INST.map(x=>{
+      const list=sortI(filt(ALL().filter(i=>i.inst==x.id&&i.asg==ME&&i.status!='done')));
+      const open=!S.closedInst[x.id];
+      return `<div class="row inst" data-act="inst" data-id="${x.id}" style="padding-left:4px" tabindex="0"><span class="tw${open?' open':''}">${IC.chev}</span>${IC.server}<span class="lbl">${x.name} <span class="desc">${x.host}</span></span>${x.tempo?'<span class="tg">Tempo</span>':''}<span class="badge">${list.length}</span></div>`+
+        (open?(list.length?list.map(i=>issueRow(i,1)).join(''):`<div class="empty">Nothing matches the filter</div>`):'');
+    }).join('');
+  } else if(S.mode=='proj'){
+    const x=instOf(S.proj),list=sortI(filt(ALL().filter(i=>i.proj==S.proj)));
+    h=`<div class="grp">${S.proj} · ${x.name} · ${list.length}</div>`+(list.length?list.map(i=>issueRow(i,0,1)).join(''):`<div class="empty">Nothing matches the filter</div>`);
+  } else {
+    const sf=FILTERS.find(f=>f.id==S.saved),p=sf?sf.p:jqlPred(S.jql);
+    const list=sortI(filt(ALL().filter(p)));
+    h=`<div class="grp">Issues found: ${list.length}</div>`+(list.length?list.map(i=>issueRow(i,0,1)).join(''):`<div class="empty">No issues for this query</div>`);
+  }
+  const q=S.q.trim().toUpperCase();
+  if(/^[A-Z][A-Z0-9]+-\d+$/.test(q)&&!I[q])h=`<div class="row" style="padding-left:20px" data-act="by-key" data-k="${q}" tabindex="0">${IC.search.replace('<svg','<svg class="s16"')}<span class="lbl">Open <span class="k">${q}</span> by key</span></div>`+h;
+  $('#tree').innerHTML=h;
+}
+function renderFilters(){
+  const row=f=>`<div class="row${S.saved==f.id&&S.mode=='jql'?' on':''}" style="padding-left:22px" data-act="saved" data-id="${f.id}" title="${esc(f.jql)}" tabindex="0">${f.own?IC.funnel:IC.star}<span class="lbl">${esc(f.name)}</span><span class="desc">${f.own?'local':ins(f.inst).name}</span></div>`;
+  $('#filters').innerHTML=`<div class="grp">My Filters</div>${FILTERS.filter(f=>f.own).map(row).join('')}<div class="grp">Jira Favorites</div>${FILTERS.filter(f=>!f.own).map(row).join('')}`;
+}
+function projSelect(id,val){
+  return `<div class="ctl"><select class="sel" id="${id}" data-chg="${id}" aria-label="Project">${INST.map(x=>`<optgroup label="${x.name}">${x.projects.map(p=>`<option value="${p}"${p==val?' selected':''}>${p}</option>`).join('')}</optgroup>`).join('')}</select></div>`;
+}
+function renderEpics(){
+  const list=Object.keys(EPICS).filter(k=>k.split('-')[0]==S.epicProj);
+  const c=cur();
+  $('#epics').innerHTML=projSelect('epicProj',S.epicProj)+(list.length?list.map(k=>{
+    const s=stats(ALL().filter(i=>i.epic==k));
+    return `<div class="row${c&&c.kind=='epic'&&c.id==k?' on':''}" style="padding-left:22px" data-act="epic" data-k="${k}" tabindex="0">${TI.epic}<span class="lbl">${esc(EPICS[k].sum)} <span class="desc">${k}</span></span>${segBar(s,'mini')}<span class="desc" style="font-variant-numeric:tabular-nums">${s.done}/${s.total}</span></div>`;
+  }).join(''):`<div class="empty">No unresolved epics in ${S.epicProj}</div>`);
+}
+function renderRels(){
+  const list=REL.filter(r=>r.proj==S.relProj),c=cur();
+  $('#rels').innerHTML=projSelect('relProj',S.relProj)+(list.length?list.map(r=>{
+    const s=stats(ALL().filter(i=>i.fix==r.id));
+    return `<div class="row${c&&c.kind=='rel'&&c.id==r.id?' on':''}" style="padding-left:22px" data-act="rel" data-id="${r.id}" tabindex="0" title="${r.released?'Released':'Unreleased'}">${r.released?IC.ok.replace('class="s16"','class="s16" style="color:var(--green)"'):IC.pend}<span class="lbl">${esc(r.name)} <span class="desc">${r.date?dd(r.date):'no date'}</span></span>${s.total?`<span class="desc" style="font-variant-numeric:tabular-nums">${s.done}/${s.total}</span>`:''}</div>`;
+  }).join(''):`<div class="empty">No versions in ${S.relProj}</div>`);
+}
+function renderTempo(){
+  const t=myDay(TODAY),pct=Math.min(100,t/480*100);
+  const todays=LOG.filter(l=>l.who==ME&&l.date==TODAY);
+  $('#tempo').innerHTML=`<div class="tp">
+    <div class="tp-top"><div><div class="sm mut">Today, Fri, October 2</div><div class="big">${fmt(t)}</div></div><div class="sm mut">of 8h · ${fmt(Math.max(0,480-t))} left</div></div>
+    <div class="bar"><i class="b-acc" style="width:${pct}%"></i></div>
+    <div class="tl">${todays.map(l=>`<div class="row" data-act="open" data-k="${l.key}" tabindex="0" title="${esc(l.c)}"><span class="k">${l.key}</span><span class="lbl mut">${esc(l.c)}</span><span class="t">${fmt(l.m)}</span></div>`).join('')}</div>
+    <div class="row-btns"><button class="btn sm" data-act="refresh">Refresh</button><button class="btn sm pri" data-act="log" data-k="${cur()&&cur().kind=='issue'?cur().id:'HOME-710'}">${IC.clock} Log</button></div>
+  </div>`;
+}
+
+/* ---------- editor ---------- */
+function tabLabel(t){
+  if(t.kind=='issue')return TI[I[t.id].type]+`<span>${t.id}</span>`;
+  if(t.kind=='epic')return TI.epic+`<span>${t.id}</span>`;
+  if(t.kind=='rel')return IC.tag+`<span>${esc(REL.find(r=>r.id==t.id).name)}</span>`;
+  if(t.kind=='ts')return IC.cal+`<span>Tempo · week</span>`;
+  return (t.id.endsWith('.php')?IC.php:IC.file)+`<span>${esc(t.id)}</span>`;
+}
+function renderTabs(){
+  $('#tabs').innerHTML=S.tabs.map((t,n)=>`<div class="tab${n==S.active?' on':''}" role="tab" aria-selected="${n==S.active}" data-act="tab" data-n="${n}" tabindex="0">${tabLabel(t)}<button class="ib" data-act="tab-x" data-n="${n}" aria-label="Close">${IC.x}</button></div>`).join('');
+}
+function renderPane(){
+  const t=cur(),p=$('#pane');
+  if(!t){p.innerHTML=`<div class="wide-pad mut">Open an issue from the tree on the left.</div>`;return}
+  p.innerHTML=t.kind=='issue'?vIssue(t.id):t.kind=='epic'?vEpic(t.id):t.kind=='rel'?vRel(t.id):t.kind=='ts'?vTS():vFile(t.id);
+}
+function vFile(n){
+  return `<div class="code">${FILES[n].map(l=>`<div class="${/^\s*\/\//.test(l)?'cmt':''}">${esc(l)||' '}</div>`).join('')}</div>`;
+}
+function shot(v){
+  if(v==3)return `<svg viewBox="0 0 240 180" role="img" aria-label="Photo of the kiosk screen"><rect width="240" height="180" style="fill:#2c3138"/><rect x="20" y="14" width="200" height="140" rx="6" style="fill:#e9eef3"/><rect x="20" y="14" width="200" height="22" rx="6" style="fill:#1f5fa8"/><text x="32" y="29" style="fill:#fff;font:600 9px sans-serif">Support · Queue</text><text x="120" y="70" text-anchor="middle" style="fill:#1b2a3a;font:700 16px sans-serif">Ticket A-042</text><text x="120" y="88" text-anchor="middle" style="fill:#3c4a5a;font:9px sans-serif">Ticket issued</text><rect x="70" y="102" width="100" height="22" rx="4" style="fill:#1f5fa8"/><text x="120" y="117" text-anchor="middle" style="fill:#fff;font:600 9px sans-serif">Done</text><rect x="92" y="160" width="56" height="6" rx="3" style="fill:#121418"/></svg>`;
+  const ev=[0,1,2,3,4].map(j=>{const y=172+j*28;
+    if(v==2&&j>1)return j==2?`<circle cx="90" cy="${y+22}" r="9" style="fill:none;stroke:#3b82f6;stroke-width:2.5;stroke-dasharray:40 20"/><text x="90" y="${y+46}" text-anchor="middle" style="fill:#8a93a3;font:8px sans-serif">Loading…</text>`:'';
+    return `<rect x="10" y="${y}" width="160" height="22" rx="4" style="fill:#1f232a"/><circle cx="21" cy="${y+11}" r="4" style="fill:${j%2?'#f59e0b':'#3b82f6'}"/><rect x="31" y="${y+6}" width="${70+j*9%40}" height="4" rx="2" style="fill:#c9ced6"/><rect x="31" y="${y+13}" width="44" height="3" rx="1.5" style="fill:#5d6573"/>`;}).join('');
+  const marks=[14,22,30,47,52,66,80,95,101,118,130].map(x=>`<rect x="${10+x}" y="139" width="3" height="8" style="fill:${x>100&&v==1?'#3a3f48':'#3b82f6'}"/>`).join('');
+  return `<svg viewBox="0 0 180 330" role="img" aria-label="Orbit app screenshot"><rect width="180" height="330" rx="14" style="fill:#121418"/><rect width="180" height="28" style="fill:#1b1e24"/><text x="12" y="18" style="fill:#e8e8e8;font:600 9px sans-serif">Entrance 2 · Archive</text><rect x="10" y="36" width="160" height="90" rx="6" style="fill:#262b33"/><path d="M82 70l20 11-20 11z" style="fill:#5d6573"/><rect x="10" y="134" width="160" height="18" rx="3" style="fill:#1b1e24"/>${marks}<path d="M${v==1?115:88} 131v24" style="stroke:#ef4444;stroke-width:1.5"/><text x="12" y="164" style="fill:#8a93a3;font:7px sans-serif">${v==1?'Aug 24':'Sep 2'}</text><text x="168" y="164" text-anchor="end" style="fill:#8a93a3;font:7px sans-serif">${v==1?'Aug 26':'Sep 4'}</text>${v==1?'<rect x="108" y="131" width="64" height="24" rx="3" style="fill:none;stroke:#ef4444;stroke-width:1.5"/>':''}${ev}</svg>`;
+}
+function vIssue(k){
+  const i=I[k],x=ins(i.inst),sub=S.sub[k]||'desc',logs=logsOf(k),spent=logs.reduce((s,l)=>s+l.m,0);
+  const hist=i.hist||[{who:i.rep,at:i.created+' 10:00',created:true}];
+  const T=[['desc','Description'],['att','Attachments',i.att.length],['com','Comments',i.com.length],['hist','History',hist.length],['wl','Work Log',logs.length]];
+  let body='';
+  if(sub=='desc')body=`<div class="rich">${i.desc||`<p class="mut">No description.</p>`}</div>`;
+  if(sub=='att')body=i.att.length?`<div class="toolbar"><span class="mut sm">${i.att.length} ${i.att.length==1?'file':'files'} · images are downloaded by the extension with authorization and shown here</span><span class="sp"></span><button class="btn sm" data-act="dl-all" data-k="${k}">${IC.dl} Download All</button></div>
+    <div class="att-grid">${i.att.map((a,n)=>`<div class="att">${a.img?`<button class="th" data-act="img" data-k="${k}" data-n="${n}" aria-label="Open ${esc(a.n)}">${shot(a.img)}</button>`:`<div class="th file">${IC.file.replace('class="s16"','')}<span>.${a.n.split('.').pop()}</span></div>`}
+      <div class="inf"><span class="nm" title="${esc(a.n)}">${esc(a.n)}</span><span class="mut">${a.size} · ${U[a.who][0]} · ${a.at}</span></div>
+      <div class="ab">${FILES[a.n]?`<button class="btn sm" data-act="file" data-f="${esc(a.n)}">Open in Editor</button>`:''}<button class="btn sm" data-act="dl" data-k="${k}" data-f="${esc(a.n)}" aria-label="Download">${IC.dl}</button></div></div>`).join('')}</div>`:`<p class="mut">No attachments.</p>`;
+  if(sub=='com')body=(i.com.length?i.com.map(c=>`<div class="cm">${av(c.who,28)}<div><div class="who"><b>${U[c.who][0]}</b><span class="mut sm">${c.at}</span></div><div class="tx">${c.t}</div></div></div>`).join(''):`<p class="mut">No comments.</p>`)+`<div class="ro-note">Comments are read-only in the MVP. Replying from VS Code is coming in the next version.</div>`;
+  if(sub=='hist')body=hist.map(h=>`<div class="hi">${av(h.who,28)}<div><div class="who"><b>${U[h.who][0]}</b> <span class="mut sm">${h.at}</span></div>${h.created?`<div class="chg mut">created the issue</div>`:h.ch.map(c=>`<div class="chg"><span class="f">${c[0]}</span>${c[1]=='—'?'':`<span class="old">${esc(c[1])}</span><span class="arr">→</span>`}<span>${esc(c[2])}</span></div>`).join('')}</div></div>`).join('');
+  if(sub=='wl')body=`<div class="toolbar"><span class="src">${x.tempo?`${IC.clock} Tempo Timesheets · attributes “Work Type”, “AI Tokens”`:`${IC.info} No Tempo on ${x.name} — using the standard Jira work log`}</span><span class="sp"></span><button class="btn sm pri" data-act="log" data-k="${k}">${IC.clock} Log Work</button></div>
+    ${logs.length?`<div class="tw-wrap"><table class="t"><thead><tr><th>Who</th><th>Date</th><th class="num">Time</th><th>Comment</th>${x.tempo?'<th>Work Type</th><th class="num">AI Tokens</th>':''}</tr></thead>
+    <tbody>${logs.map(l=>`<tr><td>${person(l.who)}</td><td class="num" style="text-align:left">${dd(l.date)}</td><td class="num">${fmt(l.m)}</td><td>${esc(l.c)}</td>${x.tempo?`<td>${esc(l.wt)}</td><td class="num">${tok(l.tok)}</td>`:''}</tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total</td><td></td><td class="num">${fmt(spent)}</td><td></td>${x.tempo?`<td></td><td class="num">${tok(logs.reduce((s,l)=>s+(l.tok||0),0))}</td>`:''}</tr></tfoot></table></div>`:`<p class="mut">No entries yet.</p>`}`;
+  const rem=Math.max(0,i.est-spent),over=i.est&&spent>i.est;
+  const rel=i.fix&&REL.find(r=>r.id==i.fix);
+  return `<div class="iv">
+    <div class="iv-head">
+      <div class="crumbs">${IC.server} ${x.name}<span>›</span>${i.proj}${i.epic?`<span>›</span><button class="ln" data-act="epic" data-k="${i.epic}">${i.epic}</button>`:''}<span>›</span>${TI[i.type]}<span class="k">${i.key}</span></div>
+      <h1>${esc(i.sum)}</h1>
+      <div class="hrow"><button class="pill pill-btn s-${i.status}" data-act="status" data-k="${k}" title="Change Status">${SL[i.status]} ▾</button><span class="prio">${PI[i.prio]}${PL[i.prio]}</span><span class="mut sm">${TL[i.type]}</span><span class="sp"></span>
+        <button class="btn" data-act="copy" data-k="${k}">${IC.copy} Key</button>
+        <a class="btn" href="https://${x.host}/browse/${k}" target="_blank" rel="noopener">${IC.ext} Open in Jira</a>
+        <button class="btn" data-act="pin">${IC.pin} Pin</button>
+        <button class="btn pri" data-act="log" data-k="${k}">${IC.clock} Log Work</button></div>
+    </div>
+    <div style="min-width:0">
+      <div class="subtabs" role="tablist">${T.map(s=>`<button class="${s[0]==sub?'on':''}" role="tab" aria-selected="${s[0]==sub}" data-act="sub" data-k="${k}" data-s="${s[0]}">${s[1]}${s[2]!=null?`<span class="cnt">${s[2]}</span>`:''}</button>`).join('')}</div>
+      ${body}
+    </div>
+    <aside class="meta">
+      <div class="mg"><h5>People</h5>
+        <div class="mr"><span class="l">Assignee</span><span class="v">${person(i.asg)}</span></div>
+        <div class="mr"><span class="l">Reporter</span><span class="v">${person(i.rep)}</span></div>
+        <div class="mr"><span class="l">Watchers</span><span class="v">${i.watchers.length?`<span class="stack">${i.watchers.map(w=>av(w,22)).join('')}</span><span class="mut">${i.watchers.length}</span>`:'<span class="mut">—</span>'}</span></div>
+      </div>
+      <div class="mg"><h5>Details</h5>
+        <div class="mr"><span class="l">Epic</span><span class="v">${i.epic?`<button class="ln" data-act="epic" data-k="${i.epic}">${esc(EPICS[i.epic].sum)}</button>`:'<span class="mut">—</span>'}</span></div>
+        <div class="mr"><span class="l">Release</span><span class="v">${rel?`<button class="ln" data-act="rel" data-id="${rel.id}">${esc(rel.name)}</button>`:'<span class="mut">—</span>'}</span></div>
+        <div class="mr"><span class="l">Labels</span><span class="v">${i.labels.length?i.labels.map(l=>`<span class="tag">${l}</span>`).join(''):'<span class="mut">—</span>'}</span></div>
+        <div class="mr"><span class="l">Components</span><span class="v">${i.comps.length?i.comps.join(', '):'<span class="mut">—</span>'}</span></div>
+      </div>
+      <div class="mg"><h5>Time</h5>
+        <div class="mr"><span class="l">Estimate</span><span class="v">${i.est?fmt(i.est):'<span class="mut">—</span>'}</span></div>
+        <div class="mr"><span class="l">Logged</span><span class="v">${spent?fmt(spent):'0m'}${over?' <span class="under">· over estimate</span>':''}</span></div>
+        <div class="mr"><span class="l">Remaining</span><span class="v">${i.est?fmt(rem):'<span class="mut">—</span>'}</span></div>
+        ${i.est?`<div class="bar" style="margin-top:6px"><i class="${over?'b-over':'b-acc'}" style="width:${Math.min(100,spent/i.est*100)}%"></i></div>`:''}
+      </div>
+      <div class="mg"><h5>Dates</h5>
+        <div class="mr"><span class="l">Created</span><span class="v">${i.created}</span></div>
+        <div class="mr"><span class="l">Updated</span><span class="v">${i.updated}</span></div>
+        <div class="mr"><span class="l">Due</span><span class="v">${i.due||'<span class="mut">—</span>'}</span></div>
+      </div>
+    </aside>
+  </div>`;
+}
+function issueTable(list,o){
+  return `<div class="tw-wrap"><table class="t"><thead><tr><th></th><th>Key</th><th>Issue</th><th>Status</th><th>Priority</th><th>Assignee</th>${o.rel?'<th>Release</th>':''}${o.epic?'<th>Epic</th>':''}</tr></thead><tbody>
+  ${sortI(list).map(i=>{const r=i.fix&&REL.find(z=>z.id==i.fix);return `<tr class="click" data-act="open" data-k="${i.key}" tabindex="0"><td>${TI[i.type]}</td><td class="k" style="white-space:nowrap">${i.key}</td><td>${esc(i.sum)}</td><td>${pill(i.status)}</td><td>${PI[i.prio]}</td><td>${person(i.asg)}</td>${o.rel?`<td class="mut" style="white-space:nowrap">${r?esc(r.name):'—'}</td>`:''}${o.epic?`<td class="mut" style="white-space:nowrap">${i.epic?esc(EPICS[i.epic].sum):'—'}</td>`:''}</tr>`}).join('')}</tbody></table></div>`;
+}
+function progressBlock(s){
+  const pct=s.total?Math.round(s.done/s.total*100):0;
+  return `<div class="sum"><div><b>${s.done} of ${s.total}</b><span>done · ${pct}%</span></div><div><b>${s.prog+s.rev}</b><span>in progress</span></div><div><b>${s.todo}</b><span>not started</span></div></div>
+  ${segBar(s)}<div class="legend"><span><i class="b-done"></i>Done ${s.done}</span><span><i class="b-rev"></i>In Review ${s.rev}</span><span><i class="b-prog"></i>In Progress ${s.prog}</span><span><i style="background:var(--track)"></i>To Do ${s.todo}</span></div>`;
+}
+function vEpic(k){
+  const e=EPICS[k],p=k.split('-')[0],x=instOf(p),kids=ALL().filter(i=>i.epic==k);
+  return `<div class="wide-pad"><div class="crumbs">${IC.server} ${x.name}<span>›</span>${p}<span>›</span>Epics</div>
+  <h1 style="display:flex;align-items:center;gap:10px">${TI.epic.replace('class="ti"','class="ti" style="width:20px;height:20px"')}${esc(e.sum)}</h1>
+  <div class="hrow" style="margin-bottom:16px"><span class="k">${k}</span>${pill(e.status)}<span class="sp"></span><button class="btn" data-act="refresh">Refresh</button><a class="btn" href="https://${x.host}/browse/${k}" target="_blank" rel="noopener">${IC.ext} Open in Jira</a></div>
+  ${progressBlock(stats(kids))}${issueTable(kids,{rel:1})}
+  <p class="foot">Server/DC: epic issues are looked up by the Epic Link field. Jira Cloud: epic issues are looked up by <code>parent</code>.</p></div>`;
+}
+function vRel(id){
+  const r=REL.find(z=>z.id==id),x=instOf(r.proj),kids=ALL().filter(i=>i.fix==id);
+  const left=r.date&&!r.released?daysBetween(TODAY,r.date):null;
+  return `<div class="wide-pad"><div class="crumbs">${IC.server} ${x.name}<span>›</span>${r.proj}<span>›</span>Releases</div>
+  <h1 style="display:flex;align-items:center;gap:10px">${IC.tag.replace('class="s16"','style="width:20px;height:20px;color:var(--mut)"')}${esc(r.name)}</h1>
+  <div class="hrow" style="margin-bottom:16px">${r.released?'<span class="pill s-done">Released</span>':'<span class="pill s-prog">Unreleased</span>'}
+    <span class="sm">${r.start?`Start ${dd(r.start)}`:'No start date'} · ${r.date?`${r.released?'Released':'Release'} ${dd(r.date)}`:'no release date'}${left!=null?` · <b>${left} d left</b>`:''}</span>
+    ${r.desc?`<span class="mut sm">${esc(r.desc)}</span>`:''}<span class="sp"></span><button class="btn" data-act="refresh">Refresh</button><a class="btn" href="https://${x.host}/projects/${r.proj}?selectedItem=com.atlassian.jira.jira-projects-plugin:release-page" target="_blank" rel="noopener">${IC.ext} Open in Jira</a></div>
+  ${kids.length?progressBlock(stats(kids))+issueTable(kids,{epic:1}):'<p class="mut">This version has no issues yet.</p>'}</div>`;
+}
+function vTS(){
+  const mine=LOG.filter(l=>l.who==ME&&WEEK.includes(l.date));
+  const keys=[...new Set(mine.map(l=>l.key))].sort((a,b)=>INST.findIndex(x=>x.id==I[a].inst)-INST.findIndex(x=>x.id==I[b].inst)||a.localeCompare(b));
+  const cell=(k,d)=>mine.filter(l=>l.key==k&&l.date==d).reduce((s,l)=>s+l.m,0);
+  const tot=mine.reduce((s,l)=>s+l.m,0);
+  let lastInst=null;
+  const rows=keys.map(k=>{const i=I[k],x=ins(i.inst);let g='';if(x.id!==lastInst){lastInst=x.id;g=`<tr><td colspan="7" class="mut sm" style="padding-top:12px">${x.name} · ${x.tempo?'Tempo':'Jira work log'}</td></tr>`}
+    const rt=WEEK.reduce((s,d)=>s+cell(k,d),0);
+    return g+`<tr><td><button class="ln" data-act="open" data-k="${k}"><span class="k">${k}</span></button> <span class="mut">${esc(i.sum)}</span></td>${WEEK.map(d=>{const m=cell(k,d);return `<td class="num cell" data-act="log" data-k="${k}" data-d="${d}" title="Log work to ${k} on ${dd(d)}" tabindex="0">${m?fmt(m):'<span class="mut">·</span>'}</td>`}).join('')}<td class="num">${fmt(rt)}</td></tr>`}).join('');
+  return `<div class="wide-pad"><div class="crumbs">${IC.clock} Tempo · all instances</div>
+  <h1>Week of September 28 – October 2</h1>
+  <div class="sum"><div><b>${fmt(tot)}</b><span>of 40h this week</span></div><div><b>${fmt(myDay(TODAY))}</b><span>today</span></div><div><b>${keys.length}</b><span>issues</span></div></div>
+  <div class="bar" style="margin-bottom:18px"><i class="b-acc" style="width:${Math.min(100,tot/2400*100)}%"></i></div>
+  <div class="tw-wrap"><table class="t"><thead><tr><th>Issue</th>${WEEK.map((d,n)=>`<th class="num">${WD[n]} ${dshort(d)}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>${rows}</tbody>
+  <tfoot><tr><td>Per day</td>${WEEK.map(d=>{const m=myDay(d);return `<td class="num${m<480&&d<TODAY?' under':''}">${fmt(m)}</td>`}).join('')}<td class="num">${fmt(tot)}</td></tr></tfoot></table></div>
+  <p class="foot">Click a cell to log time to that issue for that day. Days under 8 hours are highlighted.</p></div>`;
+}
+function renderSB(){
+  const t=cur(),i=t&&t.kind=='issue'?I[t.id]:null;
+  $('#sb').innerHTML=`<span class="it rem">${IC.giraffe} Jiraffe</span><span class="it opt">${IC.branch} main</span><span class="it opt" data-act="add-inst">${IC.server.replace('class="s16"','')} 3 instances</span><span class="sp"></span>
+  ${i?`<span class="it" data-act="sub" data-k="${i.key}" data-s="desc">${TI[i.type]} ${i.key} · ${SL[i.status]}</span>`:''}<span class="it" data-act="ts" title="Click to open the Tempo section">${IC.clock} Today ${fmt(myDay(TODAY))} / 8h</span><span class="it opt">${IC.bell}</span>`;
+}
+function renderStatic(){
+  $('#tbs').innerHTML=IC.search+' jiraffe';
+  $('#act').innerHTML=`<button title="Explorer">${AIC.files}</button><button title="Search">${AIC.search}</button><button title="Git">${AIC.scm}</button><button title="Extensions">${AIC.ext}</button><button class="on" title="Jiraffe">${IC.giraffe}</button>`;
+  $('#side-acts').innerHTML=`<button class="ib" data-act="add-inst" title="Add Instance">${IC.plus}</button><button class="ib" data-act="refresh" title="Refresh">${IC.refresh}</button>`;
+  $('#issues-acts').innerHTML=`<button class="ib" data-act="qp" title="Quick Filters (OR within a group, AND between groups)">${IC.filter}</button><button class="ib" data-act="mode" data-m="jql" title="Edit JQL">${IC.search}</button>`;
+  $('#q-ic').innerHTML=IC.search;
+  document.querySelectorAll('.view-h .tw').forEach(e=>e.innerHTML=IC.chev);
+}
+function renderViews(){for(const v of ['issues','filters','epics','rel','tempo'])$('#view-'+v).classList.toggle('collapsed',!!S.collapsed[v])}
+function renderSide(){renderChips();renderTree();renderFilters();renderEpics();renderRels();renderTempo()}
+function render(){renderSide();renderTabs();renderPane();renderSB()}
+
+/* ---------- overlays ---------- */
+function showOv(h){$('#ovl').innerHTML=`<div class="ov" data-act="ov-bg">${h}</div>`;const f=$('#ovl').querySelector('input,select,textarea,button');if(f)f.focus()}
+function closeOv(){S.ov=null;$('#ovl').innerHTML=''}
+let tt;
+function toast(m){const t=$('#toast');t.innerHTML=IC.info+`<span>${m}</span>`;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3600)}
+function qpHtml(){
+  const G=[['status','Status',SL],['type','Type',{bug:TL.bug,story:TL.story,task:TL.task}],['prio','Priority',PL],['inst','Instance',Object.fromEntries(INST.map(x=>[x.id,x.name]))]];
+  const n=Object.values(S.f).reduce((s,x)=>s+x.size,0);
+  return `<div class="dlg qp" role="dialog" aria-label="Quick Filters"><div class="dlg-h">${IC.filter.replace('<svg','<svg style="width:16px;height:16px"')} Quick Filters <span class="mut sm" style="font-weight:400">${n?`${n} selected`:'nothing selected — showing everything'}</span><button class="ib" data-act="ov-x" aria-label="Close">${IC.x}</button></div>
+  <div style="padding-bottom:8px">${G.map(([g,t,m])=>`<div class="qp-g">${t}</div>${Object.entries(m).map(([v,l])=>{const on=S.f[g].has(v),c=ALL().filter(i=>i[g]==v).length;return `<div class="qp-i" data-act="qp-t" data-g="${g}" data-v="${v}" role="checkbox" aria-checked="${on}" tabindex="0"><span class="cb${on?' on':''}">${IC.check}</span>${g=='type'?TI[v]:g=='prio'?PI[v]:g=='status'?pill(v,1):IC.server}<span>${l}</span><span class="desc">${c}</span></div>`}).join('')}`).join('')}</div>
+  <div class="dlg-f"><button class="btn" data-act="qp-reset">Reset</button><button class="btn pri" data-act="ov-x">Done</button></div></div>`;
+}
+const NEXT={todo:['prog','canc'],prog:['review','done','canc'],review:['prog','done','canc'],done:['todo'],canc:['todo']};
+const CAT={todo:'To Do',prog:'In Progress',review:'In Progress',done:'Done',canc:'Done'};
+function stHtml(k){
+  return `<div class="dlg qp" role="dialog" aria-label="Change Status · ${k}"><div class="dlg-h">Change Status · ${k}<button class="ib" data-act="ov-x" aria-label="Close">${IC.x}</button></div>
+  <div style="padding:8px 14px"><div class="inp"><input placeholder="Transition" aria-label="Transition" autocomplete="off"></div></div>
+  <div style="padding-bottom:8px">${NEXT[I[k].status].map((s,n)=>`<div class="qp-i${n?'':' on'}" data-act="st-set" data-k="${k}" data-s="${s}" role="option" tabindex="0"><span>→ ${SL[s]}</span><span class="desc">${CAT[s]}</span></div>`).join('')}</div></div>`;
+}
+function logHtml(k,d){
+  const i=I[k],x=ins(i.inst);
+  return `<div class="dlg" role="dialog" aria-label="Log Work"><div class="dlg-h">${IC.clock.replace('<svg','<svg style="width:16px;height:16px"')} Log Work · ${k}<button class="ib" data-act="ov-x" aria-label="Close">${IC.x}</button></div>
+  <div class="dlg-b">
+    <div class="fld"><span class="lb">Issue</span><div class="ro">${TI[i.type]}<span class="k">${k}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.sum)}</span></div></div>
+    <div class="g2"><div class="fld"><label for="lg-dur">Time spent</label><input id="lg-dur" value="1h 30m" autocomplete="off"><small>1h 30m · 1h30m · 90m · 1.5h</small></div>
+    <div class="fld"><label for="lg-date">Date</label><input type="date" id="lg-date" value="${d}"></div></div>
+    <div class="fld"><label for="lg-c">Comment</label><textarea id="lg-c" rows="3" placeholder="What was done"></textarea></div>
+    ${x.tempo?`<fieldset class="tempo"><legend>Tempo · work attributes</legend><div class="g2"><div class="fld"><label for="lg-type">Work Type</label><select id="lg-type"><option>Development</option><option>Code Review</option><option>Analysis</option><option>Testing</option><option>Call</option></select></div>
+    <div class="fld"><label for="lg-tok">AI Tokens</label><input id="lg-tok" inputmode="numeric" placeholder="e.g. 120000" autocomplete="off"></div></div></fieldset>`
+    :`<div class="fld"><label for="lg-tok">AI Tokens</label><input id="lg-tok" inputmode="numeric" placeholder="e.g. 120000" autocomplete="off"></div><div class="note">No Tempo on ${x.name} — the entry goes to the issue’s standard work log, AI Tokens are appended to the comment.</div>`}
+    <div class="err" id="lg-err" hidden></div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-act="ov-x">Cancel</button><button class="btn pri" data-act="log-save" data-k="${k}">Log</button></div></div>`;
+}
+function addInstHtml(){
+  return `<div class="dlg" role="dialog" aria-label="Add Instance"><div class="dlg-h">${IC.server.replace('class="s16"','style="width:16px;height:16px"')} Add Instance<button class="ib" data-act="ov-x" aria-label="Close">${IC.x}</button></div>
+  <div class="dlg-b">
+    <div class="fld"><label for="ai-url">URL</label><input id="ai-url" placeholder="https://jira.example.com or https://host/jira" autocomplete="off"></div>
+    <div class="fld"><span class="lb">Type</span><div class="radios"><label><input type="radio" name="ai-kind" id="ai-k1" value="dc" data-chg="ai-kind" checked> Server / Data Center</label><label><input type="radio" name="ai-kind" id="ai-k2" value="cloud" data-chg="ai-kind"> Cloud</label></div></div>
+    <div class="fld" id="ai-email-w" hidden><label for="ai-email">Atlassian account email</label><input id="ai-email" type="email" autocomplete="off"></div>
+    <div class="fld"><label for="ai-tok" id="ai-tok-l">Personal Access Token</label><input id="ai-tok" type="password" autocomplete="off"><small>The token is stored in VS Code SecretStorage and never lands in settings.json.</small></div>
+    <div id="ai-res" class="sm" hidden></div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-act="ai-check" style="margin-right:auto">Test Connection</button><button class="btn" data-act="ov-x">Cancel</button><button class="btn pri" data-act="ai-add">Add</button></div></div>`;
+}
+function parseDur(s){
+  s=s.trim().toLowerCase().replace(/,/g,'.');
+  if(!s||!/^(\s*\d+(\.\d+)?\s*(min|h|m)?\s*)+$/.test(s))return 0;
+  let m=0,r;const re=/(\d+(?:\.\d+)?)\s*(min|h|m)?/g;
+  while((r=re.exec(s))){const v=parseFloat(r[1]),u=r[2];m+=(!u||u=='h')?v*60:v}
+  return Math.round(m);
+}
+
+/* ---------- actions ---------- */
+function openTab(kind,id){
+  let n=S.tabs.findIndex(t=>t.kind==kind&&t.id==id);
+  if(n<0){S.tabs.push({kind,id});n=S.tabs.length-1}
+  S.active=n;render();$('#pane').scrollTop=0;
+}
+const A={
+  open:t=>openTab('issue',t.dataset.k),
+  'by-key':t=>toast(`There is no issue ${t.dataset.k} in the prototype. The extension loads it by key from the matching instance.`),
+  inst:t=>{S.closedInst[t.dataset.id]=!S.closedInst[t.dataset.id];renderTree()},
+  mode:t=>{S.mode=t.dataset.m;if(S.mode!='jql')S.saved=null;S.collapsed.issues=false;renderViews();renderExtra();renderTree();renderFilters()},
+  view:(t,e)=>{if(e.target.closest('.ib'))return;S.collapsed[t.dataset.v]=!S.collapsed[t.dataset.v];renderViews()},
+  qp:()=>{S.ov='qp';showOv(qpHtml())},
+  status:t=>{S.ov='st';showOv(stHtml(t.dataset.k))},
+  'st-set':t=>{const k=t.dataset.k,s=t.dataset.s;I[k].status=s;closeOv();render();toast(`Jiraffe: ${k} → ${SL[s]}`)},
+  pin:t=>toast('Jiraffe: issue card pinned'),
+  'qp-t':t=>{const s=S.f[t.dataset.g],v=t.dataset.v;s.has(v)?s.delete(v):s.add(v);renderChips();renderTree();if(S.ov=='qp'){$('#ovl .ov').innerHTML=qpHtml();const el=$(`#ovl [data-g="${t.dataset.g}"][data-v="${v}"]`);if(el)el.focus()}},
+  'qp-reset':()=>{for(const g in S.f)S.f[g].clear();renderChips();renderTree();if(S.ov=='qp')$('#ovl .ov').innerHTML=qpHtml()},
+  'chip-x':t=>{S.f[t.dataset.g].delete(t.dataset.v);renderChips();renderTree()},
+  'run-jql':()=>{S.jql=$('#jql').value;S.saved=null;renderExtra();renderTree();renderFilters()},
+  'save-jql':()=>toast('In the extension the JQL is saved to local filters (globalState) and shows up under “My Filters”.'),
+  saved:t=>{const f=FILTERS.find(z=>z.id==t.dataset.id);S.mode='jql';S.saved=f.id;S.jql=f.jql;S.collapsed.issues=false;renderViews();renderExtra();renderTree();renderFilters()},
+  epic:t=>openTab('epic',t.dataset.k),
+  rel:t=>openTab('rel',t.dataset.id),
+  ts:()=>{S.collapsed.tempo=false;renderViews()},
+  file:t=>openTab('file',t.dataset.f),
+  tab:(t,e)=>{if(e.target.closest('[data-act="tab-x"]'))return;S.active=+t.dataset.n;render()},
+  'tab-x':t=>{const n=+t.dataset.n;S.tabs.splice(n,1);if(S.active>=n&&S.active>0)S.active--;if(!S.tabs.length)S.active=0;render()},
+  sub:t=>{S.sub[t.dataset.k]=t.dataset.s;openTab('issue',t.dataset.k)},
+  copy:t=>{const k=t.dataset.k;try{navigator.clipboard.writeText(k).then(()=>toast('Key copied: '+k),()=>toast('Could not copy. Key: '+k))}catch(_){toast('Could not copy. Key: '+k)}},
+  img:t=>{const a=I[t.dataset.k].att[+t.dataset.n];S.ov='lb';showOv(`<div class="lb-box" role="dialog" aria-label="${esc(a.n)}">${shot(a.img)}<div class="hrow" style="width:100%"><span class="nm">${esc(a.n)}</span><span class="mut sm">${a.size} · ${U[a.who][0]}</span><span class="sp"></span><button class="btn sm" data-act="dl" data-k="${t.dataset.k}" data-f="${esc(a.n)}">${IC.dl} Download</button><button class="btn sm" data-act="ov-x">Close</button></div></div>`)},
+  dl:t=>toast(`Saved: .jiraffe/${t.dataset.k}/${t.dataset.f}`),
+  'dl-all':t=>toast(`Saved ${I[t.dataset.k].att.length} files to .jiraffe/${t.dataset.k}/`),
+  log:t=>{S.ov='log';showOv(logHtml(t.dataset.k,t.dataset.d||TODAY));const d=$('#lg-dur');if(d){d.focus();d.select()}},
+  'log-save':t=>{
+    const k=t.dataset.k,m=parseDur($('#lg-dur').value),d=$('#lg-date').value,err=$('#lg-err');
+    if(!m||m>1440){err.textContent='Couldn\'t parse the duration. Try something like 1h 30m or 90m.';err.hidden=false;$('#lg-dur').focus();return}
+    if(!d){err.textContent='Enter the date as YYYY-MM-DD.';err.hidden=false;return}
+    const x=ins(I[k].inst),tk=$('#lg-tok')?parseInt($('#lg-tok').value.replace(/\D/g,''),10)||null:null;
+    let cm=$('#lg-c').value.trim();if(!x.tempo&&tk){cm=(cm?cm+' ':'')+`(AI Tokens: ${tk.toLocaleString('en-US')})`}
+    LOG.push(L(k,ME,d,m,cm||'—',x.tempo?tk:null,$('#lg-type')?$('#lg-type').value:'Development'));
+    closeOv();S.sub[k]=S.sub[k]||'desc';
+    const c=cur();if(c&&c.kind=='issue'&&c.id==k)S.sub[k]='wl';
+    render();toast(`Jiraffe: Logged ${fmt(m)} to ${k} on ${dd(d)}${x.tempo?' · Tempo':' · Jira worklog'}`);
+  },
+  'add-inst':()=>{S.ov='ai';showOv(addInstHtml())},
+  'ai-check':()=>{const r=$('#ai-res'),u=$('#ai-url').value.trim();r.hidden=false;
+    if(!/^https:\/\/[^\s/]+\.[^\s]+/.test(u)){r.className='err';r.textContent='A URL like https://jira.example.com is required';return}
+    r.className='mut sm';r.textContent='Checking the connection…';
+    setTimeout(()=>{if(!$('#ai-res'))return;r.className='ok';r.textContent='Connected as Andrew Foster (afoster). Sample only: the prototype sends no request.'},700)},
+  'ai-add':()=>{closeOv();toast('The prototype does not save the instance. In the extension it appears in the Issues tree.')},
+  refresh:()=>toast(`Refreshed: ${INST.length} instances, ${ALL().filter(i=>i.asg==ME&&i.status!='done').length} open issues assigned to you.`),
+  'ov-x':()=>closeOv(),
+  'ov-bg':(t,e)=>{if(e.target===t)closeOv()},
+};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t)return;const f=A[t.dataset.act];if(f){if(t.tagName=='A')return;f(t,e)}});
+document.addEventListener('keydown',e=>{
+  if(e.key=='Escape'&&S.ov){closeOv();return}
+  if((e.key=='Enter'||e.key==' ')&&e.target.matches('[data-act][tabindex]')&&e.target.tagName!='BUTTON'){e.preventDefault();e.target.click()}
+  if(e.key=='Enter'&&e.target.id=='lg-dur'){e.preventDefault();const b=$('[data-act="log-save"]');if(b)b.click()}
+  if(e.key=='Enter'&&(e.metaKey||e.ctrlKey)&&e.target.id=='jql'){A['run-jql']()}
+});
+document.addEventListener('change',e=>{
+  const c=e.target.dataset.chg;if(!c)return;
+  if(c=='proj'){S.proj=e.target.value;renderTree()}
+  if(c=='epicProj'){S.epicProj=e.target.value;renderEpics()}
+  if(c=='relProj'){S.relProj=e.target.value;renderRels()}
+  if(c=='ai-kind'){const cl=e.target.value=='cloud';$('#ai-email-w').hidden=!cl;$('#ai-tok-l').textContent=cl?'API token':'Personal Access Token'}
+});
+$('#q').addEventListener('input',e=>{S.q=e.target.value;renderTree()});
+
+renderStatic();renderViews();renderExtra();render();
+window.__proto={S,A,openTab,render,showOv,closeOv,logHtml,qpHtml,cur,TODAY};
+})();
+</script>
+</html>
