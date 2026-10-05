@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { registerInstanceCommands } from './commands/instances';
+import { readScope, registerInstanceCommands } from './commands/instances';
 import { registerFilterCommands } from './commands/filters';
 import { registerIssueCommands } from './commands/issue';
 import { registerSectionCommands } from './commands/sections';
@@ -26,7 +26,8 @@ const TIMER_REFRESH_MS = 15 * 60_000;
 
 export function activate(context: vscode.ExtensionContext): void {
   const instances = new InstanceStore(context.globalState, context.secrets);
-  const filters = new FilterState(context.globalState);
+  instances.setScope(readScope);
+  const filters = new FilterState(context.globalState, context.workspaceState);
   const meta = new InstanceMeta(instances);
   const attachments = new AttachmentService();
   void attachments.cleanupTmp();
@@ -34,8 +35,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const today = new TodayService(instances, meta);
   const panels = new IssuePanelManager(context.extensionUri, instances, meta, attachments, worklog);
   const lists = new ListPanelManager(context.extensionUri, instances, meta);
-  const epicProject = new SectionProject(context.globalState, EPIC_PROJECT_KEY);
-  const releaseProject = new SectionProject(context.globalState, RELEASE_PROJECT_KEY);
+  const epicProject = new SectionProject(context.workspaceState, EPIC_PROJECT_KEY, context.globalState);
+  const releaseProject = new SectionProject(context.workspaceState, RELEASE_PROJECT_KEY, context.globalState);
   const epicsTree = new EpicsTree(instances, epicProject, meta);
   const releasesTree = new ReleasesTree(instances, releaseProject, meta);
   const epicsView = vscode.window.createTreeView('jiraffe.epics', { treeDataProvider: epicsTree });
@@ -69,6 +70,7 @@ export function activate(context: vscode.ExtensionContext): void {
     releasesView,
     vscode.window.createTreeView('jiraffe.filters', { treeDataProvider: filtersTree }),
     ...registerInstanceCommands(instances),
+    vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration('jiraffe.instances')) instances.scopeChanged(); }),
     ...registerFilterCommands(instances, filters, meta, issuesTree, () => filtersTree.refresh(), panels, () => {
       void today.refresh();
       epicsTree.refresh();

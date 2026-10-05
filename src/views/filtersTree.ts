@@ -106,7 +106,8 @@ export class FiltersTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       ];
     }
     if (n.kind === 'group' && n.id === 'mine') {
-      const list = this.filters.listSaved();
+      // фильтры, привязанные к инстансу вне этого workspace, не показываем
+      const list = this.filters.listSaved().filter((f) => !f.instanceId || this.store.visible(f.instanceId));
       return list.length
         ? list.map((filter): Node => ({ kind: 'local', filter }))
         : [{ kind: 'hint', id: 'no-local', text: 'Нет сохранённых — «Сохранить как фильтр»' }];

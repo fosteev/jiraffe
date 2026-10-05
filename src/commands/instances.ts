@@ -3,15 +3,57 @@ import { createJiraClient } from '../jira/client';
 import { detectCapabilities } from '../jira/capabilities';
 import { canonicalBaseUrl } from '../jira/http';
 import type { Instance, InstanceKind } from '../jira/types';
-import { InstanceStore, instanceIdFromUrl } from '../state/instances';
+import { InstanceStore, inScope, instanceIdFromUrl } from '../state/instances';
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 const withProgress = <T>(title: string, task: () => Promise<T>): Thenable<T> =>
   vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title }, task);
 
+const SCOPE_KEY = 'instances';
+const config = () => vscode.workspace.getConfiguration('jiraffe');
+
+/** Набор инстансов workspace из `jiraffe.instances`; не задан или пуст — undefined (видны все). */
+export function readScope(): string[] | undefined {
+  const v = config().get<unknown>(SCOPE_KEY);
+  const list = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim()) : [];
+  return list.length ? list : undefined;
+}
+
+/** Инстанс, добавленный из workspace с заданным набором, сразу попадает в этот набор — иначе он «пропал» бы после добавления. */
+async function addToWorkspaceScope(id: string): Promise<void> {
+  const ws = config().inspect<unknown>(SCOPE_KEY)?.workspaceValue;
+  if (!Array.isArray(ws) || !ws.length || ws.includes(id)) return;
+  await config().update(SCOPE_KEY, [...ws, id], vscode.ConfigurationTarget.Workspace);
+}
+
+async function scopeInstances(store: InstanceStore): Promise<void> {
+  if (!vscode.workspace.workspaceFolders?.length) {
+    void vscode.window.showInformationMessage('Jiraffe: откройте папку или workspace — набор инстансов хранится в его настройках');
+    return;
+  }
+  const all = store.all();
+  if (!all.length) {
+    await vscode.commands.executeCommand('jiraffe.addInstance');
+    return;
+  }
+  const scope = readScope();
+  const picked = await vscode.window.showQuickPick(
+    all.map((i) => ({ label: i.name, description: i.baseUrl, picked: inScope(i, scope), id: i.id })),
+    { canPickMany: true, placeHolder: 'Какие инстансы показывать в этом workspace (все отмечены — все)' },
+  );
+  if (!picked) return;
+  if (!picked.length) {
+    void vscode.window.showWarningMessage('Jiraffe: нужен хотя бы один инстанс');
+    return;
+  }
+  const value = picked.length === all.length ? undefined : picked.map((p) => p.id);
+  await config().update(SCOPE_KEY, value, vscode.ConfigurationTarget.Workspace);
+}
+
+/** Управление подключениями — среди всех инстансов, не только этого workspace. */
 async function pickInstance(store: InstanceStore, placeHolder: string, instanceId?: string): Promise<Instance | undefined> {
-  const all = store.list();
+  const all = store.all();
   if (instanceId) {
     const known = store.get(instanceId);
     if (known) return known;
@@ -102,6 +144,7 @@ async function addInstance(store: InstanceStore): Promise<void> {
   } catch (e) {
     void vscode.window.showWarningMessage(`Jiraffe: возможности инстанса не определены (${errText(e)}). Повторите «Обновить возможности инстанса».`);
   }
+  await addToWorkspaceScope(id);
   await store.add(instance, token.trim());
   void vscode.window.showInformationMessage(`Jiraffe: инстанс «${instance.name}» добавлен` + (instance.caps ? ` (Tempo: ${instance.caps.tempo ? 'есть' : 'нет'})` : ''));
 }
@@ -115,6 +158,7 @@ async function clientFor(store: InstanceStore, inst: Instance) {
 export function registerInstanceCommands(store: InstanceStore): vscode.Disposable[] {
   return [
     vscode.commands.registerCommand('jiraffe.addInstance', () => addInstance(store)),
+    vscode.commands.registerCommand('jiraffe.scopeInstances', () => scopeInstances(store)),
     vscode.commands.registerCommand('jiraffe.removeInstance', async () => {
       const inst = await pickInstance(store, 'Какой инстанс удалить?');
       if (!inst) return;

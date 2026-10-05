@@ -105,6 +105,7 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
     const sel = this.project.get();
     if (!sel) return [{ kind: 'hint', id: 'no-project', text: 'Выберите проект (кнопка в заголовке)', command: 'jiraffe.pickEpicProject' }];
     if (!this.store.get(sel.instanceId)) return [{ kind: 'hint', id: 'no-inst', text: 'Инстанс проекта удалён — выберите проект', command: 'jiraffe.pickEpicProject' }];
+    if (!this.store.visible(sel.instanceId)) return [{ kind: 'hint', id: 'out-of-scope', text: 'Инстанс проекта не входит в этот workspace — выберите проект', command: 'jiraffe.pickEpicProject' }];
     const st = this.state;
     if (!st) {
       void this.load();
