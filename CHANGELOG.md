@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - Quick Filters: a Project group to narrow any view (Assigned to Me, JQL) to several projects. Applied in the query, so counts and paging stay correct; a project missing on an instance is skipped there.
 
