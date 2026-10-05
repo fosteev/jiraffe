@@ -6,7 +6,7 @@ import type { Capabilities, Instance } from '../jira/types';
 export const INSTANCES_KEY = 'jiraffe.instances';
 export const tokenKey = (id: string): string => `jiraffe.token.${id}`;
 
-/** slug хоста (+context path): `https://atlassian.tatikoma.ru/jira` → `atlassian-tatikoma-ru-jira`. */
+/** slug хоста (+context path): `https://tracker.initech.net/jira` → `tracker-initech-net-jira`. */
 export function instanceIdFromUrl(url: string): string {
   const u = new URL(normalizeBaseUrl(url));
   return (u.host + u.pathname)

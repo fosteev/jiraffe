@@ -120,7 +120,7 @@ export function validateDraft(raw: unknown, form: LogForm, today = localDate()):
   return { ok: true, req: { timeSpentSec: sec, date: d.date, comment: comment.trim(), ...(tokens !== null ? { aiTokens: tokens } : {}), attributes } };
 }
 
-/** Без Tempo AI Tokens дописываются в конец комментария — как в скриптах sccloud/tatikoma. */
+/** Без Tempo AI Tokens дописываются в конец комментария — как в скриптах globex/initech. */
 export const appendAiTokens = (comment: string, tokens: number): string => `${comment ? `${comment} ` : ''}(AI Tokens: ${tokens})`;
 
 /** `started` стандартного ворклога: полдень выбранного дня с локальным смещением (`2026-10-04T12:00:00.000+0300`). */

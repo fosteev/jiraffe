@@ -304,7 +304,7 @@ describe('чтение Tempo', () => {
 
 describe('сводка «сегодня»', () => {
   const me: MyselfInfo = { id: 'ivan', name: 'ivan', displayName: 'Ivan' };
-  const inst = (tempo: boolean): Pick<Instance, 'id' | 'name' | 'caps'> => ({ id: tempo ? 'p' : 's', name: tempo ? 'Pilot' : 'SCC', caps: { tempo, epicLinkField: null, checkedAt: '' } });
+  const inst = (tempo: boolean): Pick<Instance, 'id' | 'name' | 'caps'> => ({ id: tempo ? 'p' : 's', name: tempo ? 'Northwind' : 'SCC', caps: { tempo, epicLinkField: null, checkedAt: '' } });
   it('mineOn: автор и префикс даты', () => {
     const w = (id: string, author: string, started: string): Worklog => ({ id, author: { id: author, name: author }, started, timeSpentSec: 60, comment: '' });
     expect(mineOn([w('1', 'ivan', '2026-10-04T12:00:00.000+0300'), w('2', 'anna', '2026-10-04T12:00:00.000+0300'), w('3', 'ivan', '2026-10-03T23:00:00.000+0300')], 'ivan', '2026-10-04').map((x) => x.id)).toEqual(['1']);
@@ -353,7 +353,7 @@ describe('сводка «сегодня»', () => {
   });
   it('сумма по инстансам и строка состояния', () => {
     const list: TodayInstance[] = [
-      { instanceId: 'p', name: 'Pilot', tempo: true, totalSec: 5400, entries: [] },
+      { instanceId: 'p', name: 'Northwind', tempo: true, totalSec: 5400, entries: [] },
       { instanceId: 's', name: 'SCC', tempo: false, totalSec: 6300, entries: [] },
       { instanceId: 'c', name: 'Cloud', tempo: false, totalSec: 0, entries: [], error: 'нет связи' },
     ];
@@ -361,7 +361,7 @@ describe('сводка «сегодня»', () => {
     const s = { date: '2026-10-04', loading: false, loaded: true, instances: list, totalSec: 11700 };
     expect(statusBarText(s, 8 * 3600)).toBe('$(clock) Today 3h 15m / 8h $(warning)');
     expect(statusBarText({ ...s, loaded: false }, 8 * 3600)).toBe('$(clock) Today …');
-    expect(statusBarLines(s)).toEqual(['Pilot: 1h 30m · Tempo', 'SCC: 1h 45m', 'Cloud: error — нет связи']);
+    expect(statusBarLines(s)).toEqual(['Northwind: 1h 30m · Tempo', 'SCC: 1h 45m', 'Cloud: error — нет связи']);
   });
   it('TodayService: упавший инстанс не мешает остальным, устаревший ответ отбрасывается', async () => {
     const insts: Instance[] = [
@@ -393,7 +393,7 @@ describe('сводка «сегодня»', () => {
 
 describe('разметка', () => {
   const base: IssueCard = {
-    instanceId: 'p', instanceName: 'Pilot', host: 'jira.example.test', kind: 'dc', tempo: true, pinned: false, tab: 'wl',
+    instanceId: 'p', instanceName: 'Northwind', host: 'jira.example.test', kind: 'dc', tempo: true, pinned: false, tab: 'wl',
     issue: {
       instanceId: 'p', key: 'ABC-123', summary: 'S', type: 'Task', status: 'Open', statusCategory: 'new', updated: '2026-10-04T10:00:00.000+0300',
       watchers: [], descriptionHtml: '', fixVersions: [], labels: [], components: [], created: '2026-10-01T10:00:00.000+0300',
@@ -419,10 +419,10 @@ describe('разметка', () => {
   it('журнал без Tempo — без колонок атрибутов', () => {
     const html = renderWorklog({ ...base, tempo: false });
     expect(html).not.toContain('AI Tokens</th>');
-    expect(html).toContain('No Tempo on Pilot');
+    expect(html).toContain('No Tempo on Northwind');
   });
   it('диалог: поля атрибутов по форме, AI Tokens; без Tempo — заметка про комментарий', () => {
-    const f = { ...logFormFor(true, [LIST, AI]), instanceName: 'Pilot', summary: 'S <script>', today: '2026-10-04' };
+    const f = { ...logFormFor(true, [LIST, AI]), instanceName: 'Northwind', summary: 'S <script>', today: '2026-10-04' };
     const html = renderLogDialog('ABC-123', f);
     expect(html).toContain('data-attr="_Kind_"');
     expect(html).toContain('<option value="dev">Разработка</option>');
@@ -441,7 +441,7 @@ describe('разметка', () => {
     const v: TodayView = {
       date: '2026-10-04', loading: false, totalSec: 11700, workdaySec: 8 * 3600, noInstances: false,
       instances: [
-        { instanceId: 'p', name: 'Pilot', tempo: true, totalSec: 11700, entries: [{ key: 'ABC-1', comment: '<i>x</i>', timeSpentSec: 11700, started: '' }] },
+        { instanceId: 'p', name: 'Northwind', tempo: true, totalSec: 11700, entries: [{ key: 'ABC-1', comment: '<i>x</i>', timeSpentSec: 11700, started: '' }] },
         { instanceId: 'c', name: 'Cloud', tempo: false, totalSec: 0, entries: [], error: 'нет <связи>' },
       ],
     };

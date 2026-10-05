@@ -25,8 +25,8 @@
 Расширение ставится из `.vsix` (в Marketplace пока не опубликовано). Нужен VS Code 1.90 или новее.
 
 1. Взять `jiraffe-<версия>.vsix` со страницы GitHub Releases или собрать из исходников: `npm ci && npm run package` (сборка `dist/` запускается сама).
-2. Установить: палитра команд → «Extensions: Install from VSIX…» → выбрать файл. То же из терминала: `code --install-extension jiraffe-0.2.0.vsix`.
-3. Для пробной установки без влияния на основной профиль: `code --profile jiraffe-test --install-extension jiraffe-0.2.0.vsix`, затем `code --profile jiraffe-test`.
+2. Установить: палитра команд → «Extensions: Install from VSIX…» → выбрать файл. То же из терминала: `code --install-extension jiraffe-0.3.0.vsix`.
+3. Для пробной установки без влияния на основной профиль: `code --profile jiraffe-test --install-extension jiraffe-0.3.0.vsix`, затем `code --profile jiraffe-test`.
 4. В панели слева появится иконка жирафа — разделы «Задачи», «Фильтры», «Эпики», «Релизы», «Tempo».
 
 Расширение работает только в доверенных папках (оно ходит в Jira с вашим токеном и сохраняет вложения в папку рабочей области).

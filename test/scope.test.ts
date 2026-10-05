@@ -8,24 +8,24 @@ const mem = (init: Record<string, unknown> = {}) => {
   return { m, get: (k: string, d?: unknown) => (m.has(k) ? m.get(k) : d), update: async (k: string, v: unknown) => void m.set(k, JSON.parse(JSON.stringify(v))) };
 };
 const secrets = { get: async () => undefined, store: async () => undefined, delete: async () => undefined };
-const pilot = { id: 'jira-pilot-gps-com', name: 'Pilot', baseUrl: 'https://jira.pilot-gps.com', kind: 'dc' as const };
-const tati = { id: 'atlassian-tatikoma-ru-jira', name: 'Tatikoma', baseUrl: 'https://atlassian.tatikoma.ru/jira', kind: 'dc' as const };
+const northwind = { id: 'jira-northwind-io', name: 'Northwind', baseUrl: 'https://jira.northwind.io', kind: 'dc' as const };
+const tati = { id: 'tracker-initech-net-jira', name: 'Initech', baseUrl: 'https://tracker.initech.net/jira', kind: 'dc' as const };
 
 describe('набор инстансов workspace', () => {
   it('inScope: по id и по адресу, без набора — все', () => {
-    expect(inScope(pilot, undefined)).toBe(true);
-    expect(inScope(pilot, ['jira-pilot-gps-com'])).toBe(true);
-    expect(inScope(pilot, ['https://jira.pilot-gps.com/'])).toBe(true);
-    expect(inScope(tati, ['https://atlassian.tatikoma.ru/jira'])).toBe(true);
-    expect(inScope(tati, ['https://atlassian.tatikoma.ru'])).toBe(false);
-    expect(inScope(pilot, ['мусор', tati.id])).toBe(false);
+    expect(inScope(northwind, undefined)).toBe(true);
+    expect(inScope(northwind, ['jira-northwind-io'])).toBe(true);
+    expect(inScope(northwind, ['https://jira.northwind.io/'])).toBe(true);
+    expect(inScope(tati, ['https://tracker.initech.net/jira'])).toBe(true);
+    expect(inScope(tati, ['https://tracker.initech.net'])).toBe(false);
+    expect(inScope(northwind, ['мусор', tati.id])).toBe(false);
   });
 
   it('list фильтрует, all и get — нет; смена набора будит подписчиков', () => {
-    const store = new InstanceStore(mem({ [INSTANCES_KEY]: [pilot, tati] }) as never, secrets as never);
+    const store = new InstanceStore(mem({ [INSTANCES_KEY]: [northwind, tati] }) as never, secrets as never);
     const cur: { scope?: string[] } = {};
     store.setScope(() => cur.scope);
-    expect(store.list().map((i) => i.id)).toEqual([pilot.id, tati.id]);
+    expect(store.list().map((i) => i.id)).toEqual([northwind.id, tati.id]);
     let fired = 0;
     store.onDidChange(() => fired++);
     cur.scope = [tati.baseUrl];
@@ -33,8 +33,8 @@ describe('набор инстансов workspace', () => {
     expect(fired).toBe(1);
     expect(store.list().map((i) => i.id)).toEqual([tati.id]);
     expect(store.all()).toHaveLength(2);
-    expect(store.get(pilot.id)?.name).toBe('Pilot');
-    expect(store.visible(pilot.id)).toBe(false);
+    expect(store.get(northwind.id)?.name).toBe('Northwind');
+    expect(store.visible(northwind.id)).toBe(false);
     expect(store.visible(tati.id)).toBe(true);
     expect(store.visible('нет-такого')).toBe(false);
   });

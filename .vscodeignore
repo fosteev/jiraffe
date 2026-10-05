@@ -8,3 +8,4 @@
 !dist/webview/*.css
 !l10n/**
 !package.nls*.json
+!LICENSE

@@ -49,8 +49,8 @@ Tempo is supported on Server/DC. On Cloud, time goes to the standard worklog.
 
 Requires VS Code 1.90+.
 
-1. Download `jiraffe-<version>.vsix` from [Releases](https://github.com/fosteev/jiraffe/releases), or build it: `npm ci && npm run package`.
-2. Command Palette → **Extensions: Install from VSIX…**, or `code --install-extension jiraffe-0.2.0.vsix`.
+1. Install **Jiraffe** from the VS Code Marketplace (Cursor, VSCodium: Open VSX). Or download `jiraffe-<version>.vsix` from [Releases](https://github.com/fosteev/jiraffe/releases), or build it: `npm ci && npm run package`.
+2. Command Palette → **Extensions: Install from VSIX…**, or `code --install-extension jiraffe-0.3.0.vsix`.
 3. A giraffe icon appears in the Activity Bar.
 
 ## Adding an instance
@@ -92,3 +92,7 @@ npm run watch   # then F5 in VS Code
 npm test
 npm run lint
 ```
+
+## License
+
+[MIT](LICENSE)

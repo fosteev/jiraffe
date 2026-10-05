@@ -62,7 +62,7 @@ export function activeFilterCount(s: FilterSnapshot): number {
   return s.quick.statusCategory.length + s.quick.types.length + s.quick.priorities.length + (instancesApply(s) ? s.instances.length : 0) + (s.text.trim() ? 1 : 0);
 }
 
-/** Подпись в заголовке view: «2 фильтра · GARM». */
+/** Подпись в заголовке view: «2 фильтра · HOME». */
 export function describeFilters(s: FilterSnapshot): string {
   const n = activeFilterCount(s);
   const parts: string[] = [];

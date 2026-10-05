@@ -116,11 +116,11 @@ describe('FilterState', () => {
 
 describe('describeFilters', () => {
   const base = () => new FilterState(mem() as never);
-  it('«2 фильтра · GARM»', () => {
+  it('«2 фильтра · HOME»', () => {
     const f = base();
-    f.setProject({ instanceId: 'a', key: 'GARM' });
+    f.setProject({ instanceId: 'a', key: 'HOME' });
     f.setQuick({ statusCategory: ['new', 'done'], types: [], priorities: [] }, []);
-    expect(describeFilters(f.snapshot)).toBe('2 filters · GARM');
+    expect(describeFilters(f.snapshot)).toBe('2 filters · HOME');
   });
   it('склонения и режимы', () => {
     const f = base();
@@ -140,8 +140,8 @@ describe('describeFilters', () => {
     const f = base();
     f.setQuick(emptyQuick(), ['a']);
     expect(describeFilters(f.snapshot)).toBe('1 filter');
-    f.setProject({ instanceId: 'b', key: 'GARM' });
-    expect(describeFilters(f.snapshot)).toBe('GARM');
+    f.setProject({ instanceId: 'b', key: 'HOME' });
+    expect(describeFilters(f.snapshot)).toBe('HOME');
     f.setJql('x = 1', { scope: 'b' });
     expect(activeFilterCount(f.snapshot)).toBe(0);
   });

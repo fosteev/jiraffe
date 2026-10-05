@@ -1,5 +1,5 @@
 {
-  "extension.description": "Jira в VS Code: задачи, фильтры, карточка, журнал работ, эпики и релизы",
+  "extension.description": "Jira в VS Code: задачи, карточка, вложения, смена статуса, журнал работ и Tempo, эпики и релизы",
   "capabilities.untrusted": "Jiraffe ходит в Jira с вашим токеном и сохраняет вложения в папку рабочей области — только в доверенных папках.",
   "view.issues": "Задачи",
   "view.filters": "Фильтры",

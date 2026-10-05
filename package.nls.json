@@ -1,5 +1,5 @@
 {
-  "extension.description": "Jira in VS Code: issues, filters, issue card, work log, epics and releases",
+  "extension.description": "Jira in VS Code: your issues, issue card, attachments, status changes, time logging with Tempo, epics and releases",
   "capabilities.untrusted": "Jiraffe talks to Jira with your token and saves attachments to the workspace folder, so it only works in trusted folders.",
   "view.issues": "Issues",
   "view.filters": "Filters",

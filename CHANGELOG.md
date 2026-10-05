@@ -1,21 +1,29 @@
 # Changelog
 
+## Unreleased
+
+- Quick Filters: a Project group to narrow any view (Assigned to Me, JQL) to several projects. Applied in the query, so counts and paging stay correct; a project missing on an instance is skipped there.
+
+## 0.3.0
+
+- English UI by default; Russian when VS Code runs in Russian.
+- First Marketplace and Open VSX release. The extension ID is now `fosteev.jiraffe`: if you installed an earlier `.vsix` (`jiraffe.jiraffe`), uninstall it and add your instances again.
+
 ## 0.2.0
 
-- Смена статуса: команда «Jiraffe: Сменить статус» — клик по статусу в карточке, контекстное меню задачи в дереве, палитра. Переходы — доступные пользователю из Jira; обязательные поля перехода со списком значений (резолюция и т. п.) спрашиваются выбором, остальные — предложение открыть задачу в Jira. После перехода обновляются карточка, «Задачи», эпики и релизы.
-- Инстансы по workspace: настройка `jiraffe.instances` и команда «Jiraffe: Инстансы этого workspace» — в окне видны только выбранные Jira; подключения и токены остаются общими. Выбор режима, проекта, быстрых фильтров и проектов «Эпиков»/«Релизов» хранится у каждого workspace свой. Кнопка в заголовке «Задач» и «Фильтров» (галочки + новое подключение), после добавления — предложение оставить в workspace только новый инстанс; добавление, проверка и удаление инстанса — в меню «…».
+- Change status: click the status in the issue card, use the issue context menu in the tree, or the Command Palette. Only transitions available to you are offered; required transition fields with a list of values (resolution, etc.) are asked for in a picker, others offer to open the issue in Jira. The card, Issues, Epics and Releases refresh after a transition.
+- Instances per workspace: the `jiraffe.instances` setting and the "Workspace Instances" command. Connections and tokens stay shared; mode, project, quick filters and the Epics/Releases project are remembered per workspace.
 
 ## 0.1.0
 
-Первая версия: чтение и журнал работ, без изменения задач.
+First version: reading and work logging, no issue editing.
 
-- Несколько инстансов Jira одновременно: Server / Data Center 8.22+ (Personal Access Token) и Cloud (email + API token); токены в SecretStorage.
-- Раздел «Задачи»: «на мне», по проекту, произвольный JQL, быстрые фильтры (категория статуса, тип, приоритет, инстанс), поиск по ключу и тексту, подгрузка длинных списков.
-- Раздел «Фильтры»: свои сохранённые и избранные фильтры Jira.
-- Карточка задачи: описание, комментарии, история изменений, журнал работ, люди, детали, ссылки на эпик и релиз; закрепление вкладки. Подзадач и связанных задач пока нет.
-- Вложения: превью картинок в описании и комментариях, лайтбокс, скачивание (одно и все), открытие текстовых файлов в редакторе.
-- Журнал работ: запись времени из карточки и из дерева (QuickInput); Tempo (рабочие атрибуты, в том числе «AI Tokens») или стандартный worklog; защита от двойной записи.
-- Раздел «Tempo» и строка состояния: сколько залогано сегодня из рабочего дня.
-- Разделы «Эпики» и «Релизы»: свой выбор проекта, прогресс эпиков, вкладки эпика и релиза (сводка, сегментная полоса, таблица задач), ссылки из карточки.
-- Пустые состояния (нет инстансов — кнопка «Добавить инстанс»), ошибка одного инстанса не ломает остальные; для несуществующего проекта в «Эпиках» и «Релизах» — «Проект не найден или нет доступа».
-- Настройки: `jiraffe.maxResults`, `jiraffe.attachmentsDir`, `jiraffe.maxImageMb`, `jiraffe.workdayHours`.
+- Several Jira instances at once: Server / Data Center 8.22+ (Personal Access Token) and Cloud (email + API token); tokens in SecretStorage.
+- Issues: assigned to me, by project, any JQL, quick filters (status category, type, priority, instance), search by key and text, paging for long lists.
+- Filters: your saved filters and Jira favorites.
+- Issue card: description, comments, change history, work log, people, details, epic and release links; pinning.
+- Attachments: image previews in the description and comments, lightbox, download one or all, open text files in the editor.
+- Work log: log time from the card or the tree; Tempo (work attributes, including "AI Tokens") or the standard worklog; double-submit protection.
+- Tempo view and status bar: time logged today against your workday.
+- Epics and Releases: per-section project, epic progress, epic and release tabs (summary, segmented bar, issue table).
+- Settings: `jiraffe.maxResults`, `jiraffe.attachmentsDir`, `jiraffe.maxImageMb`, `jiraffe.workdayHours`.

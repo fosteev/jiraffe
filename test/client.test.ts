@@ -144,7 +144,7 @@ describe('InstanceStore', () => {
     return { store, secrets };
   };
   it('slug хоста', () => {
-    expect(instanceIdFromUrl('https://atlassian.tatikoma.ru/jira/')).toBe('atlassian-tatikoma-ru-jira');
+    expect(instanceIdFromUrl('https://tracker.initech.net/jira/')).toBe('tracker-initech-net-jira');
     expect(instanceIdFromUrl('https://Jira.Example.com')).toBe('jira-example-com');
   });
   it('CRUD: токен в SecretStorage, не в globalState', async () => {

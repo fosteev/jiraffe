@@ -2,13 +2,16 @@
   "name": "jiraffe",
   "displayName": "Jiraffe",
   "description": "%extension.description%",
-  "version": "0.2.0",
-  "publisher": "jiraffe",
-  "private": true,
-  "license": "UNLICENSED",
+  "version": "0.3.0",
+  "publisher": "fosteev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/fosteev/jiraffe.git"
+  },
+  "homepage": "https://github.com/fosteev/jiraffe#readme",
+  "bugs": {
+    "url": "https://github.com/fosteev/jiraffe/issues"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -16,7 +19,22 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "jira",
+    "atlassian",
+    "tempo",
+    "worklog",
+    "issues",
+    "jql",
+    "epics",
+    "releases",
+    "time tracking"
+  ],
   "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1f1f1f",
+    "theme": "dark"
+  },
   "l10n": "./l10n",
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -401,8 +419,9 @@
     "test": "vitest run",
     "vscode:prepublish": "npm run build",
     "package": "vsce package --no-dependencies",
-    "smoke": "tsx scripts/smoke.ts",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "publish:vsce": "vsce publish --no-dependencies",
+    "publish:ovsx": "ovsx publish --no-dependencies"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
@@ -411,6 +430,7 @@
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.12.0",
+    "ovsx": "^1.2.0",
     "playwright-core": "^1.63.0",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",

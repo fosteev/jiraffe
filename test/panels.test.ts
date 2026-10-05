@@ -71,7 +71,7 @@ describe('render карточки', () => {
     expect(fmtDue('not-a-date')).toBe('not-a-date');
   });
   it('проверки сообщений из webview: ключ и id релиза', () => {
-    for (const k of ['ABC-1', 'GARM_2-123', 'A1-0']) expect(isIssueKey(k)).toBe(true);
+    for (const k of ['ABC-1', 'HOME_2-123', 'A1-0']) expect(isIssueKey(k)).toBe(true);
     for (const k of ['abc-1', 'ABC-1/../../rest', 'ABC-1?x', ' ABC-1', 'ABC', '-1', 1, undefined, 'A'.repeat(70) + '-1']) expect(isIssueKey(k)).toBe(false);
     expect(isVersionId('10200')).toBe(true);
     for (const v of ['1.0', '', '1 OR 1', 7]) expect(isVersionId(v)).toBe(false);

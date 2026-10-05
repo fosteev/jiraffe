@@ -280,7 +280,7 @@ fieldset.tempo legend{font-size:12px;color:var(--fg2);padding:0 4px;font-weight:
                 <button data-act="mode" data-m="jql" role="tab">JQL</button>
               </div>
               <div id="mode-extra"></div>
-              <label class="inp" for="q"><span id="q-ic"></span><input id="q" placeholder="Ключ или текст: GARM-710, архив…" autocomplete="off"></label>
+              <label class="inp" for="q"><span id="q-ic"></span><input id="q" placeholder="Ключ или текст: HOME-710, архив…" autocomplete="off"></label>
               <div class="chips" id="chips"></div>
             </div>
             <div id="tree"></div>
@@ -374,9 +374,9 @@ const PL={highest:'Наивысший',high:'Высокий',medium:'Средн�
 const ME='af';
 const U={af:['Андрей Фостеев','#2f6fd6'],mk:['Мария Котова','#b4459b'],is:['Илья Сорокин','#b8650f'],dl:['Дарья Лебедева','#1d8a5a'],oc:['Олег Чернов','#c2413b'],vs:['Вера Смирнова','#7a52c7'],np:['Нина Павлова','#3f7f8f']};
 const INST=[
-  {id:'pilot',name:'Pilot',host:'jira.pilot-gps.com',kind:'Server/DC',tempo:true,projects:['GARM','P7']},
-  {id:'sccloud',name:'SmartCityCloud',host:'jira.sccloud.ru',kind:'Server/DC',tempo:false,projects:['NEWMFC','RPGU']},
-  {id:'tatikoma',name:'Tatikoma',host:'atlassian.tatikoma.ru/jira',kind:'Server/DC',tempo:false,projects:['VBV','SDU']},
+  {id:'northwind',name:'Northwind',host:'jira.northwind.io',kind:'Server/DC',tempo:true,projects:['HOME','TRK']},
+  {id:'globex',name:'Globex',host:'jira.globex.dev',kind:'Server/DC',tempo:false,projects:['CRM','PORT']},
+  {id:'initech',name:'Initech',host:'tracker.initech.net/jira',kind:'Server/DC',tempo:false,projects:['OPS','DESK']},
 ];
 const instOf=p=>INST.find(x=>x.projects.includes(p));
 const I={};
@@ -384,101 +384,101 @@ function mk(key,type,status,prio,sum,asg,x){
   const proj=key.split('-')[0];
   I[key]=Object.assign({key,proj,inst:instOf(proj).id,type,status,prio,sum,asg,rep:'dl',epic:null,fix:null,labels:[],comps:[],est:0,created:'14.09.2026',updated:'30.09.2026',due:null,watchers:[],desc:null,att:[],com:[],hist:null},x||{});
 }
-mk('GARM-710','bug','prog','high','Ivideon: архив событий не подгружается глубже 30 дней','af',{
-  rep:'mk',epic:'GARM-600',fix:'v214',labels:['ivideon','archive'],comps:['Backend API'],est:480,created:'25.09.2026',updated:'01.10.2026',due:'14.10.2026',watchers:['mk','is','dl'],
-  desc:`<p>В Pulse при прокрутке архива камеры дальше 30 дней лента событий обрывается: новые события не подгружаются, спиннер крутится бесконечно.</p>
-<h4>Шаги</h4><ol><li>Открыть камеру «Подъезд 2» в тестовом аккаунте <code>demo-pulse</code></li><li>Архив → прокрутить таймлайн на 31+ день назад</li><li>Дождаться подгрузки событий</li></ol>
+mk('HOME-710','bug','prog','high','CamCloud: архив событий не подгружается глубже 30 дней','af',{
+  rep:'mk',epic:'HOME-600',fix:'v214',labels:['camcloud','archive'],comps:['Backend API'],est:480,created:'25.09.2026',updated:'01.10.2026',due:'14.10.2026',watchers:['mk','is','dl'],
+  desc:`<p>В Orbit при прокрутке архива камеры дальше 30 дней лента событий обрывается: новые события не подгружаются, спиннер крутится бесконечно.</p>
+<h4>Шаги</h4><ol><li>Открыть камеру «Подъезд 2» в тестовом аккаунте <code>demo-orbit</code></li><li>Архив → прокрутить таймлайн на 31+ день назад</li><li>Дождаться подгрузки событий</li></ol>
 <h4>Ожидаемо</h4><p>События подгружаются порциями по 50.</p>
 <h4>Фактически</h4><p><code>get_camera_events</code> возвращает пустой <code>items</code> при <code>offset ≥ 1000</code>, хотя <code>total</code> = 1342.</p>
 <pre>{ "result": { "items": [], "total": 1342, "offset": 1000, "limit": 50 } }</pre>
 <p>Логи Android и полный ответ API — во вложениях.</p>`,
-  att:[{n:'archive-timeline.png',size:'412 КБ',who:'mk',at:'25.09.2026',img:1},{n:'events-spinner.png',size:'268 КБ',who:'mk',at:'25.09.2026',img:2},{n:'ivideon-response.json',size:'14 КБ',who:'mk',at:'25.09.2026'},{n:'pulse-android-2.13.2.log',size:'220 КБ',who:'mk',at:'25.09.2026'}],
+  att:[{n:'archive-timeline.png',size:'412 КБ',who:'mk',at:'25.09.2026',img:1},{n:'events-spinner.png',size:'268 КБ',who:'mk',at:'25.09.2026',img:2},{n:'camcloud-response.json',size:'14 КБ',who:'mk',at:'25.09.2026'},{n:'orbit-android-2.13.2.log',size:'220 КБ',who:'mk',at:'25.09.2026'}],
   com:[
     {who:'mk',at:'25.09.2026 11:20',t:'Воспроизводится на Android и iOS. В веб-кабинете архив листается нормально — там другой запрос.'},
-    {who:'is',at:'28.09.2026 16:05',t:'Ivideon отдаёт максимум 1000 записей по <code>offset</code>, дальше нужен курсор <code>next_page_token</code>. В доке это в разделе archive_timeline.'},
-    {who:'af',at:'29.09.2026 10:42',t:'Подтверждаю. Переделываю пагинацию в <code>utils/Ivideon.php</code> на курсор, мобилку трогать не нужно.'},
+    {who:'is',at:'28.09.2026 16:05',t:'CamCloud отдаёт максимум 1000 записей по <code>offset</code>, дальше нужен курсор <code>next_page_token</code>. В доке это в разделе archive_timeline.'},
+    {who:'af',at:'29.09.2026 10:42',t:'Подтверждаю. Переделываю пагинацию в <code>utils/CamCloud.php</code> на курсор, мобилку трогать не нужно.'},
     {who:'dl',at:'01.10.2026 09:15',t:'Ставлю в 2.14.0. Сборка в сторы 16 октября.'},
   ],
   hist:[
-    {who:'dl',at:'01.10.2026 09:14',ch:[['Fix Version','—','Pulse 2.14.0']]},
+    {who:'dl',at:'01.10.2026 09:14',ch:[['Fix Version','—','Orbit 2.14.0']]},
     {who:'af',at:'29.09.2026 10:40',ch:[['Статус','Открыта','В работе']]},
     {who:'is',at:'28.09.2026 16:10',ch:[['Исполнитель','Илья Сорокин','Андрей Фостеев'],['Приоритет','Средний','Высокий']]},
-    {who:'is',at:'28.09.2026 16:02',ch:[['Эпик','—','GARM-600 Видеонаблюдение Ivideon'],['Метки','ivideon','ivideon, archive']]},
-    {who:'mk',at:'25.09.2026 11:22',ch:[['Вложение','—','ivideon-response.json, pulse-android-2.13.2.log']]},
+    {who:'is',at:'28.09.2026 16:02',ch:[['Эпик','—','HOME-600 Видеонаблюдение CamCloud'],['Метки','camcloud','camcloud, archive']]},
+    {who:'mk',at:'25.09.2026 11:22',ch:[['Вложение','—','camcloud-response.json, orbit-android-2.13.2.log']]},
     {who:'mk',at:'25.09.2026 11:02',created:true},
   ]});
-mk('GARM-715','task','todo','low','Обновить Ivideon SDK до 3.2','af',{epic:'GARM-600',fix:'v214',labels:['ivideon'],est:240,rep:'is'});
-mk('GARM-702','bug','todo','medium','Push о протечке приходят дважды','af',{epic:'GARM-655',fix:'v214',rep:'mk',est:180});
-mk('GARM-688','story','review','medium','Экран сценариев в новом дизайне','af',{epic:'GARM-640',fix:'v214',est:960,comps:['Mobile']});
-mk('GARM-709','bug','done','high','Краш при открытии архива без интернета','af',{epic:'GARM-600',fix:'v214',rep:'mk'});
-mk('GARM-698','bug','prog','high','Ivideon: таймлайн съезжает при смене часового пояса','oc',{epic:'GARM-600',fix:'v214',labels:['ivideon'],rep:'mk'});
-mk('GARM-706','story','todo','medium','События камеры в общей ленте уведомлений','vs',{epic:'GARM-655',fix:'v214'});
-mk('GARM-693','story','prog','medium','Главный экран: новые карточки устройств','vs',{epic:'GARM-640',fix:'v214'});
-mk('GARM-603','story','done','medium','Live-поток камеры в карточке устройства','is',{epic:'GARM-600',fix:'v2132'});
-mk('GARM-611','task','done','medium','OAuth Ivideon: обновление токена','is',{epic:'GARM-600',fix:'v2132'});
-mk('GARM-624','story','done','medium','Список камер с превью','oc',{epic:'GARM-600',fix:'v2132'});
-mk('GARM-660','task','done','medium','Каналы уведомлений: настройки по дому','vs',{epic:'GARM-655',fix:'v2132'});
-mk('GARM-646','story','done','low','Навигация: нижнее меню','oc',{epic:'GARM-640',fix:'v2132'});
-mk('GARM-650','task','done','medium','Дизайн-токены во Flutter','af',{epic:'GARM-640',fix:'v2132'});
-mk('P7-1423','task','prog','medium','Отчёт по топливу: экспорт в XLSX','af',{est:600,rep:'np'});
-mk('P7-1431','bug','todo','high','Трек машины рвётся при потере GPS дольше 5 минут','af',{rep:'np'});
-mk('NEWMFC-123','bug','todo','highest','Электронная очередь: талон не печатается при повторной записи','af',{rep:'np',epic:'NEWMFC-90',fix:'m47',est:240,due:'07.10.2026',watchers:['np'],
-  desc:`<p>Если заявитель повторно записывается на ту же услугу в течение дня, терминал показывает «Талон сформирован», но принтер ничего не печатает.</p><h4>Где</h4><p>МФЦ «Центральный», терминал №3, прошивка киоска 4.6.2.</p><p>Фото экрана терминала — во вложении.</p>`,
+mk('HOME-715','task','todo','low','Обновить CamCloud SDK до 3.2','af',{epic:'HOME-600',fix:'v214',labels:['camcloud'],est:240,rep:'is'});
+mk('HOME-702','bug','todo','medium','Push о протечке приходят дважды','af',{epic:'HOME-655',fix:'v214',rep:'mk',est:180});
+mk('HOME-688','story','review','medium','Экран сценариев в новом дизайне','af',{epic:'HOME-640',fix:'v214',est:960,comps:['Mobile']});
+mk('HOME-709','bug','done','high','Краш при открытии архива без интернета','af',{epic:'HOME-600',fix:'v214',rep:'mk'});
+mk('HOME-698','bug','prog','high','CamCloud: таймлайн съезжает при смене часового пояса','oc',{epic:'HOME-600',fix:'v214',labels:['camcloud'],rep:'mk'});
+mk('HOME-706','story','todo','medium','События камеры в общей ленте уведомлений','vs',{epic:'HOME-655',fix:'v214'});
+mk('HOME-693','story','prog','medium','Главный экран: новые карточки устройств','vs',{epic:'HOME-640',fix:'v214'});
+mk('HOME-603','story','done','medium','Live-поток камеры в карточке устройства','is',{epic:'HOME-600',fix:'v2132'});
+mk('HOME-611','task','done','medium','OAuth CamCloud: обновление токена','is',{epic:'HOME-600',fix:'v2132'});
+mk('HOME-624','story','done','medium','Список камер с превью','oc',{epic:'HOME-600',fix:'v2132'});
+mk('HOME-660','task','done','medium','Каналы уведомлений: настройки по дому','vs',{epic:'HOME-655',fix:'v2132'});
+mk('HOME-646','story','done','low','Навигация: нижнее меню','oc',{epic:'HOME-640',fix:'v2132'});
+mk('HOME-650','task','done','medium','Дизайн-токены во Flutter','af',{epic:'HOME-640',fix:'v2132'});
+mk('TRK-1423','task','prog','medium','Отчёт по топливу: экспорт в XLSX','af',{est:600,rep:'np'});
+mk('TRK-1431','bug','todo','high','Трек машины рвётся при потере GPS дольше 5 минут','af',{rep:'np'});
+mk('CRM-123','bug','todo','highest','Электронная очередь: талон не печатается при повторной записи','af',{rep:'np',epic:'CRM-90',fix:'m47',est:240,due:'07.10.2026',watchers:['np'],
+  desc:`<p>Если заявитель повторно записывается на ту же услугу в течение дня, терминал показывает «Талон сформирован», но принтер ничего не печатает.</p><h4>Где</h4><p>Поддержка «Центральный», терминал №3, прошивка киоска 4.6.2.</p><p>Фото экрана терминала — во вложении.</p>`,
   att:[{n:'terminal-3.jpg',size:'1,2 МБ',who:'np',at:'30.09.2026',img:3}],
   com:[{who:'np',at:'30.09.2026 14:48',t:'Жалобы от операторов с утра, в день примерно 15–20 повторных записей.'}]});
-mk('NEWMFC-131','task','prog','medium','Окно оператора: таймер обслуживания','af',{epic:'NEWMFC-90',fix:'m47',est:480,rep:'np'});
-mk('NEWMFC-118','story','done','medium','Табло: голосовой вызов талона','oc',{epic:'NEWMFC-90',fix:'m46'});
-mk('RPGU-58','story','todo','low','Запись на приём: подсказки по адресу','af',{rep:'np'});
-mk('VBV-12','task','prog','medium','СМЭВ: статусы заявлений в личном кабинете','af',{est:720});
-mk('SDU-3','bug','review','high','Дашборд: неверный подсчёт обращений за неделю','af',{rep:'vs'});
+mk('CRM-131','task','prog','medium','Окно оператора: таймер обслуживания','af',{epic:'CRM-90',fix:'m47',est:480,rep:'np'});
+mk('CRM-118','story','done','medium','Табло: голосовой вызов талона','oc',{epic:'CRM-90',fix:'m46'});
+mk('PORT-58','story','todo','low','Запись на приём: подсказки по адресу','af',{rep:'np'});
+mk('OPS-12','task','prog','medium','СМЭВ: статусы заявлений в личном кабинете','af',{est:720});
+mk('DESK-3','bug','review','high','Дашборд: неверный подсчёт обращений за неделю','af',{rep:'vs'});
 
 const EPICS={
-  'GARM-600':{sum:'Видеонаблюдение Ivideon',status:'prog'},
-  'GARM-655':{sum:'Уведомления 2.0',status:'prog'},
-  'GARM-640':{sum:'Редизайн приложения',status:'prog'},
-  'NEWMFC-90':{sum:'Электронная очередь v4',status:'prog'},
+  'HOME-600':{sum:'Видеонаблюдение CamCloud',status:'prog'},
+  'HOME-655':{sum:'Уведомления 2.0',status:'prog'},
+  'HOME-640':{sum:'Редизайн приложения',status:'prog'},
+  'CRM-90':{sum:'Электронная очередь v4',status:'prog'},
 };
 const REL=[
-  {id:'v215',proj:'GARM',name:'Pulse 2.15.0',released:false,start:null,date:null},
-  {id:'v214',proj:'GARM',name:'Pulse 2.14.0',released:false,start:'2026-09-21',date:'2026-10-16',desc:'Сборка в Google Play и App Store'},
-  {id:'v2132',proj:'GARM',name:'Pulse 2.13.2',released:true,start:'2026-09-01',date:'2026-09-22'},
-  {id:'m47',proj:'NEWMFC',name:'МФЦ 4.7',released:false,start:'2026-09-28',date:'2026-10-30'},
-  {id:'m46',proj:'NEWMFC',name:'МФЦ 4.6',released:true,start:'2026-08-25',date:'2026-09-15'},
+  {id:'v215',proj:'HOME',name:'Orbit 2.15.0',released:false,start:null,date:null},
+  {id:'v214',proj:'HOME',name:'Orbit 2.14.0',released:false,start:'2026-09-21',date:'2026-10-16',desc:'Сборка в Google Play и App Store'},
+  {id:'v2132',proj:'HOME',name:'Orbit 2.13.2',released:true,start:'2026-09-01',date:'2026-09-22'},
+  {id:'m47',proj:'CRM',name:'Поддержка 4.7',released:false,start:'2026-09-28',date:'2026-10-30'},
+  {id:'m46',proj:'CRM',name:'Поддержка 4.6',released:true,start:'2026-08-25',date:'2026-09-15'},
 ];
 const FILTERS=[
   {id:'f1',own:true,name:'Мои баги High+',jql:'assignee = currentUser() AND type = Bug AND priority in (Highest, High) AND resolution = Unresolved',p:i=>i.asg==ME&&i.type=='bug'&&(i.prio=='highest'||i.prio=='high')&&i.status!='done'},
   {id:'f2',own:true,name:'Ждут ревью',jql:'assignee = currentUser() AND status = Review',p:i=>i.asg==ME&&i.status=='review'},
-  {id:'f3',inst:'pilot',name:'GARM: релиз 2.14.0',jql:'project = GARM AND fixVersion = "Pulse 2.14.0" ORDER BY status',p:i=>i.fix=='v214'},
-  {id:'f4',inst:'pilot',name:'Ivideon — всё открытое',jql:'labels = ivideon AND resolution = Unresolved',p:i=>i.labels.includes('ivideon')&&i.status!='done'},
-  {id:'f5',inst:'sccloud',name:'МФЦ — горящие',jql:'project = NEWMFC AND priority = Highest AND resolution = Unresolved',p:i=>i.proj=='NEWMFC'&&i.prio=='highest'&&i.status!='done'},
+  {id:'f3',inst:'northwind',name:'HOME: релиз 2.14.0',jql:'project = HOME AND fixVersion = "Orbit 2.14.0" ORDER BY status',p:i=>i.fix=='v214'},
+  {id:'f4',inst:'northwind',name:'CamCloud — всё открытое',jql:'labels = camcloud AND resolution = Unresolved',p:i=>i.labels.includes('camcloud')&&i.status!='done'},
+  {id:'f5',inst:'globex',name:'Поддержка — горящие',jql:'project = CRM AND priority = Highest AND resolution = Unresolved',p:i=>i.proj=='CRM'&&i.prio=='highest'&&i.status!='done'},
 ];
 const TODAY='2026-10-02';
 const WEEK=['2026-09-28','2026-09-29','2026-09-30','2026-10-01','2026-10-02'];
 const WD=['Пн','Вт','Ср','Чт','Пт'];
 const L=(key,who,date,m,c,tok,wt)=>({key,who,date,m,c,tok:tok||null,wt:wt||'Разработка'});
 const LOG=[
-  L('GARM-710','mk','2026-09-25',30,'Воспроизведение на стенде, сбор логов',null,'Тестирование'),
-  L('GARM-688','vs','2026-09-24',120,'Макеты, правки по ревью',null,'Дизайн'),
-  L('GARM-688','af','2026-09-28',240,'Вёрстка экрана сценариев',312000),
-  L('GARM-702','af','2026-09-28',90,'Разбор дублей push, логи FCM',95000),
-  L('NEWMFC-131','af','2026-09-28',120,'Таймер: модель и API'),
-  L('GARM-688','af','2026-09-29',180,'Анимации и пустые состояния',204000),
-  L('GARM-710','af','2026-09-29',120,'Воспроизведение, разбор логов Ivideon',148000),
-  L('P7-1423','af','2026-09-29',180,'Шаблон XLSX, группировка по машинам',121000),
-  L('GARM-710','af','2026-09-30',105,'Разбор ответа get_camera_events',186000),
-  L('VBV-12','af','2026-09-30',150,'Маппинг статусов СМЭВ',77000),
-  L('SDU-3','af','2026-09-30',120,'Поиск ошибки в агрегации по неделям',54000),
-  L('P7-1423','af','2026-10-01',240,'Экспорт: стили, итоги, тесты',166000),
-  L('NEWMFC-123','af','2026-10-01',120,'Воспроизведение на стенде, логи киоска'),
-  L('GARM-688','af','2026-10-01',120,'Правки по ревью',98000,'Ревью кода'),
-  L('GARM-710','af','2026-10-02',120,'Пагинация архива: переход на next_page_token',231000),
-  L('P7-1423','af','2026-10-02',45,'Ответ на замечания тестирования',22000),
-  L('NEWMFC-131','af','2026-10-02',30,'Созвон с аналитиком',null,'Созвон'),
+  L('HOME-710','mk','2026-09-25',30,'Воспроизведение на стенде, сбор логов',null,'Тестирование'),
+  L('HOME-688','vs','2026-09-24',120,'Макеты, правки по ревью',null,'Дизайн'),
+  L('HOME-688','af','2026-09-28',240,'Вёрстка экрана сценариев',312000),
+  L('HOME-702','af','2026-09-28',90,'Разбор дублей push, логи FCM',95000),
+  L('CRM-131','af','2026-09-28',120,'Таймер: модель и API'),
+  L('HOME-688','af','2026-09-29',180,'Анимации и пустые состояния',204000),
+  L('HOME-710','af','2026-09-29',120,'Воспроизведение, разбор логов CamCloud',148000),
+  L('TRK-1423','af','2026-09-29',180,'Шаблон XLSX, группировка по машинам',121000),
+  L('HOME-710','af','2026-09-30',105,'Разбор ответа get_camera_events',186000),
+  L('OPS-12','af','2026-09-30',150,'Маппинг статусов СМЭВ',77000),
+  L('DESK-3','af','2026-09-30',120,'Поиск ошибки в агрегации по неделям',54000),
+  L('TRK-1423','af','2026-10-01',240,'Экспорт: стили, итоги, тесты',166000),
+  L('CRM-123','af','2026-10-01',120,'Воспроизведение на стенде, логи киоска'),
+  L('HOME-688','af','2026-10-01',120,'Правки по ревью',98000,'Ревью кода'),
+  L('HOME-710','af','2026-10-02',120,'Пагинация архива: переход на next_page_token',231000),
+  L('TRK-1423','af','2026-10-02',45,'Ответ на замечания тестирования',22000),
+  L('CRM-131','af','2026-10-02',30,'Созвон с аналитиком',null,'Созвон'),
 ];
 const FILES={
-  'Ivideon.php':['<?php','// utils/Ivideon.php','','public function getCameraEvents(string $cameraId, int $offset = 0, int $limit = 50): array','{','    // GARM-710: Ivideon отдаёт не больше 1000 записей по offset,','    // дальше — курсор next_page_token','    $response = $this->request(\'GET\', \'/cameras/\' . $cameraId . \'/events\', [','        \'offset\' => $offset,','        \'limit\'  => $limit,','    ]);','','    return $response[\'result\'][\'items\'] ?? [];','}'],
-  'ivideon-response.json':['{','  "success": true,','  "result": {','    "items": [],','    "total": 1342,','    "offset": 1000,','    "limit": 50,','    "next_page_token": "eyJ0cyI6MTcyNjk5MjAwMCwiaWQiOiI4ZjNhIn0"','  }','}'],
-  'pulse-android-2.13.2.log':['2026-09-25 10:58:12.402 I/ArchiveRepo: load events camera=cam_8f3a offset=950 limit=50','2026-09-25 10:58:12.871 I/ArchiveRepo: got 50 items (total=1342)','2026-09-25 10:58:19.115 I/ArchiveRepo: load events camera=cam_8f3a offset=1000 limit=50','2026-09-25 10:58:19.530 W/ArchiveRepo: got 0 items (total=1342) — retry in 2s','2026-09-25 10:58:21.533 I/ArchiveRepo: load events camera=cam_8f3a offset=1000 limit=50','2026-09-25 10:58:21.902 W/ArchiveRepo: got 0 items (total=1342) — retry in 4s','2026-09-25 10:58:25.904 E/ArchiveRepo: give up after 2 retries, keep spinner'],
+  'CamCloud.php':['<?php','// utils/CamCloud.php','','public function getCameraEvents(string $cameraId, int $offset = 0, int $limit = 50): array','{','    // HOME-710: CamCloud отдаёт не больше 1000 записей по offset,','    // дальше — курсор next_page_token','    $response = $this->request(\'GET\', \'/cameras/\' . $cameraId . \'/events\', [','        \'offset\' => $offset,','        \'limit\'  => $limit,','    ]);','','    return $response[\'result\'][\'items\'] ?? [];','}'],
+  'camcloud-response.json':['{','  "success": true,','  "result": {','    "items": [],','    "total": 1342,','    "offset": 1000,','    "limit": 50,','    "next_page_token": "eyJ0cyI6MTcyNjk5MjAwMCwiaWQiOiI4ZjNhIn0"','  }','}'],
+  'orbit-android-2.13.2.log':['2026-09-25 10:58:12.402 I/ArchiveRepo: load events camera=cam_8f3a offset=950 limit=50','2026-09-25 10:58:12.871 I/ArchiveRepo: got 50 items (total=1342)','2026-09-25 10:58:19.115 I/ArchiveRepo: load events camera=cam_8f3a offset=1000 limit=50','2026-09-25 10:58:19.530 W/ArchiveRepo: got 0 items (total=1342) — retry in 2s','2026-09-25 10:58:21.533 I/ArchiveRepo: load events camera=cam_8f3a offset=1000 limit=50','2026-09-25 10:58:21.902 W/ArchiveRepo: got 0 items (total=1342) — retry in 4s','2026-09-25 10:58:25.904 E/ArchiveRepo: give up after 2 retries, keep spinner'],
 };
 
 /* ---------- helpers ---------- */
@@ -501,10 +501,10 @@ const myDay=d=>LOG.filter(l=>l.who==ME&&l.date==d).reduce((s,l)=>s+l.m,0);
 const daysBetween=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
 
 /* ---------- state ---------- */
-const S={mode:'mine',proj:'GARM',q:'',f:{status:new Set(),type:new Set(),prio:new Set(),inst:new Set()},
+const S={mode:'mine',proj:'HOME',q:'',f:{status:new Set(),type:new Set(),prio:new Set(),inst:new Set()},
   jql:'assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC',saved:null,
-  closedInst:{},collapsed:{},epicProj:'GARM',relProj:'GARM',sub:{},
-  tabs:[{kind:'file',id:'Ivideon.php'},{kind:'issue',id:'GARM-710'}],active:1,ov:null};
+  closedInst:{},collapsed:{},epicProj:'HOME',relProj:'HOME',sub:{},
+  tabs:[{kind:'file',id:'CamCloud.php'},{kind:'issue',id:'HOME-710'}],active:1,ov:null};
 const cur=()=>S.tabs[S.active];
 
 /* ---------- sidebar ---------- */
@@ -600,7 +600,7 @@ function renderTempo(){
     <div class="bar"><i class="b-acc" style="width:${pct}%"></i></div>
     <div class="wk">${WEEK.map((d,n)=>{const m=myDay(d);return `<div class="${d==TODAY?'today':''}" title="${WD[n]} ${dshort(d)}: ${fmt(m)}"><span>${(m/60).toFixed(m%60?1:0).replace('.',',')}</span><span class="col"><i class="${d==TODAY?'b-acc':m>=480?'b-done':'b-prog'}" style="height:${Math.min(100,m/540*100)}%"></i></span><span>${WD[n]}</span></div>`}).join('')}</div>
     <div class="tl">${todays.map(l=>`<div class="row" data-act="open" data-k="${l.key}" tabindex="0" title="${esc(l.c)}"><span class="k">${l.key}</span><span class="lbl mut">${esc(l.c)}</span><span class="t">${fmt(l.m)}</span></div>`).join('')}</div>
-    <div class="row-btns"><button class="btn sm" data-act="ts">${IC.cal.replace('class="s16"','')} Неделя</button><button class="btn sm pri" data-act="log" data-k="${cur()&&cur().kind=='issue'?cur().id:'GARM-710'}">${IC.clock} Залогать</button></div>
+    <div class="row-btns"><button class="btn sm" data-act="ts">${IC.cal.replace('class="s16"','')} Неделя</button><button class="btn sm pri" data-act="log" data-k="${cur()&&cur().kind=='issue'?cur().id:'HOME-710'}">${IC.clock} Залогать</button></div>
   </div>`;
 }
 
@@ -624,12 +624,12 @@ function vFile(n){
   return `<div class="code">${FILES[n].map(l=>`<div class="${/^\s*\/\//.test(l)?'cmt':''}">${esc(l)||' '}</div>`).join('')}</div>`;
 }
 function shot(v){
-  if(v==3)return `<svg viewBox="0 0 240 180" role="img" aria-label="Фото экрана терминала"><rect width="240" height="180" style="fill:#2c3138"/><rect x="20" y="14" width="200" height="140" rx="6" style="fill:#e9eef3"/><rect x="20" y="14" width="200" height="22" rx="6" style="fill:#1f5fa8"/><text x="32" y="29" style="fill:#fff;font:600 9px sans-serif">МФЦ · Электронная очередь</text><text x="120" y="70" text-anchor="middle" style="fill:#1b2a3a;font:700 16px sans-serif">Талон А-042</text><text x="120" y="88" text-anchor="middle" style="fill:#3c4a5a;font:9px sans-serif">Талон сформирован</text><rect x="70" y="102" width="100" height="22" rx="4" style="fill:#1f5fa8"/><text x="120" y="117" text-anchor="middle" style="fill:#fff;font:600 9px sans-serif">Готово</text><rect x="92" y="160" width="56" height="6" rx="3" style="fill:#121418"/></svg>`;
+  if(v==3)return `<svg viewBox="0 0 240 180" role="img" aria-label="Фото экрана терминала"><rect width="240" height="180" style="fill:#2c3138"/><rect x="20" y="14" width="200" height="140" rx="6" style="fill:#e9eef3"/><rect x="20" y="14" width="200" height="22" rx="6" style="fill:#1f5fa8"/><text x="32" y="29" style="fill:#fff;font:600 9px sans-serif">Поддержка · Электронная очередь</text><text x="120" y="70" text-anchor="middle" style="fill:#1b2a3a;font:700 16px sans-serif">Талон А-042</text><text x="120" y="88" text-anchor="middle" style="fill:#3c4a5a;font:9px sans-serif">Талон сформирован</text><rect x="70" y="102" width="100" height="22" rx="4" style="fill:#1f5fa8"/><text x="120" y="117" text-anchor="middle" style="fill:#fff;font:600 9px sans-serif">Готово</text><rect x="92" y="160" width="56" height="6" rx="3" style="fill:#121418"/></svg>`;
   const ev=[0,1,2,3,4].map(j=>{const y=172+j*28;
     if(v==2&&j>1)return j==2?`<circle cx="90" cy="${y+22}" r="9" style="fill:none;stroke:#3b82f6;stroke-width:2.5;stroke-dasharray:40 20"/><text x="90" y="${y+46}" text-anchor="middle" style="fill:#8a93a3;font:8px sans-serif">Загрузка…</text>`:'';
     return `<rect x="10" y="${y}" width="160" height="22" rx="4" style="fill:#1f232a"/><circle cx="21" cy="${y+11}" r="4" style="fill:${j%2?'#f59e0b':'#3b82f6'}"/><rect x="31" y="${y+6}" width="${70+j*9%40}" height="4" rx="2" style="fill:#c9ced6"/><rect x="31" y="${y+13}" width="44" height="3" rx="1.5" style="fill:#5d6573"/>`;}).join('');
   const marks=[14,22,30,47,52,66,80,95,101,118,130].map(x=>`<rect x="${10+x}" y="139" width="3" height="8" style="fill:${x>100&&v==1?'#3a3f48':'#3b82f6'}"/>`).join('');
-  return `<svg viewBox="0 0 180 330" role="img" aria-label="Скриншот приложения Pulse"><rect width="180" height="330" rx="14" style="fill:#121418"/><rect width="180" height="28" style="fill:#1b1e24"/><text x="12" y="18" style="fill:#e8e8e8;font:600 9px sans-serif">Подъезд 2 · Архив</text><rect x="10" y="36" width="160" height="90" rx="6" style="fill:#262b33"/><path d="M82 70l20 11-20 11z" style="fill:#5d6573"/><rect x="10" y="134" width="160" height="18" rx="3" style="fill:#1b1e24"/>${marks}<path d="M${v==1?115:88} 131v24" style="stroke:#ef4444;stroke-width:1.5"/><text x="12" y="164" style="fill:#8a93a3;font:7px sans-serif">${v==1?'24 авг':'2 сен'}</text><text x="168" y="164" text-anchor="end" style="fill:#8a93a3;font:7px sans-serif">${v==1?'26 авг':'4 сен'}</text>${v==1?'<rect x="108" y="131" width="64" height="24" rx="3" style="fill:none;stroke:#ef4444;stroke-width:1.5"/>':''}${ev}</svg>`;
+  return `<svg viewBox="0 0 180 330" role="img" aria-label="Скриншот приложения Orbit"><rect width="180" height="330" rx="14" style="fill:#121418"/><rect width="180" height="28" style="fill:#1b1e24"/><text x="12" y="18" style="fill:#e8e8e8;font:600 9px sans-serif">Подъезд 2 · Архив</text><rect x="10" y="36" width="160" height="90" rx="6" style="fill:#262b33"/><path d="M82 70l20 11-20 11z" style="fill:#5d6573"/><rect x="10" y="134" width="160" height="18" rx="3" style="fill:#1b1e24"/>${marks}<path d="M${v==1?115:88} 131v24" style="stroke:#ef4444;stroke-width:1.5"/><text x="12" y="164" style="fill:#8a93a3;font:7px sans-serif">${v==1?'24 авг':'2 сен'}</text><text x="168" y="164" text-anchor="end" style="fill:#8a93a3;font:7px sans-serif">${v==1?'26 авг':'4 сен'}</text>${v==1?'<rect x="108" y="131" width="64" height="24" rx="3" style="fill:none;stroke:#ef4444;stroke-width:1.5"/>':''}${ev}</svg>`;
 }
 function vIssue(k){
   const i=I[k],x=ins(i.inst),sub=S.sub[k]||'desc',logs=logsOf(k),spent=logs.reduce((s,l)=>s+l.m,0);

@@ -1,5 +1,5 @@
 // Tempo Timesheets Server (REST v3) — атрибуты, чтение и запись ворклогов. Без vscode — тестируется в vitest.
-// Форматы проверены GET-запросами на живом DC (см. «Допущения» в roadmap-mvp.md); запись — по скрипту pilot-jira `cmd_worklog`.
+// Форматы проверены GET-запросами на живом DC (см. «Допущения» в roadmap-mvp.md); запись — по скрипту northwind-jira `cmd_worklog`.
 import type { HttpClient } from './http';
 import { JiraError } from './http';
 import type { Worklog } from './types';
@@ -40,7 +40,7 @@ export interface TempoWorklogInput {
   remainingEstimateSec: number;
 }
 
-/** Ключ атрибута AI Tokens на Pilot (`JIRA_PILOT_AI_TOKENS_ATTR` в скрипте, по умолчанию `_AITokensUsed_`). */
+/** Ключ атрибута AI Tokens на Northwind (`JIRA_PILOT_AI_TOKENS_ATTR` в скрипте, по умолчанию `_AITokensUsed_`). */
 export const AI_TOKENS_ATTR = '_AITokensUsed_';
 
 const KIND: Record<string, WorkAttributeKind> = {
@@ -86,7 +86,7 @@ export function mapTempoWorklog(w: Raw): TempoWorklog {
   };
 }
 
-/** Тело POST /rest/tempo-timesheets/3/worklogs/ — как в `cmd_worklog` скрипта pilot-jira. */
+/** Тело POST /rest/tempo-timesheets/3/worklogs/ — как в `cmd_worklog` скрипта northwind-jira. */
 export function tempoPayload(i: TempoWorklogInput): Record<string, unknown> {
   const attrs = Object.entries(i.attributes).filter(([, v]) => v !== '');
   return {

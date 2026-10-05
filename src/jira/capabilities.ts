@@ -17,7 +17,7 @@ export async function detectCapabilities(client: JiraClient): Promise<Capabiliti
       await client.http.getJson('/rest/tempo-core/1/work-attribute');
       tempo = true;
     } catch (e) {
-      // Сервер без Tempo: 404 либо (sccloud) 302 на login.jsp → после редиректа HTML вместо JSON.
+      // Сервер без Tempo: 404 либо (globex) 302 на login.jsp → после редиректа HTML вместо JSON.
       if (!(e instanceof JiraError && (e.status === 404 || e.code === 'format'))) throw e;
     }
     const fields = await client.fields();
