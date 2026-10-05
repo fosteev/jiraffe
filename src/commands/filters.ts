@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { Instance } from '../jira/types';
 import { buildJql, isIssueKey, type Mode, type QuickFilters } from '../jql';
-import { instancesApply, type FilterState } from '../state/filters';
+import { instancesApply, projectsApply, type FilterState } from '../state/filters';
 import type { InstanceStore } from '../state/instances';
 import { matchInstancesByKey, unionNames, type InstanceMeta } from '../state/meta';
 import { jqlForInstance } from '../state/query';
@@ -151,10 +151,11 @@ export function registerFilterCommands(
     const { ok, failed } = await withProgress(t('Jiraffe: loading types and priorities…'), async () => ({
       types: await perInstance(all, (i) => meta.types(i)),
       prios: await perInstance(all, (i) => meta.priorities(i)),
-    })).then((r) => ({ ok: r, failed: [...r.types.failed, ...r.prios.failed] }));
+      projects: projectsApply(snap) ? await perInstance(all, (i) => meta.projects(i)) : { ok: [], failed: [] },
+    })).then((r) => ({ ok: r, failed: [...r.types.failed, ...r.prios.failed, ...r.projects.failed] }));
     if (failed.length) void vscode.window.showWarningMessage(t('Jiraffe: lookups failed to load — {0}', [...new Set(failed)].join('; ')));
 
-    type Group = 'status' | 'type' | 'prio' | 'inst';
+    type Group = 'status' | 'type' | 'prio' | 'inst' | 'proj';
     type Item = vscode.QuickPickItem & { group?: Group; value?: string };
     const items: Item[] = [{ label: t('Status'), kind: vscode.QuickPickItemKind.Separator }];
     for (const c of ['new', 'indeterminate', 'done'] as const) {
@@ -176,6 +177,25 @@ export function registerFilterCommands(
       items.push({ label: t('Instance'), kind: vscode.QuickPickItemKind.Separator });
       for (const i of all) items.push({ label: i.name, description: hostOf(i.baseUrl), group: 'inst', value: i.id, picked: snap.instances.includes(i.id) });
     }
+    // в режиме «проект» группа не нужна; проектов бывает много — она последняя, чтобы не закапывать остальные
+    const projGroup = projectsApply(snap);
+    if (projGroup) {
+      const byKey = new Map<string, { name: string; hosts: string[] }>();
+      for (const [inst, ps] of ok.projects.ok) {
+        for (const p of ps) {
+          const k = p.key.toUpperCase();
+          const e = byKey.get(k) ?? byKey.set(k, { name: p.name, hosts: [] }).get(k)!;
+          e.hosts.push(hostOf(inst.baseUrl));
+        }
+      }
+      for (const k of snap.quick.projects) if (!byKey.has(k.toUpperCase())) byKey.set(k.toUpperCase(), { name: '', hosts: [] });
+      if (byKey.size) items.push({ label: t('Project'), kind: vscode.QuickPickItemKind.Separator });
+      const picked = new Set(snap.quick.projects.map((k) => k.toUpperCase()));
+      for (const [k, e] of [...byKey].sort(([a], [b]) => a.localeCompare(b))) {
+        const description = all.length > 1 && e.hosts.length ? [e.name, ...e.hosts].filter(Boolean).join(' · ') : e.name;
+        items.push({ label: k, description, group: 'proj', value: k, picked: picked.has(k) });
+      }
+    }
 
     const picked = await vscode.window.showQuickPick(items, { canPickMany: true, placeHolder: t('Quick Filters (OR within a group, AND between groups)'), matchOnDescription: true });
     if (!picked) return;
@@ -184,6 +204,7 @@ export function registerFilterCommands(
       statusCategory: by('status') as QuickFilters['statusCategory'],
       types: by('type'),
       priorities: by('prio'),
+      projects: projGroup ? by('proj') : snap.quick.projects,
     };
     const insts = by('inst');
     filters.setQuick(quick, !instGroup ? snap.instances : insts.length === all.length ? [] : insts); // «все» = без ограничения

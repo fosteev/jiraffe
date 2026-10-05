@@ -5,7 +5,7 @@ import type { FilterSnapshot } from './filters';
 import { intersectNames, keyPrefix, type InstanceMeta } from './meta';
 
 /**
- * JQL для инстанса. Выбранные типы/приоритеты сужаются до существующих на инстансе:
+ * JQL для инстанса. Выбранные типы/приоритеты/проекты сужаются до существующих на инстансе:
  * неизвестное значение Jira отвергает с 400. Если из выбранного на инстансе нет ничего — `null`
  * (запрашивать нечего, выдача пуста). Не удалось получить справочник — берём выбор как есть.
  * Текст вида `ABC-123` ищется как ключ, только если проект `ABC` есть на инстансе (иначе `UTF-8` не найти);
@@ -29,7 +29,8 @@ export async function jqlForInstance(
   };
   const types = await narrow(quick.types, () => meta.types(inst));
   const prios = await narrow(quick.priorities, () => meta.priorities(inst));
-  if (types === null || prios === null) return null;
+  const projects = snap.mode === 'project' ? [] : await narrow(quick.projects, async () => (await meta.projects(inst)).map((p) => ({ name: p.key })));
+  if (types === null || prios === null || projects === null) return null;
   let textAsKey = false;
   if (!opts.textOnly && isIssueKey(snap.text)) {
     const prefix = keyPrefix(snap.text);
@@ -43,7 +44,7 @@ export async function jqlForInstance(
     mode: snap.mode,
     projectKey: snap.project?.key,
     jql: snap.jql,
-    quick: { ...quick, types, priorities: prios },
+    quick: { ...quick, types, priorities: prios, projects },
     text: snap.text,
     textAsKey,
   });

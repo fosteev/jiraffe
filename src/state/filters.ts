@@ -29,7 +29,7 @@ const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is st
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
 
 export function emptyQuick(): QuickFilters {
-  return { statusCategory: [], types: [], priorities: [] };
+  return { statusCategory: [], types: [], priorities: [], projects: [] };
 }
 
 export function sanitizeSnapshot(v: unknown): FilterSnapshot {
@@ -48,6 +48,7 @@ export function sanitizeSnapshot(v: unknown): FilterSnapshot {
       statusCategory: strs(q.statusCategory).filter((c): c is StatusCategory => CATS.includes(c as StatusCategory)),
       types: strs(q.types),
       priorities: strs(q.priorities),
+      projects: strs(q.projects),
     },
     text: typeof o.text === 'string' ? o.text : '',
     instances: strs(o.instances),
@@ -57,9 +58,13 @@ export function sanitizeSnapshot(v: unknown): FilterSnapshot {
 /** Действует ли выбор инстансов: в режиме «проект» и у JQL из фильтра инстанс один и задан ими. */
 export const instancesApply = (s: FilterSnapshot): boolean => s.mode === 'mine' || (s.mode === 'jql' && !s.jqlScope);
 
-/** Число активных быстрых фильтров: каждая выбранная категория/тип/приоритет/инстанс (если действует) + текст. */
+/** Действует ли выбор проектов в быстрых фильтрах: в режиме «проект» проект уже один. */
+export const projectsApply = (s: FilterSnapshot): boolean => s.mode !== 'project';
+
+/** Число активных быстрых фильтров: каждая выбранная категория/тип/приоритет/проект/инстанс (если действуют) + текст. */
 export function activeFilterCount(s: FilterSnapshot): number {
-  return s.quick.statusCategory.length + s.quick.types.length + s.quick.priorities.length + (instancesApply(s) ? s.instances.length : 0) + (s.text.trim() ? 1 : 0);
+  const q = s.quick;
+  return q.statusCategory.length + q.types.length + q.priorities.length + (projectsApply(s) ? q.projects.length : 0) + (instancesApply(s) ? s.instances.length : 0) + (s.text.trim() ? 1 : 0);
 }
 
 /** Подпись в заголовке view: «2 фильтра · HOME». */

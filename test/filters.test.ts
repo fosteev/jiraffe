@@ -16,7 +16,7 @@ describe('FilterState', () => {
     const f = new FilterState(m as never);
     expect(f.snapshot.mode).toBe('mine');
     f.setProject({ instanceId: 'a', key: 'ABC' });
-    f.setQuick({ statusCategory: ['new'], types: ['Bug'], priorities: [] }, ['a']);
+    f.setQuick({ statusCategory: ['new'], types: ['Bug'], priorities: [], projects: [] }, ['a']);
     const again = new FilterState(m as never);
     expect(again.snapshot.mode).toBe('project');
     expect(again.snapshot.project).toEqual({ instanceId: 'a', key: 'ABC' });
@@ -53,7 +53,7 @@ describe('FilterState', () => {
     const f = new FilterState(mem() as never);
     f.setProject({ instanceId: 'a', key: 'ABC' });
     f.setText('foo');
-    f.setQuick({ statusCategory: ['done'], types: [], priorities: [] }, ['a']);
+    f.setQuick({ statusCategory: ['done'], types: [], priorities: [], projects: [] }, ['a']);
     f.reset();
     expect(f.snapshot.text).toBe('');
     expect(activeFilterCount(f.snapshot)).toBe(0);
@@ -78,10 +78,10 @@ describe('FilterState', () => {
 
   it('setJql baked: категории или всё; выбор инстансов остаётся', () => {
     const f = new FilterState(mem() as never);
-    f.setQuick({ statusCategory: ['new'], types: ['Bug'], priorities: ['High'] }, ['a']);
+    f.setQuick({ statusCategory: ['new'], types: ['Bug'], priorities: ['High'], projects: [] }, ['a']);
     f.setText('foo');
     f.setJql('x = 1', { baked: 'categories' });
-    expect(f.snapshot.quick).toEqual({ statusCategory: [], types: ['Bug'], priorities: ['High'] });
+    expect(f.snapshot.quick).toEqual({ statusCategory: [], types: ['Bug'], priorities: ['High'], projects: [] });
     expect(f.snapshot.text).toBe('foo');
     expect(f.snapshot.instances).toEqual(['a']);
     f.setJql('x = 2', { baked: 'all' });
@@ -119,7 +119,7 @@ describe('describeFilters', () => {
   it('«2 фильтра · HOME»', () => {
     const f = base();
     f.setProject({ instanceId: 'a', key: 'HOME' });
-    f.setQuick({ statusCategory: ['new', 'done'], types: [], priorities: [] }, []);
+    f.setQuick({ statusCategory: ['new', 'done'], types: [], priorities: [], projects: [] }, []);
     expect(describeFilters(f.snapshot)).toBe('2 filters · HOME');
   });
   it('склонения и режимы', () => {
@@ -127,7 +127,7 @@ describe('describeFilters', () => {
     expect(describeFilters(f.snapshot)).toBe('assigned to me');
     f.setText('x');
     expect(describeFilters(f.snapshot)).toBe('1 filter');
-    f.setQuick({ statusCategory: ['new', 'done'], types: ['a', 'b', 'c'], priorities: [] }, []);
+    f.setQuick({ statusCategory: ['new', 'done'], types: ['a', 'b', 'c'], priorities: [], projects: [] }, []);
     expect(describeFilters(f.snapshot)).toBe('6 filters');
     f.setJql('a = 1', { savedName: 'Баги' });
     expect(describeFilters(f.snapshot)).toBe('6 filters · “Баги”');
@@ -217,7 +217,7 @@ describe('jqlForInstance', () => {
   const inst = { id: 'a', name: 'A', baseUrl: 'https://h.example', kind: 'dc' as const };
   const snap = (types: string[], priorities: string[] = []) => {
     const f = new FilterState(mem() as never);
-    f.setQuick({ statusCategory: ['new'], types, priorities }, []);
+    f.setQuick({ statusCategory: ['new'], types, priorities, projects: [] }, []);
     return f.snapshot;
   };
   const meta = (types: string[] | Error, prios: string[] = ['High']) => ({
@@ -244,6 +244,24 @@ describe('jqlForInstance', () => {
   it('без типов справочник не запрашивается', async () => {
     const m = { types: async () => { throw new Error('не должен вызываться'); }, priorities: async () => [], projects: async () => [] };
     expect(await jqlForInstance(snap([]), inst, m)).toContain('statusCategory in (1, 2)');
+  });
+  it('проекты сужаются до существующих на инстансе, в режиме «проект» не действуют', async () => {
+    const withProjects = (projects: string[], mode?: 'project') => {
+      const f = new FilterState(mem() as never);
+      f.setQuick({ statusCategory: [], types: [], priorities: [], projects }, []);
+      if (mode) f.setProject({ instanceId: 'a', key: 'ABC' });
+      return f.snapshot;
+    };
+    expect(await jqlForInstance(withProjects(['abc', 'XYZ']), inst, meta([]))).toBe(
+      'assignee = currentUser() AND resolution = Unresolved AND project in (ABC) ORDER BY updated DESC',
+    );
+    expect(await jqlForInstance(withProjects(['XYZ']), inst, meta([]))).toBeNull();
+    expect(await jqlForInstance(withProjects(['XYZ'], 'project'), inst, meta([]))).toBe('project = ABC ORDER BY updated DESC');
+    const f = new FilterState(mem() as never);
+    f.setQuick({ statusCategory: [], types: [], priorities: [], projects: ['XYZ'] }, []);
+    expect(activeFilterCount(f.snapshot)).toBe(1);
+    f.setProject({ instanceId: 'a', key: 'ABC' });
+    expect(activeFilterCount(f.snapshot)).toBe(0);
   });
   it('ключ ищется как ключ, только если проект есть на инстансе', async () => {
     const withText = (text: string) => {

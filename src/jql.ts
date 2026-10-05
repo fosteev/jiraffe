@@ -6,6 +6,8 @@ export interface QuickFilters {
   statusCategory: StatusCategory[];
   types: string[];
   priorities: string[];
+  /** Ключи проектов; в режиме «проект» не действуют. */
+  projects: string[];
 }
 
 export interface JqlInput {
@@ -78,6 +80,7 @@ export function buildJql(input: JqlInput): string {
   const cats = CATEGORY_ORDER.filter((c) => quick.statusCategory?.includes(c));
   const types = (quick.types ?? []).filter(Boolean);
   const prios = (quick.priorities ?? []).filter(Boolean);
+  const projects = input.mode === 'project' ? [] : (quick.projects ?? []).filter(Boolean);
   const text = (input.text ?? '').replace(/\s+/g, ' ').trim();
 
   const clauses: string[] = [];
@@ -96,6 +99,7 @@ export function buildJql(input: JqlInput): string {
   }
 
   const extra: string[] = [];
+  if (projects.length) extra.push(`project in (${projects.map(projectRef).join(', ')})`);
   if (cats.length) extra.push(`statusCategory in (${cats.flatMap((c) => CATEGORY_IDS[c]).join(', ')})`);
   if (types.length) extra.push(`issuetype in (${types.map(quoteJql).join(', ')})`);
   if (prios.length) extra.push(`priority in (${prios.map(quoteJql).join(', ')})`);
