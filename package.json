@@ -73,6 +73,10 @@
         "title": "Jiraffe: Добавить инстанс"
       },
       {
+        "command": "jiraffe.scopeInstances",
+        "title": "Jiraffe: Инстансы этого workspace"
+      },
+      {
         "command": "jiraffe.removeInstance",
         "title": "Jiraffe: Удалить инстанс"
       },
@@ -307,20 +311,28 @@
     "viewsWelcome": [
       {
         "view": "jiraffe.issues",
-        "contents": "Нет подключённых инстансов Jira.\n[Добавить инстанс](command:jiraffe.addInstance)"
+        "contents": "Нет инстансов Jira для этого workspace.\n[Добавить инстанс](command:jiraffe.addInstance)\n[Выбрать из подключённых](command:jiraffe.scopeInstances)"
       },
       {
         "view": "jiraffe.epics",
-        "contents": "Нет подключённых инстансов Jira.\n[Добавить инстанс](command:jiraffe.addInstance)"
+        "contents": "Нет инстансов Jira для этого workspace.\n[Добавить инстанс](command:jiraffe.addInstance)\n[Выбрать из подключённых](command:jiraffe.scopeInstances)"
       },
       {
         "view": "jiraffe.releases",
-        "contents": "Нет подключённых инстансов Jira.\n[Добавить инстанс](command:jiraffe.addInstance)"
+        "contents": "Нет инстансов Jira для этого workspace.\n[Добавить инстанс](command:jiraffe.addInstance)\n[Выбрать из подключённых](command:jiraffe.scopeInstances)"
       }
     ],
     "configuration": {
       "title": "Jiraffe",
       "properties": {
+        "jiraffe.instances": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "scope": "window",
+          "markdownDescription": "Какие инстансы показывать в этом workspace: id или адрес инстанса (`https://jira.example.com`). Не задано или пусто — все подключённые. Удобно класть в `.vscode/settings.json` папки проекта; выбрать мышкой — команда **Jiraffe: Инстансы этого workspace**. Подключения и токены при этом общие для всех окон."
+        },
         "jiraffe.maxResults": {
           "type": "integer",
           "default": 50,

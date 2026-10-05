@@ -14,13 +14,15 @@ export function sanitizeProjectSel(v: unknown): ProjectSel | undefined {
 export class SectionProject {
   private listeners = new Set<() => void>();
 
+  /** Выбор — свой у каждого workspace (`memento`); пока не менялся — берём глобальный (`fallback`). */
   constructor(
     private readonly memento: Memento,
     private readonly stateKey: string,
+    private readonly fallback?: Memento,
   ) {}
 
   get(): ProjectSel | undefined {
-    return sanitizeProjectSel(this.memento.get<unknown>(this.stateKey));
+    return sanitizeProjectSel(this.memento.get<unknown>(this.stateKey) ?? this.fallback?.get<unknown>(this.stateKey));
   }
 
   set(sel: ProjectSel): void {

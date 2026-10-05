@@ -84,8 +84,15 @@ export class FilterState {
   private listeners = new Set<() => void>();
   private savedListeners = new Set<() => void>();
 
-  constructor(private readonly memento: Memento) {
-    this.snap = sanitizeSnapshot(memento.get<unknown>(STATE_KEY));
+  /**
+   * Сохранённые фильтры — общие (`memento`, globalState); текущий выбор — свой у каждого workspace (`local`),
+   * а пока workspace его не менял — берём последний глобальный.
+   */
+  constructor(
+    private readonly memento: Memento,
+    private readonly local: Memento = memento,
+  ) {
+    this.snap = sanitizeSnapshot(local.get<unknown>(STATE_KEY) ?? memento.get<unknown>(STATE_KEY));
   }
 
   onDidChange(fn: () => void): { dispose(): void } {
@@ -178,7 +185,7 @@ export class FilterState {
     // undefined-поля не должны оставаться ключами (JSON и сравнение)
     for (const k of Object.keys(next) as (keyof FilterSnapshot)[]) if (next[k] === undefined) delete next[k];
     this.snap = next;
-    void this.memento.update(STATE_KEY, next);
+    void this.local.update(STATE_KEY, next);
     this.fire();
   }
 
