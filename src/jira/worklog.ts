@@ -1,3 +1,4 @@
+import { t } from '../l10n';
 // Запись времени и сводка «сегодня»: проверка формы, payload'ы, маршрут Tempo / стандартный журнал.
 // Без vscode — тестируется в vitest (запись — только на моке fetch).
 import { parseDuration } from '../duration';
@@ -80,38 +81,38 @@ export function validateDraft(raw: unknown, form: LogForm, today = localDate()):
   const d = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const durationText = str(d.duration, 64);
   const sec = durationText === undefined ? null : parseDuration(durationText);
-  if (!sec) return { ok: false, field: 'duration', error: 'Не понял длительность. Напишите, например, 1ч 30м или 90m.' };
-  if (sec > MAX_LOG_SEC) return { ok: false, field: 'duration', error: 'Больше суток за одну запись — разбейте по дням.' };
-  if (!isIsoDate(d.date)) return { ok: false, field: 'date', error: 'Укажите дату в формате ГГГГ-ММ-ДД.' };
+  if (!sec) return { ok: false, field: 'duration', error: t("Couldn't parse the duration. Try something like 1h 30m or 90m.") };
+  if (sec > MAX_LOG_SEC) return { ok: false, field: 'duration', error: t('More than a day in one entry. Split it across days.') };
+  if (!isIsoDate(d.date)) return { ok: false, field: 'date', error: t('Enter the date as YYYY-MM-DD.') };
   // Будущее — почти всегда опечатка в годе/месяце; локальная дата, сравнение строк `YYYY-MM-DD`.
-  if (d.date > today) return { ok: false, field: 'date', error: 'Дата в будущем — время логируется за сегодня или прошедшие дни.' };
+  if (d.date > today) return { ok: false, field: 'date', error: t('The date is in the future. Log time for today or earlier.') };
   const comment = str(d.comment ?? '', MAX_COMMENT);
-  if (comment === undefined) return { ok: false, field: 'comment', error: `Комментарий длиннее ${MAX_COMMENT} символов.` };
+  if (comment === undefined) return { ok: false, field: 'comment', error: t('Comment is longer than {0} characters.', MAX_COMMENT) };
   const tokensText = str(d.aiTokens ?? '', 64);
   const tokens = tokensText === undefined ? undefined : parseTokens(tokensText);
-  if (tokens === undefined) return { ok: false, field: 'aiTokens', error: 'AI Tokens — целое число, например 120000.' };
+  if (tokens === undefined) return { ok: false, field: 'aiTokens', error: t('AI Tokens must be a whole number, for example 120000.') };
 
   const given = (d.attributes && typeof d.attributes === 'object' ? d.attributes : {}) as Record<string, unknown>;
   const attributes: Record<string, string> = {};
   for (const a of form.attributes) {
     if (a.key === form.aiTokensAttr) {
-      if (a.required && tokens === null) return { ok: false, field: 'aiTokens', error: `Заполните «${a.name}».` };
+      if (a.required && tokens === null) return { ok: false, field: 'aiTokens', error: t('Fill in "{0}".', a.name) };
       continue;
     }
     const rawV = str(Object.prototype.hasOwnProperty.call(given, a.key) ? given[a.key] : '', MAX_ATTR_VALUE);
-    if (rawV === undefined) return { ok: false, field: `attr:${a.key}`, error: `«${a.name}»: слишком длинное значение.` };
+    if (rawV === undefined) return { ok: false, field: `attr:${a.key}`, error: t('"{0}": value is too long.', a.name) };
     const v = rawV.trim();
     let value = v;
     if (a.kind === 'number' && v) {
-      if (!/^-?\d{1,15}(?:[.,]\d{1,6})?$/.test(v)) return { ok: false, field: `attr:${a.key}`, error: `«${a.name}» — число.` };
+      if (!/^-?\d{1,15}(?:[.,]\d{1,6})?$/.test(v)) return { ok: false, field: `attr:${a.key}`, error: t('"{0}" must be a number.', a.name) };
       value = v.replace(',', '.');
     } else if (a.kind === 'list' && v && !(a.values ?? []).some((x) => x.value === v)) {
-      return { ok: false, field: `attr:${a.key}`, error: `«${a.name}»: выберите значение из списка.` };
+      return { ok: false, field: `attr:${a.key}`, error: t('"{0}": choose a value from the list.', a.name) };
     } else if (a.kind === 'checkbox') {
       value = v === 'true' ? 'true' : '';
     }
     if (!value) {
-      if (a.required) return { ok: false, field: `attr:${a.key}`, error: `Заполните «${a.name}».` };
+      if (a.required) return { ok: false, field: `attr:${a.key}`, error: t('Fill in "{0}".', a.name) };
       continue;
     }
     attributes[a.key] = value;

@@ -8,6 +8,7 @@ import type { InstanceMeta } from '../state/meta';
 import type { IssueRef } from '../views/issuesTree';
 import type { AttachmentContext, AttachmentService } from './attachments';
 import { browseUrl, loadCard } from './card';
+import { getBundle, locale, t } from '../l10n';
 import { makeNonce, renderShell } from './html';
 import {
   ISSUE_TABS, isAttachmentId, isImageId, isIssueKey, isVersionId, MAX_IMAGE_IDS, safeExternalUrl, type HostToView, type IssueCard, type IssueTab, type LogFormView, type ViewToHost,
@@ -101,7 +102,7 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
   copyKey(ref?: IssueRef): boolean {
     const e = ref ? this.find(ref) : this.active ?? this.preview;
     if (!e) return false;
-    void vscode.env.clipboard.writeText(e.ref.key).then(() => vscode.window.setStatusBarMessage(`Jiraffe: ключ ${e.ref.key} скопирован`, 2500));
+    void vscode.env.clipboard.writeText(e.ref.key).then(() => vscode.window.setStatusBarMessage(t('Jiraffe: key {0} copied', e.ref.key), 2500));
     return true;
   }
 
@@ -180,6 +181,7 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
       scriptUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(root, 'issue.js')).toString(),
       styleUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(root, 'common.css')).toString(),
       title: ref.key,
+      l10n: { bundle: getBundle(), locale: locale() },
     });
     const e: Entry = { panel, ref, files: [], inlineUrls: [], tab: 'desc', pinned: false, ready: false, seq: 0, disposed: false };
     panel.webview.onDidReceiveMessage((m: ViewToHost) => this.onMessage(e, m));
@@ -206,7 +208,7 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
     this.render(e); // без card — «загрузка», с card — старые данные, пока не придут новые
     try {
       const inst = this.store.get(ref.instanceId);
-      if (!inst) throw new Error('инстанс удалён — добавьте его заново');
+      if (!inst) throw new Error(t('instance removed — add it again'));
       const loaded = await loadCard(await this.meta.client(inst), inst, ref.key, () => this.meta.workAttributes(inst));
       if (e.disposed || e.seq !== seq) return;
       e.card = loaded.card;

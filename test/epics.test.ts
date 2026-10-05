@@ -209,18 +209,18 @@ describe('разметка', () => {
     expect(html).not.toMatch(/<script|<img| style=/);
     expect(html).toContain('&lt;img src=x');
     expect(html).toContain('data-act="open" data-key="ABC-1"');
-    expect(html).toContain('1 из 2');
+    expect(html).toContain('1 of 2');
     expect(html).toContain('customfield_10100');
   });
   it('эпик на DC без поля — пояснение, не пустая таблица', () => {
     const html = renderEpicPage({ ...base, type: 'epic', key: 'ABC-9', summary: 'E', status: 'Open', statusCategory: 'new', link: null, kind: 'dc', rows: [], progress: progressOf([]) });
-    expect(html).toContain('Поле Epic Link не найдено');
+    expect(html).toContain('The Epic Link field was not found');
   });
   it('релиз: даты, осталось/просрочен, пустая версия', () => {
     const page: ReleasePage = { ...base, type: 'release', id: '5', name: 'R <b>', released: false, releaseDate: '2026-10-14', daysLeft: 10, rows: [row] };
-    expect(renderReleasePage(page)).toContain('осталось 10 дн.');
-    expect(renderReleasePage({ ...page, daysLeft: -2 })).toContain('просрочен на 2 дн.');
-    expect(renderReleasePage({ ...page, rows: [], progress: progressOf([]) })).toContain('В версии пока нет задач');
+    expect(renderReleasePage(page)).toContain('10 d left');
+    expect(renderReleasePage({ ...page, daysLeft: -2 })).toContain('overdue by 2 d');
+    expect(renderReleasePage({ ...page, rows: [], progress: progressOf([]) })).toContain('This version has no issues yet');
     expect(renderReleasePage(page)).not.toMatch(/<b>R|<b>\s*<\/b>R/);
   });
   it('полоса: ширины через data-w', () => {
@@ -357,7 +357,7 @@ describe('доводка приёмки этапа 7', () => {
 
 describe('ошибка раздела проекта', () => {
   it('404 и 400 с ключом проекта — «проект не найден» (DC отвечает 400 на JQL с несуществующим проектом)', () => {
-    const notFound = { text: 'Проект ZZZ не найден или нет доступа', project: true };
+    const notFound = { text: 'Project ZZZ not found or no access', project: true };
     expect(projectErrorText(new JiraError(404, 'x', 'https://h.example/rest'), 'ZZZ')).toEqual(notFound);
     const msg = "Неверный запрос (The value 'ZZZ' does not exist for the field 'project'.)";
     expect(projectErrorText(new JiraError(400, msg, 'https://h.example/rest'), 'ZZZ')).toEqual(notFound);

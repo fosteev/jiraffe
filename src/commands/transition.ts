@@ -2,13 +2,14 @@
 import * as vscode from 'vscode';
 import { noticeText } from '../jira/attachments';
 import type { Transition } from '../jira/client';
-import { MAYBE_SAVED } from '../jira/http';
+import { maybeSaved } from '../jira/http';
 import { browseUrl } from '../panels/card';
 import type { InstanceStore } from '../state/instances';
 import type { InstanceMeta } from '../state/meta';
 import type { IssueRef } from '../views/issuesTree';
 import { pickIssueRef } from './filters';
 import { refOf, type LogWorkPanels } from './logWork';
+import { t } from '../l10n';
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const idOf = (r: IssueRef): string => `${r.instanceId}\n${r.key}`;
@@ -27,7 +28,7 @@ export function registerTransitionCommand(
   const inFlight = new Set<string>();
   return [
     vscode.commands.registerCommand('jiraffe.transition', async (arg?: unknown) => {
-      const ref = refOf(arg) ?? panels.activeRef() ?? (await pickIssueRef(store, meta, undefined, 'Сменить статус: ключ задачи'));
+      const ref = refOf(arg) ?? panels.activeRef() ?? (await pickIssueRef(store, meta, undefined, t('Change Status: issue key')));
       if (!ref) return;
       const inst = store.get(ref.instanceId);
       if (!inst) return;
@@ -37,27 +38,27 @@ export function registerTransitionCommand(
       try {
         const client = await meta.client(inst);
         const list = await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Window, title: `Jiraffe: переходы ${ref.key}…` },
+          { location: vscode.ProgressLocation.Window, title: t('Jiraffe: transitions for {0}…', ref.key) },
           () => client.transitions(ref.key),
         );
         if (!list.length) {
-          void vscode.window.showInformationMessage(`Jiraffe: у ${ref.key} нет доступных переходов`);
+          void vscode.window.showInformationMessage(t('Jiraffe: {0} has no available transitions', ref.key));
           return;
         }
-        const t = await pickTransition(ref.key, list);
-        if (!t) return;
-        const fields = await askFields(inst.baseUrl, ref, t);
+        const tr = await pickTransition(ref.key, list);
+        if (!tr) return;
+        const fields = await askFields(inst.baseUrl, ref, tr);
         if (!fields) return;
         try {
           await vscode.window.withProgress(
-            { location: vscode.ProgressLocation.Notification, title: `Jiraffe: ${ref.key} → ${t.to.name || t.name}…` },
-            () => client.transition(ref.key, t.id, fields),
+            { location: vscode.ProgressLocation.Notification, title: `Jiraffe: ${ref.key} → ${tr.to.name || tr.name}…` },
+            () => client.transition(ref.key, tr.id, fields),
           );
         } catch (e) {
-          if (e instanceof Error && e.message.includes(MAYBE_SAVED)) onDone(ref);
+          if (e instanceof Error && e.message.includes(maybeSaved())) onDone(ref);
           throw e;
         }
-        void vscode.window.showInformationMessage(noticeText(`Jiraffe: ${ref.key} → ${t.to.name || t.name}`, 200));
+        void vscode.window.showInformationMessage(noticeText(`Jiraffe: ${ref.key} → ${tr.to.name || tr.name}`, 200));
         onDone(ref);
       } catch (e) {
         void vscode.window.showErrorMessage(`Jiraffe: ${noticeText(errText(e), 240)}`);
@@ -69,32 +70,32 @@ export function registerTransitionCommand(
 }
 
 async function pickTransition(key: string, list: Transition[]): Promise<Transition | undefined> {
-  const items = list.map((t) => ({
-    label: t.name,
+  const items = list.map((tr) => ({
+    label: tr.name,
     // Имя перехода часто совпадает со статусом — тогда стрелку не дублируем.
-    description: t.to.name && t.to.name !== t.name ? `→ ${t.to.name}` : '',
-    detail: t.fields.length ? `Потребуется: ${t.fields.map((f) => f.name).join(', ')}` : undefined,
-    t,
+    description: tr.to.name && tr.to.name !== tr.name ? `→ ${tr.to.name}` : '',
+    detail: tr.fields.length ? t('Requires: {0}', tr.fields.map((f) => f.name).join(', ')) : undefined,
+    tr,
   }));
-  return (await vscode.window.showQuickPick(items, { title: `Сменить статус · ${key}`, placeHolder: 'Переход', ignoreFocusOut: true }))?.t;
+  return (await vscode.window.showQuickPick(items, { title: t('Change Status · {0}', key), placeHolder: t('Transition'), ignoreFocusOut: true }))?.tr;
 }
 
 /** Значения обязательных полей перехода; undefined — отмена или поле, которое форма не умеет. */
-async function askFields(baseUrl: string, ref: IssueRef, t: Transition): Promise<Record<string, unknown> | undefined> {
-  const unsupported = t.fields.filter((f) => !f.allowedValues?.length);
+async function askFields(baseUrl: string, ref: IssueRef, tr: Transition): Promise<Record<string, unknown> | undefined> {
+  const unsupported = tr.fields.filter((f) => !f.allowedValues?.length);
   if (unsupported.length) {
     const act = await vscode.window.showWarningMessage(
-      noticeText(`Jiraffe: переход «${t.name}» требует полей, которые здесь не заполнить (${unsupported.map((f) => f.name).join(', ')})`, 240),
-      'Открыть в Jira',
+      noticeText(t('Jiraffe: transition “{0}” needs fields that can’t be filled here ({1})', tr.name, unsupported.map((f) => f.name).join(', ')), 240),
+      t('Open in Jira'),
     );
     if (act) void vscode.env.openExternal(vscode.Uri.parse(browseUrl(baseUrl, ref.key)));
     return undefined;
   }
   const out: Record<string, unknown> = {};
-  for (const f of t.fields) {
+  for (const f of tr.fields) {
     const picked = await vscode.window.showQuickPick(
       (f.allowedValues ?? []).map((v) => ({ label: v.name, id: v.id })),
-      { title: `${t.name} · ${ref.key}`, placeHolder: f.name, ignoreFocusOut: true },
+      { title: `${tr.name} · ${ref.key}`, placeHolder: f.name, ignoreFocusOut: true },
     );
     if (!picked) return undefined;
     out[f.id] = f.array ? [{ id: picked.id }] : { id: picked.id };

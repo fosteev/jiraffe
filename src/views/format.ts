@@ -3,8 +3,14 @@ import type { EpicItem } from '../jira/epics';
 import { sortVersions } from '../jira/epics';
 import { JiraError } from '../jira/http';
 import type { IssueSummary, StatusCategory, Version } from '../jira/types';
+import { t } from '../l10n';
 
-export const CATEGORY_LABEL: Record<StatusCategory, string> = { new: 'Открыта', indeterminate: 'В работе', done: 'Готово' };
+// Геттеры: подписи переводятся при обращении, а не при загрузке модуля (до setL10n).
+export const CATEGORY_LABEL: Record<StatusCategory, string> = {
+  get new(): string { return t('To Do'); },
+  get indeterminate(): string { return t('In Progress'); },
+  get done(): string { return t('Done'); },
+};
 
 /** Иконка codicon и id цвета темы по категории статуса. */
 export const CATEGORY_ICON: Record<StatusCategory, { icon: string; color: string }> = {
@@ -23,10 +29,10 @@ export function tooltipMarkdown(i: IssueSummary, instanceName: string): string {
     `**${mdEscape(i.key)}** · ${mdEscape(i.summary)}`,
     '',
     `${mdEscape(i.type)} · ${mdEscape(i.status)} (${CATEGORY_LABEL[i.statusCategory]})`,
-    ...(i.priority ? [`Приоритет: ${mdEscape(i.priority)}`] : []),
-    `Исполнитель: ${i.assignee ? mdEscape(i.assignee.name) : 'не назначен'}`,
-    `Обновлена: ${mdEscape(i.updated.replace('T', ' ').slice(0, 16))}`,
-    `Инстанс: ${mdEscape(instanceName)}`,
+    ...(i.priority ? [t('Priority: {0}', mdEscape(i.priority))] : []),
+    t('Assignee: {0}', i.assignee ? mdEscape(i.assignee.name) : t('unassigned')),
+    t('Updated: {0}', mdEscape(i.updated.replace('T', ' ').slice(0, 16))),
+    t('Instance: {0}', mdEscape(instanceName)),
   ];
   return lines.join('  \n');
 }
@@ -73,7 +79,7 @@ export function projectErrorText(e: unknown, projectKey: string): { text: string
   if (e instanceof JiraError && e.code === 'http') {
     const mentionsKey = new RegExp(`(^|[^A-Za-z0-9_-])${escapeRe(projectKey)}([^A-Za-z0-9_-]|$)`, 'i').test(e.message);
     if (e.status === 404 || (e.status === 400 && mentionsKey)) {
-      return { text: `Проект ${projectKey} не найден или нет доступа`, project: true };
+      return { text: t('Project {0} not found or no access', projectKey), project: true };
     }
   }
   return { text: e instanceof Error ? e.message : String(e), project: false };

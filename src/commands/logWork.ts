@@ -2,7 +2,7 @@
 import * as vscode from 'vscode';
 import { formatDuration, parseDuration } from '../duration';
 import { noticeText } from '../jira/attachments';
-import { MAYBE_SAVED } from '../jira/http';
+import { maybeSaved } from '../jira/http';
 import type { WorkAttribute } from '../jira/tempo';
 import type { Instance } from '../jira/types';
 import {
@@ -13,6 +13,7 @@ import type { InstanceStore } from '../state/instances';
 import type { InstanceMeta } from '../state/meta';
 import type { IssueRef } from '../views/issuesTree';
 import { pickIssueRef } from './filters';
+import { t } from '../l10n';
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const idOf = (r: IssueRef): string => `${r.instanceId}\n${r.key}`;
@@ -51,7 +52,7 @@ export class WorklogService {
       try {
         attrs = await this.meta.workAttributes(inst);
       } catch (e) {
-        throw new Error(`не удалось загрузить рабочие атрибуты Tempo: ${errText(e)}`);
+        throw new Error(t('could not load Tempo work attributes: {0}', errText(e)));
       }
     }
     return logFormFor(tempo, attrs);
@@ -59,15 +60,15 @@ export class WorklogService {
 
   async submit(ref: IssueRef, draft: unknown): Promise<SubmitResult> {
     const inst = this.store.get(ref.instanceId);
-    if (!inst) return { ok: false, error: 'Инстанс удалён — добавьте его заново' };
-    if (!isIssueKey(ref.key)) return { ok: false, error: 'Неверный ключ задачи' };
+    if (!inst) return { ok: false, error: t('The instance was removed — add it again') };
+    if (!isIssueKey(ref.key)) return { ok: false, error: t('Invalid issue key') };
     const id = idOf(ref);
-    if (this.inFlight.has(id)) return { ok: false, error: 'Запись в эту задачу уже идёт — дождитесь ответа Jira' };
+    if (this.inFlight.has(id)) return { ok: false, error: t('A worklog for this issue is already being sent — wait for Jira to respond') };
     const unsureAt = this.unsure.get(id);
     this.unsure.delete(id);
     if (unsureAt !== undefined && Date.now() - unsureAt < UNSURE_MS) {
       // Повтор сразу после таймаута/5xx — частый источник дублей: первый раз останавливаем, второй — отправляем.
-      return { ok: false, error: 'Предыдущая отправка в эту задачу закончилась без ответа — запись могла сохраниться. Проверьте «Журнал работ» задачи; если записи нет, отправьте ещё раз.' };
+      return { ok: false, error: t('The previous submission to this issue ended without a response — the worklog may have been saved. Check the issue’s Work Log; if it’s not there, submit again.') };
     }
     // Флаг ставится до первого await: два сообщения подряд (двойной клик, Enter + клик) не должны оба пройти проверку.
     this.inFlight.add(id);
@@ -83,17 +84,17 @@ export class WorklogService {
       const { req } = v;
       const client = await this.meta.client(inst);
       const r = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Jiraffe: записываю ${formatDuration(req.timeSpentSec)} в ${ref.key}…` },
+        { location: vscode.ProgressLocation.Notification, title: t('Jiraffe: logging {0} to {1}…', formatDuration(req.timeSpentSec), ref.key) },
         () => submitWorklog(client, ref.key, form, req),
       );
-      const when = req.date === localDate() ? '' : ` за ${req.date}`;
-      void vscode.window.showInformationMessage(noticeText(`Jiraffe: Залогано ${formatDuration(req.timeSpentSec)} в ${ref.key}${when} · ${r.via === 'tempo' ? 'Tempo' : 'журнал Jira'}`, 200));
+      const when = req.date === localDate() ? '' : t(' for {0}', req.date);
+      void vscode.window.showInformationMessage(noticeText(t('Jiraffe: Logged {0} to {1}{2} · {3}', formatDuration(req.timeSpentSec), ref.key, when, r.via === 'tempo' ? 'Tempo' : t('Jira worklog')), 200));
       this.fire(ref);
       return { ok: true };
     } catch (e) {
       // Обрыв/таймаут после отправки: запись могла пройти — обновим карточку и сводку, чтобы это было видно.
       // Сервер мог закоммитить позже нашего GET — перечитываем ещё раз с задержкой.
-      if (e instanceof Error && e.message.includes(MAYBE_SAVED)) {
+      if (e instanceof Error && e.message.includes(maybeSaved())) {
         this.unsure.set(id, Date.now());
         this.fire(ref);
         setTimeout(() => this.fire(ref), RELOAD_AFTER_UNSURE_MS);
@@ -137,7 +138,7 @@ export interface LogWorkPanels {
 export function registerLogWorkCommand(service: WorklogService, panels: LogWorkPanels, store: InstanceStore, meta: InstanceMeta): vscode.Disposable[] {
   return [
     vscode.commands.registerCommand('jiraffe.logWork', async (arg?: unknown) => {
-      const ref = refOf(arg) ?? panels.activeRef() ?? (await pickIssueRef(store, meta, undefined, 'Залогать время: ключ задачи'));
+      const ref = refOf(arg) ?? panels.activeRef() ?? (await pickIssueRef(store, meta, undefined, t('Log Work: issue key')));
       if (!ref) return;
       if (await panels.showLogForm(ref)) return;
       await quickLog(service, store, ref);
@@ -151,47 +152,47 @@ async function quickLog(service: WorklogService, store: InstanceStore, ref: Issu
   let form: LogForm;
   try {
     form = inst.caps?.tempo
-      ? await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Jiraffe: атрибуты Tempo…' }, () => service.form(inst))
+      ? await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: t('Jiraffe: Tempo attributes…') }, () => service.form(inst))
       : await service.form(inst);
   } catch (e) {
     void vscode.window.showErrorMessage(`Jiraffe: ${noticeText(errText(e))}`);
     return;
   }
-  const title = `Залогать время · ${ref.key}${form.tempo ? ' · Tempo' : ''}`;
+  const title = t('Log Work · {0}', ref.key) + (form.tempo ? ' · Tempo' : '');
   if (form.unsupportedRequired.length) {
-    void vscode.window.showWarningMessage(noticeText(`Jiraffe: обязательные атрибуты Tempo не поддерживаются формой (${form.unsupportedRequired.join(', ')}) — Tempo может отклонить запись`, 240));
+    void vscode.window.showWarningMessage(noticeText(t('Jiraffe: required Tempo attributes are not supported by the form ({0}) — Tempo may reject the entry', form.unsupportedRequired.join(', ')), 240));
   }
   const duration = await vscode.window.showInputBox({
     title: `${title} (1/4)`,
-    prompt: 'Потрачено: 1ч 30м · 1h30m · 90m · 1.5h',
-    placeHolder: '1ч 30м',
+    prompt: t('Spent: 1h 30m · 1h30m · 90m · 1.5h'),
+    placeHolder: t('1h 30m'),
     ignoreFocusOut: true,
     validateInput: (v) => {
       const s = parseDuration(v);
-      if (!s) return 'Не понял длительность. Например, 1ч 30м или 90m';
-      return s > MAX_LOG_SEC ? 'Больше суток за одну запись' : undefined;
+      if (!s) return t('Can’t parse the duration. Example: 1h 30m or 90m');
+      return s > MAX_LOG_SEC ? t('More than a day in one entry') : undefined;
     },
   });
   if (duration === undefined) return;
   const date = await pickDate(`${title} (2/4)`);
   if (!date) return;
-  const comment = await vscode.window.showInputBox({ title: `${title} (3/4)`, prompt: 'Комментарий (необязательно)', placeHolder: 'Что сделано', ignoreFocusOut: true });
+  const comment = await vscode.window.showInputBox({ title: `${title} (3/4)`, prompt: t('Comment (optional)'), placeHolder: t('What was done'), ignoreFocusOut: true });
   if (comment === undefined) return;
   const attributes: Record<string, string> = {};
   let aiTokens = '';
   const aiAttr = form.attributes.find((a) => a.key === form.aiTokensAttr);
   const tokens = await vscode.window.showInputBox({
     title: `${title} (4/4)`,
-    prompt: `${aiAttr?.name ?? 'AI Tokens'}${aiAttr?.required ? '' : ' (необязательно)'}${form.aiTokensAttr ? ' — атрибут Tempo' : ' — допишется в комментарий «(AI Tokens: N)»'}`,
-    placeHolder: 'например, 120000',
+    prompt: `${aiAttr?.name ?? 'AI Tokens'}${aiAttr?.required ? '' : t(' (optional)')}${form.aiTokensAttr ? t(' — Tempo attribute') : t(' — will be appended to the comment as “(AI Tokens: N)”')}`,
+    placeHolder: t('e.g. 120000'),
     ignoreFocusOut: true,
-    validateInput: (v) => (parseTokens(v) === undefined ? 'Целое число' : aiAttr?.required && parseTokens(v) === null ? 'Обязательное поле' : undefined),
+    validateInput: (v) => (parseTokens(v) === undefined ? t('Whole number') : aiAttr?.required && parseTokens(v) === null ? t('Required field') : undefined),
   });
   if (tokens === undefined) return;
   aiTokens = tokens;
   for (const a of form.attributes) {
     if (a.key === form.aiTokensAttr) continue;
-    const v = await askAttribute(a, `${title} · атрибуты`);
+    const v = await askAttribute(a, t('{0} · attributes', title));
     if (v === undefined) return;
     if (v) attributes[a.key] = v;
   }
@@ -204,35 +205,35 @@ async function pickDate(title: string): Promise<string | undefined> {
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
   const items = [
-    { label: 'Сегодня', description: localDate(today), date: localDate(today) },
-    { label: 'Вчера', description: localDate(yesterday), date: localDate(yesterday) },
-    { label: 'Другая дата…', date: '' },
+    { label: t('Today'), description: localDate(today), date: localDate(today) },
+    { label: t('Yesterday'), description: localDate(yesterday), date: localDate(yesterday) },
+    { label: t('Another date…'), date: '' },
   ];
-  const picked = await vscode.window.showQuickPick(items, { title, placeHolder: 'Дата записи', ignoreFocusOut: true });
+  const picked = await vscode.window.showQuickPick(items, { title, placeHolder: t('Entry date'), ignoreFocusOut: true });
   if (!picked) return undefined;
   if (picked.date) return picked.date;
   return vscode.window.showInputBox({
-    title, prompt: 'Дата в формате ГГГГ-ММ-ДД', value: localDate(today), ignoreFocusOut: true,
-    validateInput: (v) => (!isIsoDate(v.trim()) ? 'Дата вида 2026-10-04' : v.trim() > localDate() ? 'Дата в будущем' : undefined),
+    title, prompt: t('Date as YYYY-MM-DD'), value: localDate(today), ignoreFocusOut: true,
+    validateInput: (v) => (!isIsoDate(v.trim()) ? t('Date like 2026-10-04') : v.trim() > localDate() ? t('Date in the future') : undefined),
   }).then((v) => v?.trim());
 }
 
 /** Значение атрибута: '' — не указан, undefined — отмена. */
 async function askAttribute(a: WorkAttribute, title: string): Promise<string | undefined> {
-  const opt = a.required ? '' : ' (необязательно)';
+  const opt = a.required ? '' : t(' (optional)');
   if (a.kind === 'list') {
-    const items = [...(a.required ? [] : [{ label: '— не указывать', value: '' }]), ...(a.values ?? []).map((v) => ({ label: v.name, value: v.value }))];
+    const items = [...(a.required ? [] : [{ label: t('— leave empty'), value: '' }]), ...(a.values ?? []).map((v) => ({ label: v.name, value: v.value }))];
     return (await vscode.window.showQuickPick(items, { title, placeHolder: `${a.name}${opt}`, ignoreFocusOut: true }))?.value;
   }
   if (a.kind === 'checkbox') {
-    const items = [{ label: 'Да', value: 'true' }, { label: 'Нет', value: '' }];
+    const items = [{ label: t('Yes'), value: 'true' }, { label: t('No'), value: '' }];
     return (await vscode.window.showQuickPick(items, { title, placeHolder: a.name, ignoreFocusOut: true }))?.value;
   }
   return vscode.window.showInputBox({
     title, prompt: `${a.name}${opt}`, ignoreFocusOut: true,
     validateInput: (v) => {
-      if (a.required && !v.trim()) return 'Обязательное поле';
-      if (a.kind === 'number' && v.trim() && !/^-?\d{1,15}(?:[.,]\d{1,6})?$/.test(v.trim())) return 'Число';
+      if (a.required && !v.trim()) return t('Required field');
+      if (a.kind === 'number' && v.trim() && !/^-?\d{1,15}(?:[.,]\d{1,6})?$/.test(v.trim())) return t('Number');
       return undefined;
     },
   });

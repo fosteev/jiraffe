@@ -1,4 +1,5 @@
 // Webview раздела «Tempo»: рисует сводку «сегодня» (today.ts), шлёт действия в хост.
+import './l10nInit';
 import type { HostToTempo, TempoToHost } from '../src/panels/protocol';
 import { renderToday } from './today';
 

@@ -4,6 +4,7 @@ import { createJiraClient, type JiraClient, type MyselfInfo, type NamedRef, type
 import { TempoClient, type WorkAttribute } from '../jira/tempo';
 import type { Instance } from '../jira/types';
 import type { InstanceStore } from './instances';
+import { t } from '../l10n';
 
 type Factory = typeof createJiraClient;
 
@@ -28,7 +29,7 @@ export class InstanceMeta {
 
   async client(inst: Instance): Promise<JiraClient> {
     const token = await this.store.getToken(inst.id);
-    if (!token) throw new Error('токен не найден в SecretStorage — добавьте инстанс заново');
+    if (!token) throw new Error(t('token not found in SecretStorage — add the instance again'));
     return this.factory(inst, token);
   }
 

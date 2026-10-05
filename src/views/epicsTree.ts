@@ -4,6 +4,7 @@ import type { PageRequest } from '../jira/client';
 import type { InstanceMeta } from '../state/meta';
 import type { InstanceStore } from '../state/instances';
 import type { SectionProject } from '../state/sectionProject';
+import { t } from '../l10n';
 import { CATEGORY_LABEL, hostOf, mdEscape, progressLabel, projectErrorText } from './format';
 
 type Node =
@@ -61,20 +62,20 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
         item.description = prog ? `${e.key} · ${prog}` : e.key;
         item.iconPath = new vscode.ThemeIcon('zap', new vscode.ThemeColor('charts.purple'));
         const lines = [`**${mdEscape(e.key)}** · ${mdEscape(e.summary)}`, '', `${mdEscape(e.status)} (${CATEGORY_LABEL[e.statusCategory]})`];
-        if (e.progress) lines.push(`Готово ${e.progress.done} из ${e.progress.total}, в работе ${e.progress.prog}, не начато ${e.progress.todo}${e.partial ? ' (задач больше лимита запроса — цифры приблизительные)' : ''}`);
-        else lines.push('Прогресс недоступен');
+        if (e.progress) lines.push(t('Done {0} of {1}, in progress {2}, not started {3}{4}', e.progress.done, e.progress.total, e.progress.prog, e.progress.todo, e.partial ? ` ${t('(more issues than the query limit — figures are approximate)')}` : ''));
+        else lines.push(t('Progress unavailable'));
         item.tooltip = new vscode.MarkdownString(lines.join('  \n'));
         item.contextValue = 'epic';
-        if (sel) item.command = { command: 'jiraffe.openEpic', title: 'Открыть эпик', arguments: [{ instanceId: sel.instanceId, key: e.key }] };
+        if (sel) item.command = { command: 'jiraffe.openEpic', title: t('Open Epic'), arguments: [{ instanceId: sel.instanceId, key: e.key }] };
         return item;
       }
       case 'more': {
         const st = this.state;
-        const item = new vscode.TreeItem(st?.loadingMore ? 'Загружаю…' : 'Загрузить ещё', vscode.TreeItemCollapsibleState.None);
+        const item = new vscode.TreeItem(st?.loadingMore ? t('Loading more…') : t('Load More'), vscode.TreeItemCollapsibleState.None);
         item.id = 'epics-more';
         item.iconPath = new vscode.ThemeIcon(st?.loadingMore ? 'loading~spin' : 'ellipsis');
-        item.description = st ? `показано ${st.epics.length}` : undefined;
-        item.command = { command: 'jiraffe.loadMoreEpics', title: 'Загрузить ещё' };
+        item.description = st ? t('shown {0}', st.epics.length) : undefined;
+        item.command = { command: 'jiraffe.loadMoreEpics', title: t('Load More') };
         return item;
       }
       case 'error': {
@@ -82,11 +83,11 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
         item.id = 'epics-err';
         item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
         if (n.project) {
-          item.tooltip = `${n.message}\n\nНажмите — выбрать другой проект`;
-          item.command = { command: 'jiraffe.pickEpicProject', title: 'Выбрать проект' };
+          item.tooltip = `${n.message}\n\n${t('Click to pick another project')}`;
+          item.command = { command: 'jiraffe.pickEpicProject', title: t('Select Project') };
         } else {
-          item.tooltip = `${n.message}\n\nНажмите — проверить подключение; «Обновить» в заголовке раздела — повторить запрос`;
-          item.command = { command: 'jiraffe.testConnection', title: 'Проверить подключение', arguments: [n.instanceId] };
+          item.tooltip = `${n.message}\n\n${t('Click to test the connection; “Refresh” in the section header retries the request')}`;
+          item.command = { command: 'jiraffe.testConnection', title: t('Test Connection'), arguments: [n.instanceId] };
         }
         return item;
       }
@@ -103,17 +104,17 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
     if (n) return [];
     if (!this.store.list().length) return [];
     const sel = this.project.get();
-    if (!sel) return [{ kind: 'hint', id: 'no-project', text: 'Выберите проект (кнопка в заголовке)', command: 'jiraffe.pickEpicProject' }];
-    if (!this.store.get(sel.instanceId)) return [{ kind: 'hint', id: 'no-inst', text: 'Инстанс проекта удалён — выберите проект', command: 'jiraffe.pickEpicProject' }];
-    if (!this.store.visible(sel.instanceId)) return [{ kind: 'hint', id: 'out-of-scope', text: 'Инстанс проекта не входит в этот workspace — выберите проект', command: 'jiraffe.pickEpicProject' }];
+    if (!sel) return [{ kind: 'hint', id: 'no-project', text: t('Select a project (button in the header)'), command: 'jiraffe.pickEpicProject' }];
+    if (!this.store.get(sel.instanceId)) return [{ kind: 'hint', id: 'no-inst', text: t('The project’s instance was removed — select a project'), command: 'jiraffe.pickEpicProject' }];
+    if (!this.store.visible(sel.instanceId)) return [{ kind: 'hint', id: 'out-of-scope', text: t('The project’s instance is not in this workspace — select a project'), command: 'jiraffe.pickEpicProject' }];
     const st = this.state;
     if (!st) {
       void this.load();
-      return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
+      return [{ kind: 'hint', id: 'loading', text: t('Loading…') }];
     }
-    if (st.loading) return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
+    if (st.loading) return [{ kind: 'hint', id: 'loading', text: t('Loading…') }];
     if (st.error) return [{ kind: 'error', message: st.error, project: !!st.errorIsProject, instanceId: sel.instanceId }];
-    if (!st.epics.length) return [{ kind: 'hint', id: 'empty', text: `В ${sel.key} нет нерешённых эпиков` }];
+    if (!st.epics.length) return [{ kind: 'hint', id: 'empty', text: t('No unresolved epics in {0}', sel.key) }];
     return [...st.epics.map((epic): Node => ({ kind: 'epic', epic })), ...(st.next ? [{ kind: 'more' } as Node] : [])];
   }
 
@@ -159,7 +160,7 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
       st.next = r.next;
     } catch (e) {
       if (gen !== this.gen) return;
-      void vscode.window.showErrorMessage(`Jiraffe: «${inst.name}» — не удалось догрузить эпики: ${errText(e)}`);
+      void vscode.window.showErrorMessage(t('Jiraffe: "{0}" — failed to load more epics: {1}', inst.name, errText(e)));
     }
     st.loadingMore = false;
     this.emitter.fire(undefined);

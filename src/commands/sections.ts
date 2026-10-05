@@ -5,17 +5,18 @@ import type { InstanceMeta } from '../state/meta';
 import type { SectionProject } from '../state/sectionProject';
 import { hostOf } from '../views/format';
 import type { EpicsTree } from '../views/epicsTree';
+import { t } from '../l10n';
 
 /** QuickPick проекта (по всем инстансам) для раздела «Эпики» / «Релизы»; выбор пишется в `target`. */
 async function pickSectionProject(store: InstanceStore, meta: InstanceMeta, target: SectionProject, title: string): Promise<void> {
   const all = store.list();
   if (!all.length) {
-    const act = await vscode.window.showInformationMessage('Jiraffe: нет ни одного инстанса', 'Добавить');
+    const act = await vscode.window.showInformationMessage(t('Jiraffe: no instances yet'), t('Add'));
     if (act) await vscode.commands.executeCommand('jiraffe.addInstance');
     return;
   }
-  const { ok, failed } = await withProgress('Jiraffe: загружаю проекты…', () => perInstance(all, (i) => meta.projects(i)));
-  if (failed.length) void vscode.window.showWarningMessage(`Jiraffe: проекты не загрузились — ${failed.join('; ')}`);
+  const { ok, failed } = await withProgress(t('Jiraffe: loading projects…'), () => perInstance(all, (i) => meta.projects(i)));
+  if (failed.length) void vscode.window.showWarningMessage(t('Jiraffe: projects failed to load — {0}', failed.join('; ')));
   type Item = vscode.QuickPickItem & { sel?: { instanceId: string; key: string } };
   const items: Item[] = [];
   for (const [inst, projects] of ok) {
@@ -25,10 +26,10 @@ async function pickSectionProject(store: InstanceStore, meta: InstanceMeta, targ
     }
   }
   if (!items.length) {
-    void vscode.window.showInformationMessage('Jiraffe: проектов не найдено');
+    void vscode.window.showInformationMessage(t('Jiraffe: no projects found'));
     return;
   }
-  const picked = await vscode.window.showQuickPick(items, { title, placeHolder: 'Проект', matchOnDescription: true });
+  const picked = await vscode.window.showQuickPick(items, { title, placeHolder: t('Project'), matchOnDescription: true });
   if (picked?.sel) target.set(picked.sel);
 }
 
@@ -36,8 +37,8 @@ export function registerSectionCommands(
   store: InstanceStore, meta: InstanceMeta, epicProject: SectionProject, releaseProject: SectionProject, epics: EpicsTree,
 ): vscode.Disposable[] {
   return [
-    vscode.commands.registerCommand('jiraffe.pickEpicProject', () => pickSectionProject(store, meta, epicProject, 'Проект для раздела «Эпики»')),
-    vscode.commands.registerCommand('jiraffe.pickReleaseProject', () => pickSectionProject(store, meta, releaseProject, 'Проект для раздела «Релизы»')),
+    vscode.commands.registerCommand('jiraffe.pickEpicProject', () => pickSectionProject(store, meta, epicProject, t('Project for the Epics Section'))),
+    vscode.commands.registerCommand('jiraffe.pickReleaseProject', () => pickSectionProject(store, meta, releaseProject, t('Project for the Releases Section'))),
     vscode.commands.registerCommand('jiraffe.loadMoreEpics', () => epics.loadMore()),
   ];
 }

@@ -3,7 +3,7 @@ import type { Version } from '../jira/types';
 import type { InstanceMeta } from '../state/meta';
 import type { InstanceStore } from '../state/instances';
 import type { SectionProject } from '../state/sectionProject';
-import { plural } from '../state/filters';
+import { t, tn } from '../l10n';
 import { hostOf, mdEscape, projectErrorText, visibleVersions } from './format';
 
 type Node =
@@ -58,13 +58,13 @@ export class ReleasesTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
         const item = new vscode.TreeItem(v.name, vscode.TreeItemCollapsibleState.None);
         item.id = `rel:${sel?.instanceId}:${v.id}`;
         const c = this.state?.counts.get(v.id);
-        const date = v.releaseDate ? ddmmyyyy(v.releaseDate) : 'без даты';
-        const count = typeof c === 'number' ? ` · ${c} ${plural(c, 'задача', 'задачи', 'задач')}` : '';
+        const date = v.releaseDate ? ddmmyyyy(v.releaseDate) : t('no date');
+        const count = typeof c === 'number' ? ` · ${tn(c, '{0} issue|{0} issues')}` : '';
         item.description = `${date}${count}`;
         item.iconPath = v.released ? new vscode.ThemeIcon('pass', new vscode.ThemeColor('charts.green')) : new vscode.ThemeIcon(v.overdue ? 'warning' : 'circle-large-outline');
-        item.tooltip = new vscode.MarkdownString([`**${mdEscape(v.name)}** · ${v.released ? 'выпущен' : v.overdue ? 'не выпущен, просрочен' : 'не выпущен'}`, ...(v.description ? ['', mdEscape(v.description)] : [])].join('  \n'));
+        item.tooltip = new vscode.MarkdownString([`**${mdEscape(v.name)}** · ${v.released ? t('released') : v.overdue ? t('unreleased, overdue') : t('unreleased')}`, ...(v.description ? ['', mdEscape(v.description)] : [])].join('  \n'));
         item.contextValue = 'release';
-        if (sel) item.command = { command: 'jiraffe.openRelease', title: 'Открыть релиз', arguments: [{ instanceId: sel.instanceId, id: v.id }] };
+        if (sel) item.command = { command: 'jiraffe.openRelease', title: t('Open Release'), arguments: [{ instanceId: sel.instanceId, id: v.id }] };
         return item;
       }
       case 'error': {
@@ -72,11 +72,11 @@ export class ReleasesTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
         item.id = 'rel-err';
         item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
         if (n.project) {
-          item.tooltip = `${n.message}\n\nНажмите — выбрать другой проект`;
-          item.command = { command: 'jiraffe.pickReleaseProject', title: 'Выбрать проект' };
+          item.tooltip = `${n.message}\n\n${t('Click to pick another project')}`;
+          item.command = { command: 'jiraffe.pickReleaseProject', title: t('Select Project') };
         } else {
-          item.tooltip = `${n.message}\n\nНажмите — проверить подключение; «Обновить» в заголовке раздела — повторить запрос`;
-          item.command = { command: 'jiraffe.testConnection', title: 'Проверить подключение', arguments: [n.instanceId] };
+          item.tooltip = `${n.message}\n\n${t('Click to test the connection; “Refresh” in the section header retries the request')}`;
+          item.command = { command: 'jiraffe.testConnection', title: t('Test Connection'), arguments: [n.instanceId] };
         }
         return item;
       }
@@ -93,20 +93,20 @@ export class ReleasesTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
     if (n) return [];
     if (!this.store.list().length) return [];
     const sel = this.project.get();
-    if (!sel) return [{ kind: 'hint', id: 'no-project', text: 'Выберите проект (кнопка в заголовке)', command: 'jiraffe.pickReleaseProject' }];
-    if (!this.store.get(sel.instanceId)) return [{ kind: 'hint', id: 'no-inst', text: 'Инстанс проекта удалён — выберите проект', command: 'jiraffe.pickReleaseProject' }];
-    if (!this.store.visible(sel.instanceId)) return [{ kind: 'hint', id: 'out-of-scope', text: 'Инстанс проекта не входит в этот workspace — выберите проект', command: 'jiraffe.pickReleaseProject' }];
+    if (!sel) return [{ kind: 'hint', id: 'no-project', text: t('Select a project (button in the header)'), command: 'jiraffe.pickReleaseProject' }];
+    if (!this.store.get(sel.instanceId)) return [{ kind: 'hint', id: 'no-inst', text: t('The project’s instance was removed — select a project'), command: 'jiraffe.pickReleaseProject' }];
+    if (!this.store.visible(sel.instanceId)) return [{ kind: 'hint', id: 'out-of-scope', text: t('The project’s instance is not in this workspace — select a project'), command: 'jiraffe.pickReleaseProject' }];
     const st = this.state;
     if (!st) {
       void this.load();
-      return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
+      return [{ kind: 'hint', id: 'loading', text: t('Loading…') }];
     }
-    if (st.loading) return [{ kind: 'hint', id: 'loading', text: 'Загрузка…' }];
+    if (st.loading) return [{ kind: 'hint', id: 'loading', text: t('Loading…') }];
     if (st.error) return [{ kind: 'error', message: st.error, project: !!st.errorIsProject, instanceId: sel.instanceId }];
-    if (!st.versions.length) return [{ kind: 'hint', id: 'empty', text: `В ${sel.key} нет версий` }];
+    if (!st.versions.length) return [{ kind: 'hint', id: 'empty', text: t('No versions in {0}', sel.key) }];
     return [
       ...st.versions.map((v): Node => ({ kind: 'version', v })),
-      ...(st.hidden ? [{ kind: 'hint', id: 'hidden', text: `Ещё ${st.hidden} выпущенных скрыто` } as Node] : []),
+      ...(st.hidden ? [{ kind: 'hint', id: 'hidden', text: t('Another {0} released hidden', st.hidden) } as Node] : []),
     ];
   }
 

@@ -1,5 +1,7 @@
 // Webview карточки задачи: слушает сообщения хоста, рисует render.ts, шлёт действия обратно.
+import './l10nInit';
 import { parseDuration } from '../src/duration';
+import { t } from '../src/l10n';
 import { ISSUE_TABS, type HostToView, type IssueTab, type ViewToHost } from '../src/panels/protocol';
 import { esc, renderCard, renderLightbox, renderLogDialog } from './render';
 
@@ -68,7 +70,7 @@ function apply(el: HTMLElement, id: string, r: { dataUri?: string; error?: strin
   } else {
     el.removeAttribute('data-img');
     el.classList.add('err');
-    el.textContent = `[картинка не загрузилась: ${r.error ?? 'неизвестная ошибка'}]`;
+    el.textContent = t('[image failed to load: {0}]', r.error ?? t('unknown error'));
   }
 }
 
@@ -124,7 +126,7 @@ function setBusy(busy: boolean): void {
   const btn = dlgEl<HTMLButtonElement>('[data-act="log-save"]');
   if (btn) {
     btn.disabled = busy;
-    btn.textContent = busy ? 'Записываю…' : 'Залогать';
+    btn.textContent = busy ? t('Saving…') : t('Log');
   }
 }
 
@@ -134,7 +136,7 @@ function submitLog(): void {
   const val = (sel: string): string => dlgEl<HTMLInputElement | HTMLTextAreaElement>(sel)?.value ?? '';
   const duration = val('#lg-dur');
   if (!parseDuration(duration)) {
-    showLogError('Не понял длительность. Напишите, например, 1ч 30м или 90m.', 'duration');
+    showLogError(t('Could not parse the duration. Try, for example, 1h 30m or 90m.'), 'duration');
     return;
   }
   const attributes = Object.fromEntries([...dlgRoot.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-attr]')].map((el) => [
@@ -161,9 +163,9 @@ window.addEventListener('message', (ev: MessageEvent<HostToView>) => {
   if (m.type === 'loading' || m.type === 'error') dropStaleDialog(m.instanceId, m.key);
   if (m.type === 'loading') {
     // Та же задача (обновление) — оставляем старые данные до ответа; другая (в т.ч. тот же ключ на другом инстансе) — экран загрузки.
-    if (!current || current.issue.key !== m.key || current.instanceId !== m.instanceId) note(`Загрузка ${esc(m.key)}…`);
+    if (!current || current.issue.key !== m.key || current.instanceId !== m.instanceId) note(esc(t('Loading {0}…', m.key)));
   } else if (m.type === 'error') {
-    note(`${esc(m.message)}<br><button class="btn" data-act="retry" data-key="${esc(m.key)}">Повторить</button>`, 'err');
+    note(`${esc(m.message)}<br><button class="btn" data-act="retry" data-key="${esc(m.key)}">${t('Retry')}</button>`, 'err');
   } else if (m.type === 'issue') {
     dropStaleDialog(m.data.instanceId, m.data.issue.key);
     const s = savedState();
@@ -196,7 +198,7 @@ window.addEventListener('message', (ev: MessageEvent<HostToView>) => {
     if (!dialog || dialog.instanceId !== m.instanceId || dialog.key !== m.key) return;
     setBusy(false);
     if (!m.ok) {
-      showLogError(m.error ?? 'Не удалось залогать время', m.field);
+      showLogError(m.error ?? t('Failed to log work'), m.field);
       return;
     }
     closeDialog(true);
@@ -239,16 +241,16 @@ window.addEventListener('keydown', (ev) => {
 });
 
 app.addEventListener('click', (ev) => {
-  const t = ev.target as HTMLElement;
+  const tg = ev.target as HTMLElement;
   // Картинка описания — в лайтбокс, даже если Jira обернула её в ссылку на вложение.
-  const zoom = t.closest<HTMLImageElement>('img[data-zoom]');
+  const zoom = tg.closest<HTMLImageElement>('img[data-zoom]');
   if (zoom && app.contains(zoom)) {
     ev.preventDefault();
     ev.stopPropagation();
-    openLightbox(renderLightbox(zoom.dataset.zoom ?? '', zoom.alt || 'картинка'));
+    openLightbox(renderLightbox(zoom.dataset.zoom ?? '', zoom.alt || t('image')));
     return;
   }
-  const link = t.closest<HTMLAnchorElement>('a[href]');
+  const link = tg.closest<HTMLAnchorElement>('a[href]');
   if (link && app.contains(link)) {
     // stopPropagation обязателен: у VS Code в iframe свой обработчик кликов по ссылкам (defaultPrevented не смотрит) — иначе ссылка откроется дважды.
     ev.preventDefault();
@@ -256,7 +258,7 @@ app.addEventListener('click', (ev) => {
     vscode.postMessage({ type: 'openExternal', url: link.href });
     return;
   }
-  const el = t.closest<HTMLElement>('[data-act]');
+  const el = tg.closest<HTMLElement>('[data-act]');
   if (!el || el.hasAttribute('disabled')) return;
   switch (el.dataset.act) {
     case 'tab': {
@@ -285,7 +287,7 @@ app.addEventListener('click', (ev) => {
     case 'openAtt': if (current && el.dataset.id) vscode.postMessage({ type: 'openAttachment', instanceId: current.instanceId, key: current.issue.key, id: el.dataset.id }); break;
     case 'dlAll': if (current) vscode.postMessage({ type: 'downloadAll', instanceId: current.instanceId, key: current.issue.key }); break;
     case 'ov-x': closeLightbox(); break;
-    case 'ov-bg': if (t === el) closeLightbox(); break; // клик по фону, не по содержимому лайтбокса
+    case 'ov-bg': if (tg === el) closeLightbox(); break; // клик по фону, не по содержимому лайтбокса
   }
 });
 

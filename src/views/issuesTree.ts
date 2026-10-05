@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { JiraError } from '../jira/http';
 import type { IssueSummary, SearchPage } from '../jira/types';
+import { t } from '../l10n';
 import { isIssueKey } from '../jql';
 import { describeFilters, type FilterState } from '../state/filters';
 import type { InstanceMeta } from '../state/meta';
@@ -81,7 +82,7 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         item.id = `inst:${n.id}`;
         item.iconPath = new vscode.ThemeIcon(st?.error ? 'error' : 'server');
         const host = inst ? hostOf(inst.baseUrl) : '';
-        item.description = !st || st.loading ? `${host} · загрузка…` : st.error ? host : `${host} · ${countLabel(st.issues.length, st.total, !!st.next)}`;
+        item.description = !st || st.loading ? `${host} · ${t('loading…')}` : st.error ? host : `${host} · ${countLabel(st.issues.length, st.total, !!st.next)}`;
         item.tooltip = st?.jql ? new vscode.MarkdownString(`\`${st.jql.replace(/`/g, "'")}\``) : host;
         item.contextValue = 'instance';
         return item;
@@ -95,16 +96,16 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         item.iconPath = new vscode.ThemeIcon(icon, new vscode.ThemeColor(color));
         item.tooltip = new vscode.MarkdownString(tooltipMarkdown(i, this.store.get(n.instanceId)?.name ?? n.instanceId));
         item.contextValue = 'issue';
-        item.command = { command: 'jiraffe.openIssue', title: 'Открыть задачу', arguments: [{ instanceId: n.instanceId, key: i.key } satisfies IssueRef] };
+        item.command = { command: 'jiraffe.openIssue', title: t('Open Issue'), arguments: [{ instanceId: n.instanceId, key: i.key } satisfies IssueRef] };
         return item;
       }
       case 'more': {
         const st = this.states.get(n.instanceId);
-        const item = new vscode.TreeItem(st?.loadingMore ? 'Загружаю…' : 'Загрузить ещё', vscode.TreeItemCollapsibleState.None);
+        const item = new vscode.TreeItem(st?.loadingMore ? t('Loading more…') : t('Load More'), vscode.TreeItemCollapsibleState.None);
         item.id = `more:${n.instanceId}`;
         item.iconPath = new vscode.ThemeIcon(st?.loadingMore ? 'loading~spin' : 'ellipsis');
-        item.description = st ? `показано ${st.issues.length}${st.total !== undefined ? ` из ${st.total}` : ''}` : undefined;
-        item.command = { command: 'jiraffe.loadMore', title: 'Загрузить ещё', arguments: [n.instanceId] };
+        item.description = st ? st.total !== undefined ? t('shown {0} of {1}', st.issues.length, st.total) : t('shown {0}', st.issues.length) : undefined;
+        item.command = { command: 'jiraffe.loadMore', title: t('Load More'), arguments: [n.instanceId] };
         return item;
       }
       case 'error': {
@@ -112,10 +113,10 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         item.id = `err:${n.instanceId}`;
         item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
         if (n.query) {
-          item.tooltip = `${n.message}\n\nОшибка в запросе — поправьте JQL или фильтры`;
+          item.tooltip = `${n.message}\n\n${t('Query error — fix the JQL or filters')}`;
         } else {
-          item.tooltip = `${n.message}\n\nНажмите — проверить подключение`;
-          item.command = { command: 'jiraffe.testConnection', title: 'Проверить подключение', arguments: [n.instanceId] };
+          item.tooltip = `${n.message}\n\n${t('Click to test the connection')}`;
+          item.command = { command: 'jiraffe.testConnection', title: t('Test Connection'), arguments: [n.instanceId] };
         }
         return item;
       }
@@ -125,10 +126,10 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         return item;
       }
       case 'byKey': {
-        const item = new vscode.TreeItem(`Открыть ${n.key} по ключу`, vscode.TreeItemCollapsibleState.None);
+        const item = new vscode.TreeItem(t('Open {0} by key', n.key), vscode.TreeItemCollapsibleState.None);
         item.id = `bykey:${n.key}`;
         item.iconPath = new vscode.ThemeIcon('search');
-        item.command = { command: 'jiraffe.openIssueByKey', title: 'Открыть по ключу', arguments: [n.key] };
+        item.command = { command: 'jiraffe.openIssueByKey', title: t('Open by Key'), arguments: [n.key] };
         return item;
       }
     }
@@ -138,9 +139,9 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
     if (!n) return this.rootChildren();
     if (n.kind !== 'instance') return [];
     const st = this.states.get(n.id);
-    if (!st || st.loading) return [{ kind: 'hint', id: `load:${n.id}`, text: 'Загрузка…' }];
+    if (!st || st.loading) return [{ kind: 'hint', id: `load:${n.id}`, text: t('Loading…') }];
     if (st.error) return [{ kind: 'error', instanceId: n.id, message: st.error, query: !!st.queryError }];
-    if (!st.issues.length) return [{ kind: 'hint', id: `empty:${n.id}`, text: this.filters.snapshot.mode === 'jql' ? 'По этому запросу задач нет' : 'Под фильтр ничего не попало' }];
+    if (!st.issues.length) return [{ kind: 'hint', id: `empty:${n.id}`, text: this.filters.snapshot.mode === 'jql' ? t('No issues for this query') : t('Nothing matches the filter') }];
     return [
       ...st.issues.map((issue): Node => ({ kind: 'issue', instanceId: n.id, issue })),
       ...(st.next ? [{ kind: 'more', instanceId: n.id } as Node] : []),
@@ -156,11 +157,11 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
     const out: Node[] = [];
     const text = snap.text.trim();
     if (isIssueKey(text)) out.push({ kind: 'byKey', key: text.toUpperCase() });
-    if (snap.mode === 'project' && !snap.project) return [...out, { kind: 'hint', id: 'no-project', text: 'Выберите проект (команда «Выбрать проект»)' }];
-    if (snap.mode === 'jql' && !snap.jql.trim()) return [...out, { kind: 'hint', id: 'no-jql', text: 'Введите JQL (команда «Редактировать JQL»)' }];
+    if (snap.mode === 'project' && !snap.project) return [...out, { kind: 'hint', id: 'no-project', text: t('Select a project (“Select Project” command)') }];
+    if (snap.mode === 'jql' && !snap.jql.trim()) return [...out, { kind: 'hint', id: 'no-jql', text: t('Enter JQL (“Edit JQL” command)') }];
     const ids = this.filters.activeInstanceIds(all.map((i) => i.id));
     if (!ids.length) {
-      const text = snap.mode === 'project' ? 'Инстанс проекта удалён — выберите проект' : 'Инстанс фильтра удалён — выберите фильтр или «Сбросить фильтры»';
+      const text = snap.mode === 'project' ? t('The project’s instance was removed — select a project') : t('The filter’s instance was removed — select a filter or “Reset Filters”');
       return [...out, { kind: 'hint', id: 'no-inst', text }];
     }
     for (const id of ids) {
@@ -227,7 +228,7 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
       st.total = page.total ?? st.total;
     } catch (e) {
       if (gen !== this.gen) return;
-      void vscode.window.showErrorMessage(`Jiraffe: «${inst.name}» — не удалось догрузить: ${errText(e)}`);
+      void vscode.window.showErrorMessage(t('Jiraffe: "{0}" — failed to load more: {1}', inst.name, errText(e)));
     }
     st.loadingMore = false;
     this.afterChange(instanceId);
@@ -253,6 +254,6 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
       n += st.total ?? st.issues.length;
       if (st.total === undefined && st.next) more = true;
     }
-    this.view.badge = n ? { value: n, tooltip: `Найдено задач: ${more ? `не меньше ${n}` : n}` } : undefined;
+    this.view.badge = n ? { value: n, tooltip: more ? t('Issues found: at least {0}', n) : t('Issues found: {0}', n) } : undefined;
   }
 }

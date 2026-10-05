@@ -4,6 +4,7 @@ import { detectCapabilities } from '../jira/capabilities';
 import { canonicalBaseUrl } from '../jira/http';
 import type { Instance, InstanceKind } from '../jira/types';
 import { InstanceStore, inScope, instanceIdFromUrl } from '../state/instances';
+import { t } from '../l10n';
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -32,18 +33,19 @@ async function offerWorkspaceScope(store: InstanceStore, inst: Instance): Promis
     return;
   }
   if (store.all().length < 2) return;
+  const onlyThis = t('Only this one');
   const act = await vscode.window.showInformationMessage(
-    `Jiraffe: показывать в этом workspace только «${inst.name}»? Остальные инстансы останутся в других окнах.`,
-    'Только его', 'Все инстансы',
+    t('Jiraffe: show only “{0}” in this workspace? Other instances stay in other windows.', inst.name),
+    onlyThis, t('All instances'),
   );
-  if (act === 'Только его') await config().update(SCOPE_KEY, [inst.id], vscode.ConfigurationTarget.Workspace);
+  if (act === onlyThis) await config().update(SCOPE_KEY, [inst.id], vscode.ConfigurationTarget.Workspace);
 }
 
-const ADD_BUTTON: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('add'), tooltip: 'Добавить инстанс' };
+const addButton = (): vscode.QuickInputButton => ({ iconPath: new vscode.ThemeIcon('add'), tooltip: t('Add Instance') });
 
 async function scopeInstances(store: InstanceStore): Promise<void> {
   if (!vscode.workspace.workspaceFolders?.length) {
-    void vscode.window.showInformationMessage('Jiraffe: откройте папку или workspace — набор инстансов хранится в его настройках');
+    void vscode.window.showInformationMessage(t('Jiraffe: open a folder or workspace — the set of instances is stored in its settings'));
     return;
   }
   const all = store.all();
@@ -54,10 +56,10 @@ async function scopeInstances(store: InstanceStore): Promise<void> {
   const scope = readScope();
   type Item = vscode.QuickPickItem & { id: string };
   const qp = vscode.window.createQuickPick<Item>();
-  qp.title = 'Инстансы этого workspace';
-  qp.placeholder = 'Отметьте, какие показывать здесь (все отмечены — все); «+» — новое подключение';
+  qp.title = t('Workspace Instances');
+  qp.placeholder = t('Check the ones to show here (all checked means all); “+” adds a new connection');
   qp.canSelectMany = true;
-  qp.buttons = [ADD_BUTTON];
+  qp.buttons = [addButton()];
   qp.items = all.map((i) => ({ label: i.name, description: i.baseUrl, id: i.id }));
   qp.selectedItems = qp.items.filter((it) => inScope(all.find((i) => i.id === it.id)!, scope));
   const picked = await new Promise<readonly Item[] | 'add' | undefined>((resolve) => {
@@ -73,7 +75,7 @@ async function scopeInstances(store: InstanceStore): Promise<void> {
   }
   if (!picked) return;
   if (!picked.length) {
-    void vscode.window.showWarningMessage('Jiraffe: нужен хотя бы один инстанс');
+    void vscode.window.showWarningMessage(t('Jiraffe: at least one instance is required'));
     return;
   }
   const value = picked.length === all.length ? undefined : picked.map((p) => p.id);
@@ -88,7 +90,7 @@ async function pickInstance(store: InstanceStore, placeHolder: string, instanceI
     if (known) return known;
   }
   if (all.length === 0) {
-    const act = await vscode.window.showInformationMessage('Jiraffe: нет ни одного инстанса', 'Добавить');
+    const act = await vscode.window.showInformationMessage(t('Jiraffe: no instances yet'), t('Add'));
     if (act) await vscode.commands.executeCommand('jiraffe.addInstance');
     return undefined;
   }
@@ -102,33 +104,33 @@ async function pickInstance(store: InstanceStore, placeHolder: string, instanceI
 
 async function addInstance(store: InstanceStore): Promise<void> {
   const rawUrl = await vscode.window.showInputBox({
-    title: 'Новый инстанс Jira (1/5): адрес',
-    prompt: 'Адрес с context path, если он есть: https://host или https://host/jira',
+    title: t('New Jira Instance (1/5): URL'),
+    prompt: t('URL with the context path, if any: https://host or https://host/jira'),
     ignoreFocusOut: true,
     validateInput: (v) => {
       try {
         const u = new URL(canonicalBaseUrl(v));
-        return u.protocol === 'https:' || u.protocol === 'http:' ? undefined : 'Нужен http(s)-адрес';
+        return u.protocol === 'https:' || u.protocol === 'http:' ? undefined : t('An http(s) URL is required');
       } catch {
-        return 'Не похоже на URL';
+        return t('Doesn’t look like a URL');
       }
     },
   });
   if (!rawUrl) return;
   const baseUrl = canonicalBaseUrl(rawUrl);
   if (baseUrl.startsWith('http:') && (await vscode.window.showWarningMessage(
-    `${baseUrl}: адрес без https — токен уйдёт по сети открытым текстом. Продолжить?`, { modal: true }, 'Продолжить')) !== 'Продолжить') return;
+    t('{0}: the URL is not https — the token will be sent over the network in plain text. Continue?', baseUrl), { modal: true }, t('Continue'))) !== t('Continue')) return;
   const id = instanceIdFromUrl(baseUrl);
-  if (store.get(id) && (await vscode.window.showWarningMessage(`Инстанс ${id} уже добавлен. Заменить?`, { modal: true }, 'Заменить')) !== 'Заменить') return;
+  if (store.get(id) && (await vscode.window.showWarningMessage(t('Instance {0} is already added. Replace?', id), { modal: true }, t('Replace'))) !== t('Replace')) return;
 
   const guess: InstanceKind = new URL(baseUrl).host.endsWith('.atlassian.net') ? 'cloud' : 'dc';
   const kinds = [
     { label: 'Server / Data Center', description: 'Bearer PAT', instKind: 'dc' as InstanceKind },
-    { label: 'Cloud', description: 'email + API-токен', instKind: 'cloud' as InstanceKind },
+    { label: 'Cloud', description: t('email + API token'), instKind: 'cloud' as InstanceKind },
   ];
   const kindPick = await vscode.window.showQuickPick(
     kinds.sort((a, b) => Number(b.instKind === guess) - Number(a.instKind === guess)),
-    { placeHolder: 'Новый инстанс Jira (2/5): тип', ignoreFocusOut: true },
+    { placeHolder: t('New Jira Instance (2/5): type'), ignoreFocusOut: true },
   );
   if (!kindPick) return;
   const kind = kindPick.instKind;
@@ -136,51 +138,51 @@ async function addInstance(store: InstanceStore): Promise<void> {
   let email: string | undefined;
   if (kind === 'cloud') {
     email = await vscode.window.showInputBox({
-      title: 'Новый инстанс Jira (3/5): email', prompt: 'Email учётной записи Atlassian', ignoreFocusOut: true,
-      validateInput: (v) => (v.includes('@') ? undefined : 'Нужен email'),
+      title: t('New Jira Instance (3/5): email'), prompt: t('Atlassian account email'), ignoreFocusOut: true,
+      validateInput: (v) => (v.includes('@') ? undefined : t('An email is required')),
     });
     if (!email) return;
     email = email.trim();
   }
 
   const token = await vscode.window.showInputBox({
-    title: 'Новый инстанс Jira (4/5): токен',
-    prompt: kind === 'cloud' ? 'API-токен Atlassian' : 'Personal Access Token',
+    title: t('New Jira Instance (4/5): token'),
+    prompt: kind === 'cloud' ? t('Atlassian API token') : 'Personal Access Token',
     password: true, ignoreFocusOut: true,
-    validateInput: (v) => (!v.trim() ? 'Токен пустой' : /^[\x21-\x7e]+$/.test(v.trim()) ? undefined : 'В токене пробелы или лишние символы'),
+    validateInput: (v) => (!v.trim() ? t('The token is empty') : /^[\x21-\x7e]+$/.test(v.trim()) ? undefined : t('The token contains spaces or unexpected characters')),
   });
   if (!token) return;
 
   const client = createJiraClient({ id, kind, baseUrl, email }, token.trim());
   let displayName: string;
   try {
-    displayName = (await withProgress(`Jiraffe: подключение к ${baseUrl}…`, () => client.myself())).displayName;
+    displayName = (await withProgress(t('Jiraffe: connecting to {0}…', baseUrl), () => client.myself())).displayName;
   } catch (e) {
-    void vscode.window.showErrorMessage(`Jiraffe: не удалось подключиться — ${errText(e)}`);
+    void vscode.window.showErrorMessage(t('Jiraffe: could not connect — {0}', errText(e)));
     return;
   }
 
   const name = await vscode.window.showInputBox({
-    title: 'Новый инстанс Jira (5/5): имя', prompt: `Подключено как ${displayName}. Как назвать инстанс?`,
+    title: t('New Jira Instance (5/5): name'), prompt: t('Connected as {0}. What should the instance be called?', displayName),
     value: new URL(baseUrl).host, ignoreFocusOut: true,
-    validateInput: (v) => (v.trim() ? undefined : 'Имя пустое'),
+    validateInput: (v) => (v.trim() ? undefined : t('The name is empty')),
   });
   if (!name) return;
 
   const instance: Instance = { id, name: name.trim(), baseUrl, kind, ...(email ? { email } : {}) };
   try {
-    instance.caps = await withProgress('Jiraffe: определяю возможности инстанса…', () => detectCapabilities(client));
+    instance.caps = await withProgress(t('Jiraffe: detecting instance capabilities…'), () => detectCapabilities(client));
   } catch (e) {
-    void vscode.window.showWarningMessage(`Jiraffe: возможности инстанса не определены (${errText(e)}). Повторите «Обновить возможности инстанса».`);
+    void vscode.window.showWarningMessage(t('Jiraffe: could not detect instance capabilities ({0}). Run “Refresh Instance Capabilities” again.', errText(e)));
   }
   await store.add(instance, token.trim());
-  void vscode.window.showInformationMessage(`Jiraffe: инстанс «${instance.name}» добавлен` + (instance.caps ? ` (Tempo: ${instance.caps.tempo ? 'есть' : 'нет'})` : ''));
+  void vscode.window.showInformationMessage(t('Jiraffe: instance “{0}” added', instance.name) + (instance.caps ? t(' (Tempo: {0})', instance.caps.tempo ? t('available') : t('no')) : ''));
   await offerWorkspaceScope(store, instance);
 }
 
 async function clientFor(store: InstanceStore, inst: Instance) {
   const token = await store.getToken(inst.id);
-  if (!token) throw new Error('токен не найден в SecretStorage — добавьте инстанс заново');
+  if (!token) throw new Error(t('token not found in SecretStorage — add the instance again'));
   return createJiraClient(inst, token);
 }
 
@@ -189,30 +191,30 @@ export function registerInstanceCommands(store: InstanceStore): vscode.Disposabl
     vscode.commands.registerCommand('jiraffe.addInstance', () => addInstance(store)),
     vscode.commands.registerCommand('jiraffe.scopeInstances', () => scopeInstances(store)),
     vscode.commands.registerCommand('jiraffe.removeInstance', async () => {
-      const inst = await pickInstance(store, 'Какой инстанс удалить?');
+      const inst = await pickInstance(store, t('Which instance to remove?'));
       if (!inst) return;
-      const ok = await vscode.window.showWarningMessage(`Удалить инстанс «${inst.name}» и его токен?`, { modal: true }, 'Удалить');
-      if (ok === 'Удалить') await store.remove(inst.id);
+      const ok = await vscode.window.showWarningMessage(t('Remove instance “{0}” and its token?', inst.name), { modal: true }, t('Remove'));
+      if (ok === t('Remove')) await store.remove(inst.id);
     }),
     vscode.commands.registerCommand('jiraffe.testConnection', async (instanceId?: unknown) => {
       // из узла ошибки дерева приходит id инстанса; из палитры — ничего (спросим QuickPick'ом)
-      const inst = await pickInstance(store, 'Проверить подключение к…', typeof instanceId === 'string' ? instanceId : undefined);
+      const inst = await pickInstance(store, t('Test connection to…'), typeof instanceId === 'string' ? instanceId : undefined);
       if (!inst) return;
       try {
         const me = await (await clientFor(store, inst)).myself();
-        void vscode.window.showInformationMessage(`Jiraffe: «${inst.name}» — подключено как ${me.displayName}`);
+        void vscode.window.showInformationMessage(t('Jiraffe: “{0}” — connected as {1}', inst.name, me.displayName));
       } catch (e) {
         void vscode.window.showErrorMessage(`Jiraffe: «${inst.name}» — ${errText(e)}`);
       }
     }),
     vscode.commands.registerCommand('jiraffe.refreshCapabilities', async () => {
-      const inst = await pickInstance(store, 'Обновить возможности инстанса…');
+      const inst = await pickInstance(store, t('Refresh instance capabilities…'));
       if (!inst) return;
       try {
         const client = await clientFor(store, inst);
-        const caps = await withProgress(`Jiraffe: «${inst.name}» — определяю возможности…`, () => detectCapabilities(client));
+        const caps = await withProgress(t('Jiraffe: “{0}” — detecting capabilities…', inst.name), () => detectCapabilities(client));
         await store.updateCaps(inst.id, caps);
-        void vscode.window.showInformationMessage(`Jiraffe: «${inst.name}» — Tempo: ${caps.tempo ? 'есть' : 'нет'}, Epic Link: ${inst.kind === 'cloud' ? 'parent' : caps.epicLinkField ?? 'нет'}`);
+        void vscode.window.showInformationMessage(t('Jiraffe: “{0}” — Tempo: {1}, Epic Link: {2}', inst.name, caps.tempo ? t('available') : t('no'), inst.kind === 'cloud' ? 'parent' : caps.epicLinkField ?? t('no')));
       } catch (e) {
         void vscode.window.showErrorMessage(`Jiraffe: «${inst.name}» — ${errText(e)}`);
       }

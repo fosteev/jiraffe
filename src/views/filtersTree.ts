@@ -3,6 +3,7 @@ import type { FilterRef } from '../jira/client';
 import type { FilterState, SavedFilter } from '../state/filters';
 import type { InstanceMeta } from '../state/meta';
 import type { InstanceStore } from '../state/instances';
+import { t } from '../l10n';
 import { hostOf } from './format';
 
 /** Аргумент команды `jiraffe.applyFilter`. */
@@ -75,7 +76,7 @@ export class FiltersTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
         const item = new vscode.TreeItem(inst?.name ?? n.instanceId, vscode.TreeItemCollapsibleState.Expanded);
         item.id = `finst:${n.instanceId}`;
         item.iconPath = new vscode.ThemeIcon('server');
-        item.description = inst ? hostOf(inst.baseUrl) + (r?.loading ? ' · загрузка…' : '') : '';
+        item.description = inst ? hostOf(inst.baseUrl) + (r?.loading ? ` · ${t('loading…')}` : '') : '';
         return item;
       }
       case 'remote': {
@@ -101,8 +102,8 @@ export class FiltersTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
   getChildren(n?: Node): Node[] {
     if (!n) {
       return [
-        { kind: 'group', id: 'mine', label: 'Мои' },
-        { kind: 'group', id: 'jira', label: 'Избранные в Jira' },
+        { kind: 'group', id: 'mine', label: t('My Filters') },
+        { kind: 'group', id: 'jira', label: t('Jira Favorites') },
       ];
     }
     if (n.kind === 'group' && n.id === 'mine') {
@@ -110,11 +111,11 @@ export class FiltersTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       const list = this.filters.listSaved().filter((f) => !f.instanceId || this.store.visible(f.instanceId));
       return list.length
         ? list.map((filter): Node => ({ kind: 'local', filter }))
-        : [{ kind: 'hint', id: 'no-local', text: 'Нет сохранённых — «Сохранить как фильтр»' }];
+        : [{ kind: 'hint', id: 'no-local', text: t('None saved — use “Save as Filter”') }];
     }
     if (n.kind === 'group') {
       const insts = this.store.list();
-      if (!insts.length) return [{ kind: 'hint', id: 'no-inst', text: 'Нет инстансов' }];
+      if (!insts.length) return [{ kind: 'hint', id: 'no-inst', text: t('No instances') }];
       return insts.map((i): Node => {
         let node = this.instNodes.get(i.id);
         if (!node) this.instNodes.set(i.id, (node = { kind: 'instance', instanceId: i.id }));
@@ -125,11 +126,11 @@ export class FiltersTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       const r = this.remote.get(n.instanceId);
       if (!r) {
         void this.loadRemote(n.instanceId);
-        return [{ kind: 'hint', id: `load:${n.instanceId}`, text: 'Загрузка…' }];
+        return [{ kind: 'hint', id: `load:${n.instanceId}`, text: t('Loading…') }];
       }
-      if (r.loading) return [{ kind: 'hint', id: `load:${n.instanceId}`, text: 'Загрузка…' }];
+      if (r.loading) return [{ kind: 'hint', id: `load:${n.instanceId}`, text: t('Loading…') }];
       if (r.error) return [{ kind: 'hint', id: `err:${n.instanceId}`, text: r.error, error: true }];
-      if (!r.filters.length) return [{ kind: 'hint', id: `none:${n.instanceId}`, text: 'Нет избранных фильтров' }];
+      if (!r.filters.length) return [{ kind: 'hint', id: `none:${n.instanceId}`, text: t('No favorite filters') }];
       return r.filters.map((filter): Node => ({ kind: 'remote', instanceId: n.instanceId, filter }));
     }
     return [];
@@ -153,7 +154,7 @@ export class FiltersTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
 }
 
 function applyCommand(arg: ApplyFilterArg): vscode.Command {
-  return { command: 'jiraffe.applyFilter', title: 'Применить фильтр', arguments: [arg] };
+  return { command: 'jiraffe.applyFilter', title: t('Apply Filter'), arguments: [arg] };
 }
 
 /** Фильтр из контекстного меню: аргумент — узел дерева. */

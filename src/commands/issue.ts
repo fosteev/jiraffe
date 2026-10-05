@@ -2,13 +2,14 @@ import * as vscode from 'vscode';
 import { isIssueRef, type IssuePanelManager } from '../panels/issuePanel';
 import type { ListPanelManager } from '../panels/listPanel';
 import { isIssueKey, isVersionId } from '../panels/protocol';
+import { t } from '../l10n';
 
 /**
  * Команды карточки и вкладок эпика/релиза: `openEpic({instanceId, key})`, `openRelease({instanceId, id})` — карточка и деревья
  * вызывают их командами; аргументы недоверенные (проверяются по формату). `jiraffe.logWork` — в `commands/logWork.ts` (этап 6).
  */
 export function registerIssueCommands(panels: IssuePanelManager, lists: ListPanelManager): vscode.Disposable[] {
-  const noCard = (): void => void vscode.window.showInformationMessage('Jiraffe: нет открытой карточки задачи');
+  const noCard = (): void => void vscode.window.showInformationMessage(t('Jiraffe: no issue card is open'));
   return [
     vscode.commands.registerCommand('jiraffe.pinIssue', (ref?: unknown) => { if (!panels.pin(isIssueRef(ref) ? ref : undefined)) noCard(); }),
     vscode.commands.registerCommand('jiraffe.copyKey', (ref?: unknown) => { if (!panels.copyKey(isIssueRef(ref) ? ref : undefined)) noCard(); }),
@@ -22,7 +23,7 @@ export function registerIssueCommands(panels: IssuePanelManager, lists: ListPane
       const a = (arg && typeof arg === 'object' ? arg : {}) as { instanceId?: unknown; key?: unknown; id?: unknown };
       const ref = { instanceId: a.instanceId, key: a.key };
       if (!isIssueRef(ref) || typeof a.id !== 'string' || !panels.downloadAttachment(ref, a.id)) {
-        void vscode.window.showInformationMessage('Jiraffe: откройте карточку задачи и скачайте вложение на вкладке «Вложения»');
+        void vscode.window.showInformationMessage(t('Jiraffe: open an issue card and download the attachment from the Attachments tab'));
       }
     }),
     vscode.commands.registerCommand('jiraffe.openRelease', (arg?: unknown) => {

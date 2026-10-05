@@ -6,3 +6,5 @@
 !dist/extension.js
 !dist/webview/*.js
 !dist/webview/*.css
+!l10n/**
+!package.nls*.json

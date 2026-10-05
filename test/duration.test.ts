@@ -38,23 +38,23 @@ describe('parseDuration', () => {
 
 describe('formatDuration', () => {
   it('форматирует часы и минуты', () => {
-    expect(formatDuration(5400)).toBe('1ч 30м');
-    expect(formatDuration(3600)).toBe('1ч');
-    expect(formatDuration(1800)).toBe('30м');
-    expect(formatDuration(0)).toBe('0м');
-    expect(formatDuration(90000)).toBe('25ч');
+    expect(formatDuration(5400)).toBe('1h 30m');
+    expect(formatDuration(3600)).toBe('1h');
+    expect(formatDuration(1800)).toBe('30m');
+    expect(formatDuration(0)).toBe('0m');
+    expect(formatDuration(90000)).toBe('25h');
   });
   it('округляет секунды до минут', () => {
-    expect(formatDuration(5429)).toBe('1ч 30м');
-    expect(formatDuration(5431)).toBe('1ч 31м');
-    expect(formatDuration(29)).toBe('0м');
-    expect(formatDuration(30)).toBe('1м');
-    expect(formatDuration(3599)).toBe('1ч');
+    expect(formatDuration(5429)).toBe('1h 30m');
+    expect(formatDuration(5431)).toBe('1h 31m');
+    expect(formatDuration(29)).toBe('0m');
+    expect(formatDuration(30)).toBe('1m');
+    expect(formatDuration(3599)).toBe('1h');
   });
   it('отрицательное и не-число → 0м', () => {
-    expect(formatDuration(-60)).toBe('0м');
-    expect(formatDuration(NaN)).toBe('0м');
-    expect(formatDuration(Infinity)).toBe('0м');
+    expect(formatDuration(-60)).toBe('0m');
+    expect(formatDuration(NaN)).toBe('0m');
+    expect(formatDuration(Infinity)).toBe('0m');
   });
   it('обратим с parseDuration', () => {
     expect(parseDuration(formatDuration(5400))).toBe(5400);

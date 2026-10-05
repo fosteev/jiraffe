@@ -1,3 +1,4 @@
+import { t } from '../l10n';
 // Санитизация HTML из renderedFields. Чистый модуль (без vscode) — бандлится в extension.js вместе с sanitize-html.
 import sanitizeHtml from 'sanitize-html';
 import type { IssueDetail } from './types';
@@ -64,8 +65,8 @@ export function sanitizeJiraHtml(html: string, baseUrl: string): string {
         const abs = attribs.src ? resolveHref(attribs.src, baseUrl) : '';
         const own = abs ? ownImageSrc(abs, baseUrl) : '';
         const title: Record<string, string> = attribs.alt ? { title: attribs.alt } : {};
-        if (!own && /^https?:\/\//i.test(abs)) return { tagName: 'a', attribs: { href: abs, ...title }, text: '[внешняя картинка]' };
-        return { tagName: 'span', attribs: { class: 'img-ph', ...(own ? { 'data-src': own } : {}), ...title }, text: '[картинка]' };
+        if (!own && /^https?:\/\//i.test(abs)) return { tagName: 'a', attribs: { href: abs, ...title }, text: t('[external image]') };
+        return { tagName: 'span', attribs: { class: 'img-ph', ...(own ? { 'data-src': own } : {}), ...title }, text: t('[image]') };
       },
     },
     // Пустые якоря (`<a name="…"></a>` в заголовках) — мусор.

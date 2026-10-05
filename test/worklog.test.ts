@@ -185,25 +185,25 @@ describe('HttpClient.postJson', () => {
     const h = http(() => { const e = new Error(`boom ${TOKEN}`); e.name = 'TimeoutError'; throw e; });
     const err = (await h.postJson('/rest/x', { a: 1 }).then(() => undefined, (e: unknown) => e)) as JiraError;
     expect(err).toBeInstanceOf(JiraError);
-    expect(err.message).toMatch(/могла сохраниться/);
+    expect(err.message).toMatch(/may have been saved/);
     expect(err.message).not.toContain(TOKEN);
     const h2 = http(() => { throw Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNRESET', message: TOKEN } }); });
     const e2 = (await h2.postJson('/rest/x', {}).then(() => undefined, (e: unknown) => e)) as JiraError;
     expect(e2.message).not.toContain(TOKEN);
-    expect(e2.message).toMatch(/могла сохраниться/); // сброс соединения — запрос мог уйти
+    expect(e2.message).toMatch(/may have been saved/); // сброс соединения — запрос мог уйти
     const h3 = http(() => { throw Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNREFUSED' } }); });
     const e3 = (await h3.postJson('/rest/x', {}).then(() => undefined, (e: unknown) => e)) as JiraError;
-    expect(e3.message).not.toMatch(/могла сохраниться/); // соединения не было — запись точно не ушла
+    expect(e3.message).not.toMatch(/may have been saved/); // соединения не было — запись точно не ушла
   });
   it('502/503/504 прокси — «запись могла сохраниться» (code network); 500 — обычная ошибка', async () => {
     const h = http(() => new Response('<html>Gateway Timeout</html>', { status: 504 }));
     const e = (await h.postJson('/rest/x', {}).then(() => undefined, (x: unknown) => x)) as JiraError;
     expect(e).toMatchObject({ status: 504, code: 'network' });
-    expect(e.message).toMatch(/могла сохраниться/);
+    expect(e.message).toMatch(/may have been saved/);
     const h2 = http(() => new Response('{"errorMessages":["boom"]}', { status: 500 }));
     const e2 = (await h2.postJson('/rest/x', {}).then(() => undefined, (x: unknown) => x)) as JiraError;
     expect(e2.code).toBe('http');
-    expect(e2.message).not.toMatch(/могла сохраниться/);
+    expect(e2.message).not.toMatch(/may have been saved/);
   });
   it('400 с errors Tempo — текст в сообщении; 204 — undefined', async () => {
     const h = http(() => new Response(JSON.stringify({ errors: { user: 'Пользователь недействителен' } }), { status: 400 }));
@@ -359,9 +359,9 @@ describe('сводка «сегодня»', () => {
     ];
     expect(sumToday(list)).toBe(11700);
     const s = { date: '2026-10-04', loading: false, loaded: true, instances: list, totalSec: 11700 };
-    expect(statusBarText(s, 8 * 3600)).toBe('$(clock) Сегодня 3ч 15м / 8ч $(warning)');
-    expect(statusBarText({ ...s, loaded: false }, 8 * 3600)).toBe('$(clock) Сегодня …');
-    expect(statusBarLines(s)).toEqual(['Pilot: 1ч 30м · Tempo', 'SCC: 1ч 45м', 'Cloud: ошибка — нет связи']);
+    expect(statusBarText(s, 8 * 3600)).toBe('$(clock) Today 3h 15m / 8h $(warning)');
+    expect(statusBarText({ ...s, loaded: false }, 8 * 3600)).toBe('$(clock) Today …');
+    expect(statusBarLines(s)).toEqual(['Pilot: 1h 30m · Tempo', 'SCC: 1h 45m', 'Cloud: error — нет связи']);
   });
   it('TodayService: упавший инстанс не мешает остальным, устаревший ответ отбрасывается', async () => {
     const insts: Instance[] = [
@@ -371,7 +371,7 @@ describe('сводка «сегодня»', () => {
     const store = { list: () => insts, onDidChange: () => ({ dispose() {} }) };
     const { client } = mockClient('dc', () => ({ body: [{ id: 1, timeSpentSeconds: 600, dateStarted: '2026-10-04T00:00:00.000', author: { name: 'ivan' }, issue: { key: 'ABC-1' } }] }));
     const meta = {
-      client: async (i: Instance) => { if (i.id === 'b') throw new Error('токен не найден'); return client; },
+      client: async (i: Instance) => { if (i.id === 'b') throw new Error('token not found'); return client; },
       myself: async () => me,
     };
     const svc = new TodayService(store as never, meta as never, () => new Date(2026, 9, 4, 10));
@@ -384,7 +384,7 @@ describe('сводка «сегодня»', () => {
     const s = svc.get();
     expect(s.date).toBe('2026-10-04');
     expect(s.totalSec).toBe(600);
-    expect(s.instances.find((i) => i.instanceId === 'b')?.error).toMatch(/токен/);
+    expect(s.instances.find((i) => i.instanceId === 'b')?.error).toMatch(/token/);
   });
   it('localDate — локальная дата', () => {
     expect(localDate(new Date(2026, 0, 2, 23, 59))).toBe('2026-01-02');
@@ -412,21 +412,21 @@ describe('разметка', () => {
     expect(html).toContain('<th class="num">AI Tokens</th>');
     expect(html).toContain('<th>&lt;x&gt;</th>'); // ключ без описания — колонкой с ключом
     expect(html).toContain('<td>Разработка</td>');
-    expect(html).toContain((120005).toLocaleString('ru-RU'));
+    expect(html).toContain((120005).toLocaleString('en'));
     expect(html).toContain('&lt;b&gt;c&lt;/b&gt;');
     expect(html).not.toContain('<b>c</b>');
   });
   it('журнал без Tempo — без колонок атрибутов', () => {
     const html = renderWorklog({ ...base, tempo: false });
     expect(html).not.toContain('AI Tokens</th>');
-    expect(html).toContain('Tempo на Pilot нет');
+    expect(html).toContain('No Tempo on Pilot');
   });
   it('диалог: поля атрибутов по форме, AI Tokens; без Tempo — заметка про комментарий', () => {
     const f = { ...logFormFor(true, [LIST, AI]), instanceName: 'Pilot', summary: 'S <script>', today: '2026-10-04' };
     const html = renderLogDialog('ABC-123', f);
     expect(html).toContain('data-attr="_Kind_"');
     expect(html).toContain('<option value="dev">Разработка</option>');
-    expect(html).toContain('<option value="" disabled selected>— выберите —</option>'); // обязательный список: первое значение молча не выбирается
+    expect(html).toContain('<option value="" disabled selected>— select —</option>'); // обязательный список: первое значение молча не выбирается
     expect(html).toContain('max="2026-10-04"');
     expect(html).toContain('id="lg-tok"');
     expect(html).not.toContain('data-attr="_AITokensUsed_"');
@@ -434,7 +434,7 @@ describe('разметка', () => {
     expect(html).toContain('S &lt;script&gt;');
     expect(html).not.toMatch(/ style=/);
     const plain = renderLogDialog('ABC-1', { ...logFormFor(false, []), instanceName: 'SCC', summary: 's', today: '2026-10-04' });
-    expect(plain).toContain('AI Tokens допишутся в комментарий');
+    expect(plain).toContain('AI Tokens are appended to the comment');
     expect(plain).not.toContain('fieldset');
   });
   it('раздел Tempo: «сегодня», строки задач, ошибки инстансов', () => {
@@ -446,9 +446,9 @@ describe('разметка', () => {
       ],
     };
     const html = renderToday(v);
-    expect(html).toContain(`Сегодня, ${dayLabel('2026-10-04')}`);
-    expect(html).toContain('3ч 15м');
-    expect(html).toContain('из 8ч · осталось 4ч 45м');
+    expect(html).toContain(`Today, ${dayLabel('2026-10-04')}`);
+    expect(html).toContain('3h 15m');
+    expect(html).toContain('of 8h · 4h 45m left');
     expect(html).toContain('data-w="41"');
     expect(html).toContain('data-inst="p" data-key="ABC-1"');
     expect(html).toContain('&lt;i&gt;x&lt;/i&gt;');
