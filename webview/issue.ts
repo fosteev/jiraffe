@@ -271,6 +271,7 @@ app.addEventListener('click', (ev) => {
     case 'copyKey': if (current) vscode.postMessage({ type: 'copyKey', key: current.issue.key }); break;
     case 'openInBrowser': if (current) vscode.postMessage({ type: 'openInBrowser', key: current.issue.key }); break;
     case 'logWork': if (current) vscode.postMessage({ type: 'logWork', key: current.issue.key }); break;
+    case 'transition': if (current) vscode.postMessage({ type: 'transition', key: current.issue.key }); break;
     case 'pin': if (current) vscode.postMessage({ type: 'pin', key: current.issue.key }); break;
     case 'epic': if (el.dataset.key) vscode.postMessage({ type: 'openEpic', key: el.dataset.key }); break;
     case 'release': if (el.dataset.id) vscode.postMessage({ type: 'openRelease', id: el.dataset.id }); break;

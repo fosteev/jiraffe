@@ -172,3 +172,38 @@ describe('InstanceStore', () => {
     expect(fired).toBe(2);
   });
 });
+
+describe('JiraClient.transitions', () => {
+  it('маппит переходы, оставляет только обязательные поля без значения по умолчанию', async () => {
+    const { c, urls } = client('dc', () => ({ body: { transitions: [
+      { id: '11', name: 'В работу', to: { name: 'В работе', statusCategory: { key: 'indeterminate' } }, fields: {
+        summary: { required: true, hasDefaultValue: true, name: 'Summary' },
+      } },
+      { id: '31', name: 'Закрыть', to: { name: 'Закрыта', statusCategory: { key: 'done' } }, fields: {
+        resolution: { required: true, name: 'Решение', schema: { type: 'resolution' }, allowedValues: [{ id: '1', name: 'Fixed' }] },
+        components: { required: true, name: 'Компоненты', schema: { type: 'array' }, allowedValues: [{ id: '5', name: 'API' }] },
+        comment: { required: false, name: 'Comment' },
+      } },
+    ] } }));
+    const ts = await c.transitions('T-1');
+    expect(urls[0]).toContain('/rest/api/2/issue/T-1/transitions?expand=transitions.fields');
+    expect(ts[0]).toEqual({ id: '11', name: 'В работу', to: { name: 'В работе', category: 'indeterminate' }, fields: [] });
+    expect(ts[1].to.category).toBe('done');
+    expect(ts[1].fields).toEqual([
+      { id: 'resolution', name: 'Решение', array: false, allowedValues: [{ id: '1', name: 'Fixed' }] },
+      { id: 'components', name: 'Компоненты', array: true, allowedValues: [{ id: '5', name: 'API' }] },
+    ]);
+  });
+
+  it('transition шлёт id перехода и поля', async () => {
+    const bodies: unknown[] = [];
+    const fetchImpl = (async (_u: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+    const c = createJiraClient({ id: 'i1', kind: 'dc', baseUrl: 'https://h.example/jira' }, 'tok', { fetchImpl });
+    await c.transition('T-1', '31', { resolution: { id: '1' } });
+    await c.transition('T-1', '11');
+    expect(bodies).toEqual([{ transition: { id: '31' }, fields: { resolution: { id: '1' } } }, { transition: { id: '11' } }]);
+  });
+});

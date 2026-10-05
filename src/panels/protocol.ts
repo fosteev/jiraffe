@@ -86,6 +86,7 @@ export type ViewToHost =
   | { type: 'openInBrowser'; key: string }
   | { type: 'copyKey'; key: string }
   | { type: 'logWork'; key: string }
+  | { type: 'transition'; key: string }
   | { type: 'pin'; key: string }
   | { type: 'switchTab'; key: string; tab: IssueTab }
   | { type: 'openExternal'; url: string }

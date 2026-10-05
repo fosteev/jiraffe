@@ -32,7 +32,7 @@ interface Entry {
 }
 
 /** Действия над показанной задачей: принимаются, только если ключ в сообщении совпадает с текущим. */
-const CARD_ACTIONS = new Set<ViewToHost['type']>(['openInBrowser', 'copyKey', 'logWork', 'pin', 'switchTab']);
+const CARD_ACTIONS = new Set<ViewToHost['type']>(['openInBrowser', 'copyKey', 'logWork', 'transition', 'pin', 'switchTab']);
 /** Вложения и картинки: и instanceId, и key должны совпасть с показанной задачей, карточка — загружена. */
 const ATTACHMENT_ACTIONS = new Set<ViewToHost['type']>(['loadImages', 'downloadAttachment', 'downloadAll', 'openAttachment', 'submitWorklog']);
 const idOf = (r: IssueRef): string => `${r.instanceId}\n${r.key}`;
@@ -289,6 +289,9 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
         break;
       case 'logWork':
         void vscode.commands.executeCommand('jiraffe.logWork', ref);
+        break;
+      case 'transition':
+        void vscode.commands.executeCommand('jiraffe.transition', ref);
         break;
       case 'openExternal':
         openExternal(m.url);
