@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
 - Issues: a toolbar toggle between a flat list and a tree grouped by project (instance → project → issues). Not shown in Project mode.
 - Epics: “Only My Epics / All Epics” toggle (assignee is you) and a search by epic name; an issue key in the search shows an “Open … by key” row.
