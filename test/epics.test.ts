@@ -24,6 +24,11 @@ describe('JQL эпиков и релизов', () => {
     expect(epicsJql('ABC', ['x; DROP'])).toContain('issuetype = Epic');
     expect(epicsJql('my proj')).toContain('project = "my proj"');
   });
+  it('эпики проекта: фильтр «мои» и поиск по названию', () => {
+    expect(epicsJql('ABC', undefined, { mine: true })).toBe('project = ABC AND issuetype = Epic AND resolution = Unresolved AND assignee = currentUser() ORDER BY created DESC');
+    expect(epicsJql('ABC', undefined, { text: '  [UI]  релиз ' })).toBe('project = ABC AND issuetype = Epic AND resolution = Unresolved AND summary ~ "\\\\[UI\\\\] релиз" ORDER BY created DESC');
+    expect(epicsJql('ABC', undefined, { mine: false, text: ' ' })).toBe(epicsJql('ABC'));
+  });
   it('задачи эпика: DC — cf[id], поле из настроек приоритетнее caps; Cloud — parent', () => {
     expect(epicChildrenJql(dc, ['ABC-1'])).toBe('cf[10100] = ABC-1');
     expect(epicChildrenJql(dcCaps, ['ABC-1', 'ABC-2'])).toBe('cf[10102] in (ABC-1, ABC-2)');

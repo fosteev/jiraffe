@@ -289,6 +289,8 @@ export function registerFilterCommands(
       const ok = await vscode.window.showWarningMessage(t('Delete filter “{0}”?', f.name), { modal: true }, t('Delete'));
       if (ok === t('Delete')) await filters.deleteFilter(id);
     }),
+    vscode.commands.registerCommand('jiraffe.groupIssues', () => issues.setGrouped(true)),
+    vscode.commands.registerCommand('jiraffe.ungroupIssues', () => issues.setGrouped(false)),
     vscode.commands.registerCommand('jiraffe.loadMore', (instanceId: unknown) => (typeof instanceId === 'string' ? issues.loadMore(instanceId) : undefined)),
     vscode.commands.registerCommand('jiraffe.openIssueByKey', (key?: unknown) => openByKey(key)),
     vscode.commands.registerCommand('jiraffe.openIssue', (ref?: unknown) => {

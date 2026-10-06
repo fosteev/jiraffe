@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Issues: a toolbar toggle between a flat list and a tree grouped by project (instance → project → issues). Not shown in Project mode.
+- Epics: “Only My Epics / All Epics” toggle (assignee is you) and a search by epic name; an issue key in the search shows an “Open … by key” row.
+
 ## 0.4.0
 
 - Quick Filters: a Project group to narrow any view (Assigned to Me, JQL) to several projects. Applied in the query, so counts and paging stay correct; a project missing on an instance is skipped there.

@@ -40,7 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const lists = new ListPanelManager(context.extensionUri, instances, meta);
   const epicProject = new SectionProject(context.workspaceState, EPIC_PROJECT_KEY, context.globalState);
   const releaseProject = new SectionProject(context.workspaceState, RELEASE_PROJECT_KEY, context.globalState);
-  const epicsTree = new EpicsTree(instances, epicProject, meta);
+  const epicsTree = new EpicsTree(instances, epicProject, meta, context.globalState);
   const releasesTree = new ReleasesTree(instances, releaseProject, meta);
   const epicsView = vscode.window.createTreeView('jiraffe.epics', { treeDataProvider: epicsTree });
   const releasesView = vscode.window.createTreeView('jiraffe.releases', { treeDataProvider: releasesTree });
@@ -55,7 +55,7 @@ export function activate(context: vscode.ExtensionContext): void {
   today.onDidChange((s) => { if (!s.loading) lastRefresh = Date.now(); });
   // Без фокуса — только если наступил новый день (иначе в строке состояния висела бы вчерашняя сумма).
   const timer = setInterval(() => { if (vscode.window.state.focused || today.get().date !== localDate()) refreshToday(); }, TIMER_REFRESH_MS);
-  const issuesTree = new IssuesTree(instances, filters, meta);
+  const issuesTree = new IssuesTree(instances, filters, meta, context.globalState);
   const filtersTree = new FiltersTree(instances, filters, meta);
   const issuesView = vscode.window.createTreeView('jiraffe.issues', { treeDataProvider: issuesTree });
   issuesTree.attach(issuesView);

@@ -114,6 +114,16 @@
         "icon": "$(list-selection)"
       },
       {
+        "command": "jiraffe.groupIssues",
+        "title": "%command.groupIssues%",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "jiraffe.ungroupIssues",
+        "title": "%command.ungroupIssues%",
+        "icon": "$(list-flat)"
+      },
+      {
         "command": "jiraffe.pickProject",
         "title": "%command.pickProject%",
         "icon": "$(project)"
@@ -204,6 +214,21 @@
         "icon": "$(project)"
       },
       {
+        "command": "jiraffe.searchEpics",
+        "title": "%command.searchEpics%",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jiraffe.myEpics",
+        "title": "%command.myEpics%",
+        "icon": "$(account)"
+      },
+      {
+        "command": "jiraffe.allEpics",
+        "title": "%command.allEpics%",
+        "icon": "$(organization)"
+      },
+      {
         "command": "jiraffe.pickReleaseProject",
         "title": "%command.pickReleaseProject%",
         "icon": "$(project)"
@@ -263,6 +288,16 @@
           "command": "jiraffe.setMode",
           "when": "view == jiraffe.issues",
           "group": "navigation@3"
+        },
+        {
+          "command": "jiraffe.groupIssues",
+          "when": "view == jiraffe.issues && !jiraffe.issuesGrouped",
+          "group": "navigation@4"
+        },
+        {
+          "command": "jiraffe.ungroupIssues",
+          "when": "view == jiraffe.issues && jiraffe.issuesGrouped",
+          "group": "navigation@4"
         },
         {
           "command": "jiraffe.refresh",
@@ -328,6 +363,21 @@
           "command": "jiraffe.pickEpicProject",
           "when": "view == jiraffe.epics",
           "group": "navigation@1"
+        },
+        {
+          "command": "jiraffe.searchEpics",
+          "when": "view == jiraffe.epics",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jiraffe.myEpics",
+          "when": "view == jiraffe.epics && !jiraffe.epicsMine",
+          "group": "navigation@3"
+        },
+        {
+          "command": "jiraffe.allEpics",
+          "when": "view == jiraffe.epics && jiraffe.epicsMine",
+          "group": "navigation@3"
         },
         {
           "command": "jiraffe.pickReleaseProject",

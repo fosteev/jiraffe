@@ -1,22 +1,33 @@
 import * as vscode from 'vscode';
-import { loadEpics, type EpicItem } from '../jira/epics';
+import { loadEpics, type EpicFilter, type EpicItem } from '../jira/epics';
 import type { PageRequest } from '../jira/client';
 import type { InstanceMeta } from '../state/meta';
 import type { InstanceStore } from '../state/instances';
 import type { SectionProject } from '../state/sectionProject';
 import { t } from '../l10n';
+import { isIssueKey } from '../jql';
 import { CATEGORY_LABEL, hostOf, mdEscape, progressLabel, projectErrorText } from './format';
 
 type Node =
   | { kind: 'epic'; epic: EpicItem }
   | { kind: 'more' }
   | { kind: 'error'; message: string; project: boolean; instanceId: string }
-  | { kind: 'hint'; id: string; text: string; command?: string };
+  | { kind: 'hint'; id: string; text: string; command?: string }
+  | { kind: 'byKey'; instanceId: string; key: string };
 
 interface State { loading: boolean; loadingMore: boolean; epics: EpicItem[]; next?: PageRequest; error?: string; errorIsProject?: boolean; jql?: string }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const pageSize = (): number => vscode.workspace.getConfiguration('jiraffe').get<number>('maxResults', 50);
+
+/** «Мои / все» и строка поиска раздела «Эпики»; `jiraffe.epicsMine` — контекст для кнопки в заголовке. */
+export const EPIC_FILTER_KEY = 'jiraffe.epicFilter';
+const MINE_CTX = 'jiraffe.epicsMine';
+
+function sanitizeEpicFilter(v: unknown): EpicFilter {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  return { mine: o.mine === true, text: typeof o.text === 'string' ? o.text : '' };
+}
 
 /** Раздел «Эпики»: эпики выбранного проекта (свой выбор, отдельный от «Задач») со строкой `готово/всего`. */
 export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
@@ -31,7 +42,9 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
     private readonly store: InstanceStore,
     private readonly project: SectionProject,
     private readonly meta: InstanceMeta,
+    private readonly memento: vscode.Memento,
   ) {
+    void vscode.commands.executeCommand('setContext', MINE_CTX, this.filter.mine);
     this.subs = [this.emitter, store.onDidChange(() => this.refresh()), project.onDidChange(() => this.refresh())];
   }
 
@@ -42,6 +55,18 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
 
   dispose(): void {
     this.subs.forEach((s) => s.dispose());
+  }
+
+  get filter(): EpicFilter {
+    return sanitizeEpicFilter(this.memento.get<unknown>(EPIC_FILTER_KEY));
+  }
+
+  setFilter(patch: EpicFilter): void {
+    const f = { ...this.filter, ...patch };
+    f.text = (f.text ?? '').replace(/\s+/g, ' ').trim();
+    void this.memento.update(EPIC_FILTER_KEY, f);
+    void vscode.commands.executeCommand('setContext', MINE_CTX, f.mine);
+    this.refresh();
   }
 
   refresh(): void {
@@ -91,6 +116,13 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
         }
         return item;
       }
+      case 'byKey': {
+        const item = new vscode.TreeItem(t('Open {0} by key', n.key), vscode.TreeItemCollapsibleState.None);
+        item.id = `epics-bykey:${n.key}`;
+        item.iconPath = new vscode.ThemeIcon('search');
+        item.command = { command: 'jiraffe.openEpic', title: t('Open Epic'), arguments: [{ instanceId: n.instanceId, key: n.key }] };
+        return item;
+      }
       case 'hint': {
         const item = new vscode.TreeItem(n.text, vscode.TreeItemCollapsibleState.None);
         item.id = `epics-hint:${n.id}`;
@@ -107,15 +139,21 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
     if (!sel) return [{ kind: 'hint', id: 'no-project', text: t('Select a project (button in the header)'), command: 'jiraffe.pickEpicProject' }];
     if (!this.store.get(sel.instanceId)) return [{ kind: 'hint', id: 'no-inst', text: t('The project’s instance was removed — select a project'), command: 'jiraffe.pickEpicProject' }];
     if (!this.store.visible(sel.instanceId)) return [{ kind: 'hint', id: 'out-of-scope', text: t('The project’s instance is not in this workspace — select a project'), command: 'jiraffe.pickEpicProject' }];
+    // Ключ эпика в поиске — `summary ~` его не найдёт, а `key = …` на DC даёт 400, если такого ключа нет: открываем отдельной строкой.
+    const f = this.filter;
+    const head: Node[] = f.text && isIssueKey(f.text) ? [{ kind: 'byKey', instanceId: sel.instanceId, key: f.text.toUpperCase() }] : [];
     const st = this.state;
     if (!st) {
       void this.load();
-      return [{ kind: 'hint', id: 'loading', text: t('Loading…') }];
+      return [...head, { kind: 'hint', id: 'loading', text: t('Loading…') }];
     }
-    if (st.loading) return [{ kind: 'hint', id: 'loading', text: t('Loading…') }];
-    if (st.error) return [{ kind: 'error', message: st.error, project: !!st.errorIsProject, instanceId: sel.instanceId }];
-    if (!st.epics.length) return [{ kind: 'hint', id: 'empty', text: t('No unresolved epics in {0}', sel.key) }];
-    return [...st.epics.map((epic): Node => ({ kind: 'epic', epic })), ...(st.next ? [{ kind: 'more' } as Node] : [])];
+    if (st.loading) return [...head, { kind: 'hint', id: 'loading', text: t('Loading…') }];
+    if (st.error) return [...head, { kind: 'error', message: st.error, project: !!st.errorIsProject, instanceId: sel.instanceId }];
+    if (!st.epics.length) {
+      const text = f.mine || f.text ? t('No epics match the filter in {0}', sel.key) : t('No unresolved epics in {0}', sel.key);
+      return [...head, { kind: 'hint', id: 'empty', text }];
+    }
+    return [...head, ...st.epics.map((epic): Node => ({ kind: 'epic', epic })), ...(st.next ? [{ kind: 'more' } as Node] : [])];
   }
 
   private async load(): Promise<void> {
@@ -127,7 +165,7 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
     this.state = st;
     try {
       const client = await this.meta.client(inst);
-      const r = await loadEpics(client, inst, sel.key, { maxResults: pageSize() });
+      const r = await loadEpics(client, inst, sel.key, { maxResults: pageSize() }, undefined, this.filter);
       if (gen !== this.gen) return;
       st.epics = r.epics;
       st.next = r.next;
@@ -170,6 +208,14 @@ export class EpicsTree implements vscode.TreeDataProvider<Node>, vscode.Disposab
     if (!this.view) return;
     const sel = this.project.get();
     const inst = sel && this.store.get(sel.instanceId);
-    this.view.description = sel && inst ? `${sel.key} · ${this.store.list().length > 1 ? inst.name : hostOf(inst.baseUrl)}` : undefined;
+    if (!sel || !inst) {
+      this.view.description = undefined;
+      return;
+    }
+    const f = this.filter;
+    const parts = [sel.key, this.store.list().length > 1 ? inst.name : hostOf(inst.baseUrl)];
+    if (f.mine) parts.push(t('mine'));
+    if (f.text) parts.push(`“${f.text}”`);
+    this.view.description = parts.join(' · ');
   }
 }

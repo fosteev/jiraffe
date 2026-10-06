@@ -40,5 +40,13 @@ export function registerSectionCommands(
     vscode.commands.registerCommand('jiraffe.pickEpicProject', () => pickSectionProject(store, meta, epicProject, t('Project for the Epics Section'))),
     vscode.commands.registerCommand('jiraffe.pickReleaseProject', () => pickSectionProject(store, meta, releaseProject, t('Project for the Releases Section'))),
     vscode.commands.registerCommand('jiraffe.loadMoreEpics', () => epics.loadMore()),
+    vscode.commands.registerCommand('jiraffe.myEpics', () => epics.setFilter({ mine: true })),
+    vscode.commands.registerCommand('jiraffe.allEpics', () => epics.setFilter({ mine: false })),
+    vscode.commands.registerCommand('jiraffe.searchEpics', async () => {
+      const text = await vscode.window.showInputBox({
+        title: t('Search Epics'), value: epics.filter.text, placeHolder: t('Epic name; empty — clear the search'),
+      });
+      if (text !== undefined) epics.setFilter({ text });
+    }),
   ];
 }

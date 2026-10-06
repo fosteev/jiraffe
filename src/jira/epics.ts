@@ -4,7 +4,7 @@ import { epicFieldOf, mapEpic, mapStatusCategory, mapUser } from './mappers';
 import { JiraError } from './http';
 import type { JiraClient, PageRequest } from './client';
 import type { Instance, IssueSummary, Progress, StatusCategory, UserRef, Version } from './types';
-import { projectRef } from '../jql';
+import { luceneEscape, projectRef, quoteJql } from '../jql';
 
 type Raw = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 type EpicInstance = Pick<Instance, 'kind' | 'epicLinkField' | 'caps'>;
@@ -18,14 +18,21 @@ export const EPIC_NAME_RE = /^(epic|эпик)$/i;
 
 const ORDER_EPICS = 'ORDER BY created DESC';
 
+/** Фильтр раздела «Эпики»: только мои (исполнитель — я) и поиск по названию. */
+export interface EpicFilter { mine?: boolean; text?: string }
+
 /**
  * Нерешённые эпики проекта. Без `typeIds` — `issuetype = Epic`; с ними (тип называется иначе, либо Cloud: типы
- * уровня иерархии 1 проекта) — `issuetype in (id…)`.
+ * уровня иерархии 1 проекта) — `issuetype in (id…)`. Поиск — `summary ~` (операторы Lucene экранированы, как в «Задачах»).
  */
-export function epicsJql(projectKey: string, typeIds?: readonly string[]): string {
+export function epicsJql(projectKey: string, typeIds?: readonly string[], filter: EpicFilter = {}): string {
   const ids = (typeIds ?? []).filter(isId);
   const type = ids.length ? `issuetype in (${ids.join(', ')})` : 'issuetype = Epic';
-  return `project = ${projectRef(projectKey)} AND ${type} AND resolution = Unresolved ${ORDER_EPICS}`;
+  const clauses = [`project = ${projectRef(projectKey)}`, type, 'resolution = Unresolved'];
+  if (filter.mine) clauses.push('assignee = currentUser()');
+  const text = (filter.text ?? '').replace(/\s+/g, ' ').trim();
+  if (text) clauses.push(`summary ~ ${quoteJql(luceneEscape(text))}`);
+  return `${clauses.join(' AND ')} ${ORDER_EPICS}`;
 }
 
 /** Номер поля из id (`customfield_10100` → `10100`); не похоже на id — `null` (в JQL такое подставлять нельзя). */
@@ -186,7 +193,7 @@ export interface EpicList { epics: EpicItem[]; next?: PageRequest; jql: string }
  * `in (…)`» (по 10 эпиков), а не по запросу на каждый эпик: на Cloud счётчика `total` нет.
  */
 export async function loadEpics(
-  c: JiraClient, instance: EpicInstance, projectKey: string, page: PageRequest = {}, knownJql?: string,
+  c: JiraClient, instance: EpicInstance, projectKey: string, page: PageRequest = {}, knownJql?: string, filter: EpicFilter = {},
 ): Promise<EpicList> {
   const fields = ['summary', 'status'];
   // «Загрузить ещё»: JQL первой страницы (курсор Cloud привязан к нему; типы и фолбэк локали заново не выясняем).
@@ -202,7 +209,7 @@ export async function loadEpics(
       typeIds = undefined; // не смогли узнать типы — пробуем `issuetype = Epic`
     }
   }
-  let jql = epicsJql(projectKey, typeIds);
+  let jql = epicsJql(projectKey, typeIds, filter);
   let res;
   try {
     res = await c.searchRaw(jql, fields, page);
@@ -211,7 +218,7 @@ export async function loadEpics(
     if (!(e instanceof JiraError && e.status === 400) || instance.kind === 'cloud' || typeIds) throw e;
     const ids = await c.issueTypes().then((ts) => ts.filter((t) => EPIC_NAME_RE.test(t.name)).map((t) => t.id), () => [] as string[]);
     if (!ids.length) throw e; // наружу — исходная ошибка Jira, а не ошибка справочника типов
-    jql = epicsJql(projectKey, ids);
+    jql = epicsJql(projectKey, ids, filter);
     try {
       res = await c.searchRaw(jql, fields, page);
     } catch (e2) {

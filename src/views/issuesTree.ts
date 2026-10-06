@@ -13,6 +13,7 @@ export interface IssueRef { instanceId: string; key: string }
 
 type Node =
   | { kind: 'instance'; id: string }
+  | { kind: 'project'; instanceId: string; key: string }
   | { kind: 'issue'; instanceId: string; issue: IssueSummary }
   | { kind: 'more'; instanceId: string }
   | { kind: 'error'; instanceId: string; message: string; query: boolean }
@@ -33,6 +34,11 @@ interface InstState {
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const pageSize = (): number => vscode.workspace.getConfiguration('jiraffe').get<number>('maxResults', 50);
+const projectOf = (key: string): string => key.slice(0, key.lastIndexOf('-'));
+
+/** Вид списка «Задач»: плоско (проекты вперемешку) или деревом «инстанс → проект → задачи». */
+export const GROUPED_KEY = 'jiraffe.issuesGrouped';
+const GROUPED_CTX = 'jiraffe.issuesGrouped';
 
 export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<Node | undefined>();
@@ -47,7 +53,9 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
     private readonly store: InstanceStore,
     private readonly filters: FilterState,
     private readonly meta: InstanceMeta,
+    private readonly memento: vscode.Memento,
   ) {
+    void vscode.commands.executeCommand('setContext', GROUPED_CTX, this.grouped);
     this.subs = [
       this.emitter,
       store.onDidChange(() => this.refresh()),
@@ -62,6 +70,22 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
 
   dispose(): void {
     this.subs.forEach((s) => s.dispose());
+  }
+
+  get grouped(): boolean {
+    return this.memento.get<boolean>(GROUPED_KEY) === true;
+  }
+
+  /** Переключает вид без перезагрузки: задачи уже в памяти, меняется только раскладка. */
+  setGrouped(v: boolean): void {
+    void this.memento.update(GROUPED_KEY, v);
+    void vscode.commands.executeCommand('setContext', GROUPED_CTX, v);
+    this.emitter.fire(undefined);
+  }
+
+  /** В режиме «Проект» проект один — группировать нечего. */
+  private groupsShown(): boolean {
+    return this.grouped && this.filters.snapshot.mode !== 'project';
   }
 
   refresh(): void {
@@ -85,6 +109,15 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         item.description = !st || st.loading ? `${host} · ${t('loading…')}` : st.error ? host : `${host} · ${countLabel(st.issues.length, st.total, !!st.next)}`;
         item.tooltip = st?.jql ? new vscode.MarkdownString(`\`${st.jql.replace(/`/g, "'")}\``) : host;
         item.contextValue = 'instance';
+        return item;
+      }
+      case 'project': {
+        const issues = this.states.get(n.instanceId)?.issues.filter((i) => projectOf(i.key) === n.key) ?? [];
+        const item = new vscode.TreeItem(n.key, vscode.TreeItemCollapsibleState.Expanded);
+        item.id = `proj:${n.instanceId}:${n.key}`;
+        item.iconPath = new vscode.ThemeIcon('project');
+        item.description = String(issues.length);
+        item.contextValue = 'project';
         return item;
       }
       case 'issue': {
@@ -137,13 +170,20 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
 
   getChildren(n?: Node): Node[] {
     if (!n) return this.rootChildren();
+    if (n.kind === 'project') {
+      const issues = this.states.get(n.instanceId)?.issues ?? [];
+      return issues.filter((i) => projectOf(i.key) === n.key).map((issue): Node => ({ kind: 'issue', instanceId: n.instanceId, issue }));
+    }
     if (n.kind !== 'instance') return [];
     const st = this.states.get(n.id);
     if (!st || st.loading) return [{ kind: 'hint', id: `load:${n.id}`, text: t('Loading…') }];
     if (st.error) return [{ kind: 'error', instanceId: n.id, message: st.error, query: !!st.queryError }];
     if (!st.issues.length) return [{ kind: 'hint', id: `empty:${n.id}`, text: this.filters.snapshot.mode === 'jql' ? t('No issues for this query') : t('Nothing matches the filter') }];
+    const items = this.groupsShown()
+      ? [...new Set(st.issues.map((i) => projectOf(i.key)))].sort().map((key): Node => ({ kind: 'project', instanceId: n.id, key }))
+      : st.issues.map((issue): Node => ({ kind: 'issue', instanceId: n.id, issue }));
     return [
-      ...st.issues.map((issue): Node => ({ kind: 'issue', instanceId: n.id, issue })),
+      ...items,
       ...(st.next ? [{ kind: 'more', instanceId: n.id } as Node] : []),
     ];
   }
