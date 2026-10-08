@@ -171,6 +171,7 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
     const root = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
     const panel = vscode.window.createWebviewPanel('jiraffe.issue', ref.key, { viewColumn: vscode.ViewColumn.Active, preserveFocus: false }, {
       enableScripts: true,
+      enableFindWidget: true,
       retainContextWhenHidden: false,
       localResourceRoots: [root],
     });

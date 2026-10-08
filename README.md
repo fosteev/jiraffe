@@ -30,6 +30,8 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 
 **Epics and releases.** Per-project lists with progress. An epic or release opens in a tab with a status breakdown and its issues.
 
+**Find.** ⌘F / Ctrl+F searches the text of an open issue, epic or release tab. In the sidebar views use VS Code's tree find: focus a view and press ⌥⌘F / Ctrl+Alt+F or just start typing — it looks through the loaded items only.
+
 ![Epic tab](docs/screenshots/epic.png)
 
 ![Release tab](docs/screenshots/release.png)

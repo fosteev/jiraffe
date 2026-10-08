@@ -4,6 +4,7 @@
 
 - Issues: a Sort button in the toolbar — by key, priority, created or updated date; pick the active one again to reverse. Sorted by Jira (`ORDER BY`), so paging stays correct; an explicit sort overrides `ORDER BY` in your JQL, “Default” brings it back.
 - Epic and release tabs: click a column header to sort the issue table (ascending → descending → original order); priority starts with the most urgent. The choice is kept per tab.
+- Find in page (⌘F / Ctrl+F) in issue, epic and release tabs. In the sidebar trees VS Code's own find works: focus a view and press ⌥⌘F / Ctrl+Alt+F or just start typing (searches the loaded items only).
 
 ## 0.5.0
 

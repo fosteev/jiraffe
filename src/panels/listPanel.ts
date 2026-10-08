@@ -67,6 +67,7 @@ export class ListPanelManager implements vscode.Disposable {
     const title = ref.kind === 'epic' ? ref.id : t('Release');
     const panel = vscode.window.createWebviewPanel(`jiraffe.${ref.kind}`, title, { viewColumn: vscode.ViewColumn.Active, preserveFocus: false }, {
       enableScripts: true,
+      enableFindWidget: true,
       retainContextWhenHidden: false,
       localResourceRoots: [root],
     });
