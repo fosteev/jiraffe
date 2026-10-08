@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 - Issues: a Sort button in the toolbar — by key, priority, created or updated date; pick the active one again to reverse. Sorted by Jira (`ORDER BY`), so paging stays correct; an explicit sort overrides `ORDER BY` in your JQL, “Default” brings it back.
 - Epic and release tabs: click a column header to sort the issue table (ascending → descending → original order); priority starts with the most urgent. The choice is kept per tab.
