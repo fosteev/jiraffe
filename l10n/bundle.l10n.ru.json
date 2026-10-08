@@ -388,7 +388,10 @@
   "select again to reverse": "выбрать ещё раз — обратный порядок",
   "Sort Issues": "Сортировка задач",
   "Sort by this column": "Сортировать по этой колонке",
-  "Ask AI": "Спросить ИИ",
-  "Chat with AI (Agentura) about this issue": "Чат с ИИ (Agentura) по этой задаче",
+  "Open in Agentura": "Открыть в Agentura",
+  "Open a chat about this issue in Agentura": "Открыть чат по этой задаче в Agentura",
+  "New chat for this issue": "Новый чат по задаче",
+  "Continue: {0}": "Продолжить: {0}",
+  "running": "выполняется",
   "Jiraffe: could not open the AI chat: {0}": "Jiraffe: не удалось открыть чат с ИИ: {0}"
 }

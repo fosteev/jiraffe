@@ -30,6 +30,10 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 
 **Epics and releases.** Per-project lists with progress. An epic or release opens in a tab with a status breakdown and its issues.
 
+**AI chat.** With the [Agentura](https://github.com/fosteev/Agentura) extension installed, the issue card has an “Open in Agentura ▾” button: the issue goes in as context and its link is typed into the input. If the issue already has chats, a menu offers to continue the latest one, pick another, or start a new chat.
+
+**API for other extensions.** `(await getExtension('fosteev.jiraffe').activate())` returns `{ apiVersion: 1, instances(), issue(instanceId, key), myself(instanceId), openIssue(instanceId, key, beside?), onDidChangeInstances }` (in an untrusted workspace Jiraffe does not activate, so there is no API). Read-only and limited to this workspace's instances; tokens and emails are never exposed. Note that any installed extension can call it and read your Jira issues with your connections — as with any VS Code extension API, install only extensions you trust.
+
 **Find.** ⌘F / Ctrl+F searches the text of an open issue, epic or release tab. In the sidebar views use VS Code's tree find: focus a view and press ⌥⌘F / Ctrl+Alt+F or just start typing — it looks through the loaded items only.
 
 ![Epic tab](docs/screenshots/epic.png)

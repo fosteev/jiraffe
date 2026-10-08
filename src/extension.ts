@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { createApi, type JiraffeApi } from './api';
 import { setL10n } from './l10n';
 import { readScope, registerInstanceCommands } from './commands/instances';
 import { registerFilterCommands } from './commands/filters';
@@ -26,7 +27,7 @@ import { TempoViewProvider } from './views/tempoView';
 const FOCUS_REFRESH_MS = 5 * 60_000;
 const TIMER_REFRESH_MS = 15 * 60_000;
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: vscode.ExtensionContext): JiraffeApi {
   setL10n(vscode.l10n.bundle, vscode.l10n.bundle ? vscode.env.language : 'en');
   const instances = new InstanceStore(context.globalState, context.secrets);
   instances.setScope(readScope);
@@ -104,6 +105,15 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: () => clearInterval(timer) },
   );
   refreshToday();
+  const instancesChanged = new vscode.EventEmitter<void>();
+  context.subscriptions.push(instancesChanged, instances.onDidChange(() => instancesChanged.fire()));
+  return createApi({
+    list: () => instances.list(),
+    visible: (id) => (instances.visible(id) ? instances.get(id) : undefined),
+    client: (inst) => meta.client(inst),
+    open: (instanceId, key, beside) => panels.open({ instanceId, key }, beside),
+    onDidChangeInstances: instancesChanged.event,
+  });
 }
 
 export function deactivate(): void {}

@@ -1,4 +1,5 @@
 // Контекст задачи для ИИ-чата (Agentura, `agentura.openWithContext`): markdown-текст карточки. Без vscode — тестируется в vitest.
+import type { StatusCategory } from '../jira/types';
 import type { IssueCard } from './protocol';
 
 /** Последних комментариев в контексте. */
@@ -62,4 +63,67 @@ export function issueContext(c: Pick<IssueCard, 'instanceName' | 'issue'>, url: 
     for (const cm of comments) s += `\n### ${cm.author?.name ?? 'unknown'}, ${cm.created}\n\n${clip(htmlToText(cm.bodyHtml))}\n`;
   }
   return s;
+}
+
+/** Задача для Agentura (`agentura.openWithContext`, поле `task`): по ней чаты собираются в группу. */
+export interface TaskMeta {
+  key: string;
+  instanceId: string;
+  title: string;
+  status: string;
+  statusCategory: StatusCategory;
+  url: string;
+}
+
+export const taskMeta = (c: Pick<IssueCard, 'issue'>, instanceId: string, url: string): TaskMeta => ({
+  key: c.issue.key,
+  instanceId,
+  title: c.issue.summary,
+  status: c.issue.status,
+  statusCategory: c.issue.statusCategory,
+  url,
+});
+
+/** Чат задачи из команды Agentura `agentura.taskSessions({instanceId, key})`. */
+export interface TaskSession {
+  id: string;
+  provider: string;
+  title: string;
+  updatedAt: number;
+  live: boolean;
+}
+
+/** Ответ команды → список чатов, свежие первыми; не массив (старая/чужая Agentura) → undefined, битые элементы пропускаются. */
+export function parseTaskSessions(raw: unknown): TaskSession[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '');
+  const out: TaskSession[] = [];
+  for (const r of raw as Record<string, unknown>[]) {
+    if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !r.id || r.id.length > MAX_ID) continue;
+    const updated = typeof r.updatedAt === 'number' ? r.updatedAt : typeof r.updatedAt === 'string' ? Date.parse(r.updatedAt) : NaN;
+    out.push({
+      id: r.id,
+      provider: str(r.provider, 40),
+      title: str(r.title, 200),
+      updatedAt: Number.isFinite(updated) ? updated : 0,
+      live: r.live === true,
+    });
+  }
+  return out.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_SESSIONS);
+}
+
+/** Ответ чужого расширения: id обрезать нельзя (это ссылка на чат) — слишком длинный пропускаем; в меню — не больше 50 чатов. */
+const MAX_ID = 200;
+const MAX_SESSIONS = 50;
+
+export type AskEntry = { kind: 'continue' | 'chat'; session: TaskSession } | { kind: 'new' };
+
+/**
+ * Пункты меню «Открыть в Agentura ▾»: «Продолжить» (самый свежий чат) первым, остальные чаты, затем «Новый чат по задаче».
+ * Чатов нет — null: меню не нужно, сразу новый чат.
+ */
+export function askMenu(sessions: readonly TaskSession[]): AskEntry[] | null {
+  if (!sessions.length) return null;
+  const [first, ...rest] = sessions;
+  return [{ kind: 'continue', session: first }, ...rest.map((session): AskEntry => ({ kind: 'chat', session })), { kind: 'new' }];
 }

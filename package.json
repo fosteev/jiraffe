@@ -2,7 +2,7 @@
   "name": "jiraffe",
   "displayName": "Jiraffe",
   "description": "%extension.description%",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "publisher": "fosteev",
   "license": "MIT",
   "repository": {

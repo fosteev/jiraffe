@@ -7,7 +7,7 @@ import type { InstanceStore } from '../state/instances';
 import type { InstanceMeta } from '../state/meta';
 import type { IssueRef } from '../views/issuesTree';
 import type { AttachmentContext, AttachmentService } from './attachments';
-import { issueContext } from './aiContext';
+import { askMenu, issueContext, parseTaskSessions, taskMeta, type AskEntry, type TaskSession } from './aiContext';
 import { browseUrl, loadCard } from './card';
 import { getBundle, locale, t } from '../l10n';
 import { makeNonce, renderShell } from './html';
@@ -71,11 +71,15 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
     for (const e of [this.preview, ...this.pinned.values()]) e?.panel.dispose();
   }
 
-  /** Открыть задачу: закреплённая — фокус, иначе — в preview (создаётся при необходимости). */
-  open(ref: IssueRef): void {
+  /**
+   * Открыть задачу: закреплённая — фокус, иначе — в preview (создаётся при необходимости).
+   * `beside` (API): новая вкладка — в соседней колонке; уже видимая остаётся на месте, скрытая (под другой вкладкой) — переезжает рядом.
+   */
+  open(ref: IssueRef, beside = false): void {
+    const colFor = (p: vscode.WebviewPanel): vscode.ViewColumn | undefined => (beside && !p.visible ? vscode.ViewColumn.Beside : undefined);
     const pinned = this.pinned.get(idOf(ref));
     if (pinned) {
-      pinned.panel.reveal(undefined, false);
+      pinned.panel.reveal(colFor(pinned.panel), false);
       void this.load(pinned);
       return;
     }
@@ -91,11 +95,11 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
         this.preview.tab = 'desc';
         this.preview.panel.title = ref.key;
       }
-      this.preview.panel.reveal(undefined, false);
+      this.preview.panel.reveal(colFor(this.preview.panel), false);
       void this.load(this.preview);
       return;
     }
-    this.preview = this.create(ref);
+    this.preview = this.create(ref, beside);
     void this.load(this.preview);
   }
 
@@ -175,9 +179,9 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
     this.render(e);
   }
 
-  private create(ref: IssueRef): Entry {
+  private create(ref: IssueRef, beside = false): Entry {
     const root = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
-    const panel = vscode.window.createWebviewPanel('jiraffe.issue', ref.key, { viewColumn: vscode.ViewColumn.Active, preserveFocus: false }, {
+    const panel = vscode.window.createWebviewPanel('jiraffe.issue', ref.key, { viewColumn: beside ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active, preserveFocus: false }, {
       enableScripts: true,
       enableFindWidget: true,
       retainContextWhenHidden: false,
@@ -255,24 +259,69 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
     void e.panel.webview.postMessage(msg);
   }
 
-  /** Чат Agentura с задачей в контексте (файл) и ссылкой на неё в поле ввода; у задачи своя сессия — повторный вызов её возобновляет. */
+  /**
+   * «Открыть в Agentura»: задача в контексте (файл), ссылка на неё в поле ввода, чат входит в группу задачи.
+   * Чаты задачи спрашиваем у Agentura (`agentura.taskSessions`): есть — меню «Продолжить / другие / новый», нет — сразу новый.
+   * Команды нет или она упала (старая Agentura) — как раньше: `sessionKey` возобновляет единственный чат задачи.
+   */
   private async askAi(e: Entry): Promise<void> {
     const ext = vscode.extensions.getExtension(AGENTURA);
     const inst = this.store.get(e.ref.instanceId);
     if (!ext || !inst || !e.card) return;
     const { instanceId, key } = e.ref;
+    const card = e.card;
     try {
       if (!ext.isActive) await ext.activate(); // команда служебная: без активации её ещё нет
       const url = browseUrl(inst.baseUrl, key);
+      let session: string | undefined; // не задан — старое поведение (по sessionKey)
+      let sessions: TaskSession[] | undefined;
+      try {
+        sessions = parseTaskSessions(await vscode.commands.executeCommand('agentura.taskSessions', { instanceId, key }));
+      } catch {
+        sessions = undefined; // нет команды / ошибка — не мешаем открыть чат
+      }
+      if (sessions) {
+        const menu = askMenu(sessions);
+        if (!menu) session = 'new';
+        else {
+          const picked = await this.pickChat(menu);
+          if (!picked) return; // меню закрыли
+          session = picked.kind === 'new' ? 'new' : picked.session.id;
+        }
+      }
       await vscode.commands.executeCommand('agentura.openWithContext', {
         name: `${key}.md`,
-        context: issueContext(e.card, url),
+        context: issueContext(card, url),
         prompt: `${url} `, // в поле ввода — ссылка на задачу, дальше пишется вопрос
-        sessionKey: `jiraffe:${instanceId}:${key}`,
+        sessionKey: `jiraffe:${instanceId}:${key}`, // для Agentura 0.8.0 (одна сессия на ключ)
+        task: taskMeta(card, instanceId, url),
+        ...(session ? { session } : {}),
       });
     } catch (err) {
       void vscode.window.showErrorMessage(t('Jiraffe: could not open the AI chat: {0}', errText(err)));
     }
+  }
+
+  private async pickChat(menu: AskEntry[]): Promise<AskEntry | undefined> {
+    type Item = vscode.QuickPickItem & { entry?: AskEntry };
+    const items: Item[] = [];
+    for (const entry of menu) {
+      if (entry.kind === 'new') {
+        items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+        items.push({ label: `$(add) ${t('New chat for this issue')}`, entry });
+        continue;
+      }
+      const s = entry.session;
+      const title = (s.title || s.id).replace(/\$\(/g, '$\u200b('); // `$(icon)` в подписи QuickPick — иконка; чужой текст не должен её рисовать
+      items.push({
+        label: entry.kind === 'continue' ? `$(comment-discussion) ${t('Continue: {0}', title)}` : `$(comment) ${title}`,
+        description: [s.provider, s.live ? t('running') : ''].filter(Boolean).join(' · '),
+        detail: s.updatedAt && Number.isFinite(new Date(s.updatedAt).getTime()) ? new Date(s.updatedAt).toLocaleString(locale()) : undefined,
+        entry,
+      });
+    }
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: t('Open in Agentura') });
+    return pick?.entry;
   }
 
   private async submitWorklog(e: Entry, draft: unknown): Promise<void> {

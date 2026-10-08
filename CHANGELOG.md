@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0
+
+- Issue tab: “Ask AI” is now “Open in Agentura ▾”. With a recent [Agentura](https://github.com/fosteev/Agentura) it lists the issue's chats (Continue the latest, other chats, New chat for this issue); an issue without chats opens a new one right away. The issue is passed to Agentura as a task, so its chats are grouped. With an older Agentura the button works as before (one chat per issue).
+- Public API for other extensions (`apiVersion: 1`): `instances()`, `issue()`, `myself()`, `openIssue()` and `onDidChangeInstances`. Read-only and limited to the workspace's instances: it uses your existing connections, tokens and emails are never exposed. Any installed extension can call it.
+
 ## 0.7.0
 
 - Issue tab: an “Ask AI” button when the [Agentura](https://github.com/fosteev/Agentura) extension is installed. It opens an AI chat beside the issue with the issue attached as context (fields, description, last 20 comments) and the issue link typed into the input. Each issue keeps its own chat: the button resumes it next time.

@@ -272,7 +272,7 @@ export function renderCard(c: IssueCard, tab: IssueTab): string {
       <div class="crumbs">${IC.server} ${esc(c.instanceName)}<span>›</span>${esc(project)}${i.epic ? `<span>›</span><button class="ln" data-act="epic" data-key="${esc(i.epic.key)}">${esc(i.epic.key)}</button>` : ''}<span>›</span>${typeIcon(i.type)}<span class="k">${esc(i.key)}</span></div>
       <h1>${esc(i.summary)}</h1>
       <div class="hrow"><button class="pill pill-btn s-${i.statusCategory}" data-act="transition" title="${t('Change Status')}">${esc(i.status || STATUS_LABEL[i.statusCategory])} ▾</button>${i.priority ? `<span class="prio">${priorityIcon(i.priority)}${esc(i.priority)}</span>` : ''}<span class="mut sm">${esc(i.type)}</span><span class="sp"></span>
-        ${c.ai ? `<button class="btn" data-act="askAi" title="${t('Chat with AI (Agentura) about this issue')}">${IC.ai} ${t('Ask AI')}</button>` : ''}
+        ${c.ai ? `<button class="btn" data-act="askAi" title="${t('Open a chat about this issue in Agentura')}">${IC.ai} ${t('Open in Agentura')} ▾</button>` : ''}
         <button class="btn" data-act="copyKey">${IC.copy} ${t('Key')}</button>
         <button class="btn" data-act="openInBrowser">${IC.ext} ${t('Open in Jira')}</button>
         <button class="btn" data-act="pin"${c.pinned ? ' disabled' : ''}>${IC.pin} ${c.pinned ? t('Pinned') : t('Pin')}</button>
