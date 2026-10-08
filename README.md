@@ -6,6 +6,8 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 
 > The UI follows the VS Code display language: English or Russian. [Русская версия README](README.ru.md)
 
+> **New in 0.8.** “Open in Agentura ▾” on the issue card: with [Agentura](https://github.com/fosteev/Agentura) 0.9 the issue's AI chats are grouped under it — continue the latest or start a new one, and see the issue's changes beside the chat. Plus a public API for other extensions, now with writing (comment, transition, worklog). See **AI chat** and **API for other extensions** below.
+
 ![Issue card next to the issue tree](docs/screenshots/card.png)
 
 ## Features
