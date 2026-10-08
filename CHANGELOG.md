@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0
+
+- Issue tab: an “Ask AI” button when the [Agentura](https://github.com/fosteev/Agentura) extension is installed. It opens an AI chat beside the issue with the issue attached as context (fields, description, last 20 comments) and the issue link typed into the input. Each issue keeps its own chat: the button resumes it next time.
+
 ## 0.6.0
 
 - Issues: a Sort button in the toolbar — by key, priority, created or updated date; pick the active one again to reverse. Sorted by Jira (`ORDER BY`), so paging stays correct; an explicit sort overrides `ORDER BY` in your JQL, “Default” brings it back.
