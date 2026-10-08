@@ -207,3 +207,17 @@ describe('JiraClient.transitions', () => {
     expect(bodies).toEqual([{ transition: { id: '31' }, fields: { resolution: { id: '1' } } }, { transition: { id: '11' } }]);
   });
 });
+
+describe('JiraClient.addComment', () => {
+  it('POST /issue/{key}/comment с телом-строкой, возвращает id', async () => {
+    const calls: { url: string; body: unknown }[] = [];
+    const fetchImpl = (async (u: string, init?: RequestInit) => {
+      calls.push({ url: u, body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify({ id: 10001 }), { status: 201 });
+    }) as unknown as typeof fetch;
+    const c = createJiraClient({ id: 'i1', kind: 'dc', baseUrl: 'https://h.example/jira' }, 'tok', { fetchImpl });
+    expect(await c.addComment('T-1', 'h1. hi')).toEqual({ id: '10001' });
+    expect(calls[0].url).toBe('https://h.example/jira/rest/api/2/issue/T-1/comment');
+    expect(calls[0].body).toEqual({ body: 'h1. hi' });
+  });
+});

@@ -113,6 +113,17 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
     client: (inst) => meta.client(inst),
     open: (instanceId, key, beside) => panels.open({ instanceId, key }, beside),
     onDidChangeInstances: instancesChanged.event,
+    logForm: (inst) => worklog.form(inst),
+    changed: (kind, instanceId, key) => {
+      panels.reload({ instanceId, key });
+      if (kind === 'worklog') void today.refresh();
+      if (kind === 'transition') {
+        issuesTree.refresh();
+        epicsTree.refresh();
+        releasesTree.refresh();
+        lists.reloadAll();
+      }
+    },
   });
 }
 

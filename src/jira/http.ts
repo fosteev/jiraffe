@@ -131,7 +131,8 @@ export class HttpClient {
     // Пробел/перевод строки/не-ASCII в токене undici отвергает с текстом заголовка в сообщении — ловим заранее.
     this.badToken = !/^[\x21-\x7e]+$/.test(token);
     this.auth = authHeader(opts.kind, token, opts.email?.trim());
-    this.secrets = [this.auth, token, this.auth.replace(/^\S+ /, '')].filter((x) => x.length >= 4);
+    // Email (Cloud) тоже не уходит в тексты ошибок: их видит и вызывающий публичный API.
+    this.secrets = [this.auth, token, this.auth.replace(/^\S+ /, ''), opts.email?.trim() ?? ''].filter((x) => x.length >= 4);
     this.fetchImpl = opts.fetchImpl ?? ((...a) => fetch(...a));
     this.timeoutMs = opts.timeoutMs ?? 30_000;
   }

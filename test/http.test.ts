@@ -89,6 +89,12 @@ describe('HttpClient: безопасность и диагностика', () =>
     expect(err.message).not.toContain('RET123');
   });
 
+  it('email (Cloud) вычищается из текста ошибки', async () => {
+    const http = new HttpClient({ baseUrl: 'https://x.example', kind: 'cloud', token: 'tok12345', email: 'me@corp.example', fetchImpl: mockFetch(400, { errorMessages: ['user me@corp.example cannot'] }) });
+    const err = await fail(http.getJson('/p'));
+    expect(err.message).not.toContain('me@corp.example');
+  });
+
   it('токен вычищается из текста сетевой ошибки', async () => {
     const f = (async () => { throw new TypeError('Headers.append: "Bearer SECRET123" is an invalid header value'); }) as unknown as typeof fetch;
     const err = await fail(new HttpClient({ baseUrl: 'https://x.example', kind: 'dc', token: 'SECRET123', fetchImpl: f }).getJson('/p'));
