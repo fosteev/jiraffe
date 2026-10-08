@@ -18,6 +18,7 @@ export const STATUS_LABEL = {
 
 const st = 'fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"';
 export const IC = {
+  ai: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2.5l1.1 3 3 1.1-3 1.1L7 10.7 5.9 7.7l-3-1.1 3-1.1zM12 9.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" ${st}/></svg>`,
   server: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="4.5" rx="1" ${st}/><rect x="2.5" y="9" width="11" height="4.5" rx="1" ${st}/><circle cx="5" cy="4.75" r=".8" fill="currentColor"/><circle cx="5" cy="11.25" r=".8" fill="currentColor"/></svg>`,
   copy: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.2" ${st}/><path d="M3 10.5V3.8C3 3.3 3.3 3 3.8 3h6.7" ${st}/></svg>`,
   ext: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-6 6M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" ${st}/></svg>`,
@@ -271,6 +272,7 @@ export function renderCard(c: IssueCard, tab: IssueTab): string {
       <div class="crumbs">${IC.server} ${esc(c.instanceName)}<span>›</span>${esc(project)}${i.epic ? `<span>›</span><button class="ln" data-act="epic" data-key="${esc(i.epic.key)}">${esc(i.epic.key)}</button>` : ''}<span>›</span>${typeIcon(i.type)}<span class="k">${esc(i.key)}</span></div>
       <h1>${esc(i.summary)}</h1>
       <div class="hrow"><button class="pill pill-btn s-${i.statusCategory}" data-act="transition" title="${t('Change Status')}">${esc(i.status || STATUS_LABEL[i.statusCategory])} ▾</button>${i.priority ? `<span class="prio">${priorityIcon(i.priority)}${esc(i.priority)}</span>` : ''}<span class="mut sm">${esc(i.type)}</span><span class="sp"></span>
+        ${c.ai ? `<button class="btn" data-act="askAi" title="${t('Chat with AI (Agentura) about this issue')}">${IC.ai} ${t('Ask AI')}</button>` : ''}
         <button class="btn" data-act="copyKey">${IC.copy} ${t('Key')}</button>
         <button class="btn" data-act="openInBrowser">${IC.ext} ${t('Open in Jira')}</button>
         <button class="btn" data-act="pin"${c.pinned ? ' disabled' : ''}>${IC.pin} ${c.pinned ? t('Pinned') : t('Pin')}</button>

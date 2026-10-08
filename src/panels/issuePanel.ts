@@ -7,6 +7,7 @@ import type { InstanceStore } from '../state/instances';
 import type { InstanceMeta } from '../state/meta';
 import type { IssueRef } from '../views/issuesTree';
 import type { AttachmentContext, AttachmentService } from './attachments';
+import { issueContext } from './aiContext';
 import { browseUrl, loadCard } from './card';
 import { getBundle, locale, t } from '../l10n';
 import { makeNonce, renderShell } from './html';
@@ -33,9 +34,11 @@ interface Entry {
 }
 
 /** Действия над показанной задачей: принимаются, только если ключ в сообщении совпадает с текущим. */
-const CARD_ACTIONS = new Set<ViewToHost['type']>(['openInBrowser', 'copyKey', 'logWork', 'transition', 'pin', 'switchTab']);
+const CARD_ACTIONS = new Set<ViewToHost['type']>(['openInBrowser', 'copyKey', 'logWork', 'transition', 'pin', 'switchTab', 'askAi']);
 /** Вложения и картинки: и instanceId, и key должны совпасть с показанной задачей, карточка — загружена. */
 const ATTACHMENT_ACTIONS = new Set<ViewToHost['type']>(['loadImages', 'downloadAttachment', 'downloadAll', 'openAttachment', 'submitWorklog']);
+/** ИИ-чат: расширение Agentura (не на Marketplace — нет его, нет и кнопки). */
+const AGENTURA = 'fosteev.agentura';
 const idOf = (r: IssueRef): string => `${r.instanceId}\n${r.key}`;
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 export const isIssueRef = (v: unknown): v is IssueRef =>
@@ -50,6 +53,10 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
   private preview: Entry | undefined;
   private readonly pinned = new Map<string, Entry>();
   private active: Entry | undefined;
+  /** Agentura поставили или удалили — перерисовать карточки (кнопка «Спросить ИИ»). */
+  private readonly extWatch = vscode.extensions.onDidChange(() => {
+    for (const e of [this.preview, ...this.pinned.values()]) if (e?.card) this.render(e);
+  });
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -60,6 +67,7 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
   ) {}
 
   dispose(): void {
+    this.extWatch.dispose();
     for (const e of [this.preview, ...this.pinned.values()]) e?.panel.dispose();
   }
 
@@ -231,7 +239,7 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
     let msg: HostToView;
     const { instanceId, key } = e.ref;
     if (e.error) msg = { type: 'error', instanceId, key, message: e.error };
-    else if (e.card) msg = { type: 'issue', data: { ...e.card, pinned: e.pinned, tab: e.tab } };
+    else if (e.card) msg = { type: 'issue', data: { ...e.card, pinned: e.pinned, tab: e.tab, ai: !!vscode.extensions.getExtension(AGENTURA) } };
     else msg = { type: 'loading', instanceId, key };
     void e.panel.webview.postMessage(msg);
     if (msg.type === 'issue') this.flushForm(e);
@@ -245,6 +253,26 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
     if (p.key !== e.ref.key) return;
     const msg: HostToView = { type: 'logForm', instanceId: e.ref.instanceId, key: e.ref.key, form: p.form };
     void e.panel.webview.postMessage(msg);
+  }
+
+  /** Чат Agentura с задачей в контексте (файл) и ссылкой на неё в поле ввода; у задачи своя сессия — повторный вызов её возобновляет. */
+  private async askAi(e: Entry): Promise<void> {
+    const ext = vscode.extensions.getExtension(AGENTURA);
+    const inst = this.store.get(e.ref.instanceId);
+    if (!ext || !inst || !e.card) return;
+    const { instanceId, key } = e.ref;
+    try {
+      if (!ext.isActive) await ext.activate(); // команда служебная: без активации её ещё нет
+      const url = browseUrl(inst.baseUrl, key);
+      await vscode.commands.executeCommand('agentura.openWithContext', {
+        name: `${key}.md`,
+        context: issueContext(e.card, url),
+        prompt: `${url} `, // в поле ввода — ссылка на задачу, дальше пишется вопрос
+        sessionKey: `jiraffe:${instanceId}:${key}`,
+      });
+    } catch (err) {
+      void vscode.window.showErrorMessage(t('Jiraffe: could not open the AI chat: {0}', errText(err)));
+    }
   }
 
   private async submitWorklog(e: Entry, draft: unknown): Promise<void> {
@@ -280,6 +308,9 @@ export class IssuePanelManager implements vscode.Disposable, LogWorkPanels {
         break;
       case 'openInBrowser':
         this.openInBrowser(ref);
+        break;
+      case 'askAi':
+        void this.askAi(e);
         break;
       case 'openIssue':
         if (isIssueKey(m.key)) this.open({ instanceId: ref.instanceId, key: m.key });

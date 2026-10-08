@@ -57,6 +57,8 @@ export interface IssueCard {
   workAttributes?: WorkAttribute[];
   pinned: boolean;
   tab: IssueTab;
+  /** Установлена Agentura — показать кнопку «Спросить ИИ». */
+  ai?: boolean;
 }
 
 /** Данные диалога «Залогать время» в карточке. */
@@ -88,6 +90,7 @@ export type ViewToHost =
   | { type: 'logWork'; key: string }
   | { type: 'transition'; key: string }
   | { type: 'pin'; key: string }
+  | { type: 'askAi'; key: string }
   | { type: 'switchTab'; key: string; tab: IssueTab }
   | { type: 'openExternal'; url: string }
   // Вложения и картинки (этап 5): instanceId + key сверяются с показанной задачей, id — по формату и по таблице хоста.

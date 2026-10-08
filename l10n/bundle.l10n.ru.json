@@ -387,5 +387,8 @@
   "ORDER BY from the JQL, otherwise by updated date": "ORDER BY из JQL, иначе по дате обновления",
   "select again to reverse": "выбрать ещё раз — обратный порядок",
   "Sort Issues": "Сортировка задач",
-  "Sort by this column": "Сортировать по этой колонке"
+  "Sort by this column": "Сортировать по этой колонке",
+  "Ask AI": "Спросить ИИ",
+  "Chat with AI (Agentura) about this issue": "Чат с ИИ (Agentura) по этой задаче",
+  "Jiraffe: could not open the AI chat: {0}": "Jiraffe: не удалось открыть чат с ИИ: {0}"
 }

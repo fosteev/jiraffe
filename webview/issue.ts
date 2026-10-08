@@ -270,6 +270,7 @@ app.addEventListener('click', (ev) => {
       draw();
       break;
     }
+    case 'askAi': if (current) vscode.postMessage({ type: 'askAi', key: current.issue.key }); break;
     case 'copyKey': if (current) vscode.postMessage({ type: 'copyKey', key: current.issue.key }); break;
     case 'openInBrowser': if (current) vscode.postMessage({ type: 'openInBrowser', key: current.issue.key }); break;
     case 'logWork': if (current) vscode.postMessage({ type: 'logWork', key: current.issue.key }); break;
