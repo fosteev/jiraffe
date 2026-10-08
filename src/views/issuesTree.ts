@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { JiraError } from '../jira/http';
 import type { IssueSummary, SearchPage } from '../jira/types';
 import { t } from '../l10n';
-import { isIssueKey } from '../jql';
+import { isIssueKey, isIssueSort, orderBy, type IssueSort, type SortField } from '../jql';
 import { describeFilters, type FilterState } from '../state/filters';
 import type { InstanceMeta } from '../state/meta';
 import type { InstanceStore } from '../state/instances';
@@ -39,6 +39,11 @@ const projectOf = (key: string): string => key.slice(0, key.lastIndexOf('-'));
 /** Вид списка «Задач»: плоско (проекты вперемешку) или деревом «инстанс → проект → задачи». */
 export const GROUPED_KEY = 'jiraffe.issuesGrouped';
 const GROUPED_CTX = 'jiraffe.issuesGrouped';
+/** Сортировка «Задач»; нет — порядок запроса (`ORDER BY` из JQL, иначе по обновлению). */
+export const SORT_KEY = 'jiraffe.issuesSort';
+
+export const sortLabel = (f: SortField): string =>
+  ({ key: t('By Key'), priority: t('By Priority'), created: t('By Created Date'), updated: t('By Updated Date') })[f];
 
 export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<Node | undefined>();
@@ -81,6 +86,17 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
     void this.memento.update(GROUPED_KEY, v);
     void vscode.commands.executeCommand('setContext', GROUPED_CTX, v);
     this.emitter.fire(undefined);
+  }
+
+  get sort(): IssueSort | undefined {
+    const v = this.memento.get<unknown>(SORT_KEY);
+    return isIssueSort(v) ? v : undefined;
+  }
+
+  /** Сортирует сервер (`ORDER BY`): с постраничной загрузкой локально отсортировать можно только загруженное. */
+  setSort(v: IssueSort | undefined): void {
+    void this.memento.update(SORT_KEY, v);
+    this.refresh();
   }
 
   /** В режиме «Проект» проект один — группировать нечего. */
@@ -221,7 +237,9 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
     this.states.set(instanceId, st);
     try {
       const snap = this.filters.snapshot;
-      let jql = await jqlForInstance(snap, inst, this.meta);
+      const sort = this.sort;
+      const order = sort ? orderBy(sort) : undefined;
+      let jql = await jqlForInstance(snap, inst, this.meta, { order });
       if (jql === null) {
         st.jql = undefined;
       } else {
@@ -232,7 +250,7 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         } catch (e) {
           // DC отвечает 400 на `key = ABC-999`, если такой задачи нет (проект есть) — тогда ищем этот текст как текст
           if (!(e instanceof JiraError && e.status === 400 && isIssueKey(snap.text)) || gen !== this.gen) throw e;
-          jql = (await jqlForInstance(snap, inst, this.meta, { textOnly: true })) ?? jql;
+          jql = (await jqlForInstance(snap, inst, this.meta, { textOnly: true, order })) ?? jql;
           page = await client.search(jql, undefined, { maxResults: pageSize() });
         }
         if (gen !== this.gen) return;
@@ -281,7 +299,9 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
 
   private updateHeader(): void {
     if (!this.view) return;
-    this.view.description = describeFilters(this.filters.snapshot);
+    const sort = this.sort;
+    const desc = describeFilters(this.filters.snapshot);
+    this.view.description = sort ? [desc, `${sort.desc ? '↓' : '↑'} ${sortLabel(sort.field)}`].filter(Boolean).join(' · ') : desc;
     this.updateBadge();
   }
 

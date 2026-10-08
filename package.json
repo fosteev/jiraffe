@@ -114,6 +114,11 @@
         "icon": "$(list-selection)"
       },
       {
+        "command": "jiraffe.sortIssues",
+        "title": "%command.sortIssues%",
+        "icon": "$(sort-precedence)"
+      },
+      {
         "command": "jiraffe.groupIssues",
         "title": "%command.groupIssues%",
         "icon": "$(list-tree)"
@@ -288,6 +293,11 @@
           "command": "jiraffe.setMode",
           "when": "view == jiraffe.issues",
           "group": "navigation@3"
+        },
+        {
+          "command": "jiraffe.sortIssues",
+          "when": "view == jiraffe.issues",
+          "group": "navigation@4"
         },
         {
           "command": "jiraffe.groupIssues",

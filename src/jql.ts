@@ -21,9 +21,24 @@ export interface JqlInput {
    * `false` — только текстовый поиск (проекта с таким префиксом на инстансе нет: `UTF-8`, `ISO-9001`).
    */
   textAsKey?: boolean;
+  /** Явная сортировка: заменяет и порядок по умолчанию, и `ORDER BY` из пользовательского JQL. */
+  order?: string;
 }
 
 export const DEFAULT_ORDER = 'ORDER BY updated DESC';
+export type SortField = 'key' | 'priority' | 'created' | 'updated';
+export interface IssueSort { field: SortField; desc: boolean }
+export const SORT_FIELDS: SortField[] = ['key', 'priority', 'created', 'updated'];
+
+export const isIssueSort = (v: unknown): v is IssueSort =>
+  !!v && typeof v === 'object' && SORT_FIELDS.includes((v as IssueSort).field) && typeof (v as IssueSort).desc === 'boolean';
+
+/** `ORDER BY` для сортировки списка. У приоритета много равных — внутри одного приоритета свежие сверху. */
+export function orderBy(s: IssueSort): string {
+  const dir = s.desc ? 'DESC' : 'ASC';
+  return s.field === 'priority' ? `ORDER BY priority ${dir}, updated DESC` : `ORDER BY ${s.field} ${dir}`;
+}
+
 export const MINE_JQL = 'assignee = currentUser() AND resolution = Unresolved';
 
 /** Id категорий статусов в JQL: не зависят от локализации имён («To Do»/«К выполнению»). */
@@ -109,6 +124,7 @@ export function buildJql(input: JqlInput): string {
     extra.push(asKey && isIssueKey(text) ? `(key = ${text.toUpperCase()} OR ${search})` : search);
   }
 
+  if (input.order) order = input.order;
   // Пользовательский JQL может содержать OR — оборачиваем, когда есть что приклеить.
   if (input.mode === 'jql' && clauses.length && extra.length) clauses[0] = `(${clauses[0]})`;
   return [...clauses, ...extra].join(' AND ') + (clauses.length + extra.length ? ' ' : '') + order;

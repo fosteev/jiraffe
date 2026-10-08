@@ -10,7 +10,7 @@ import { isVersionId, isIssueKey } from '../src/panels/protocol';
 import { SectionProject, sanitizeProjectSel } from '../src/state/sectionProject';
 import { JiraError } from '../src/jira/http';
 import { MAX_RELEASED, progressLabel, projectErrorText, visibleVersions } from '../src/views/format';
-import { renderEpicPage, renderReleasePage, segBar } from '../webview/listRender';
+import { renderEpicPage, renderReleasePage, segBar, sortRows } from '../webview/listRender';
 import type { EpicPage, ReleasePage } from '../src/panels/protocol';
 
 const dc = { kind: 'dc' as const, epicLinkField: 'customfield_10100', caps: undefined };
@@ -227,6 +227,24 @@ describe('разметка', () => {
     expect(renderReleasePage({ ...page, daysLeft: -2 })).toContain('overdue by 2 d');
     expect(renderReleasePage({ ...page, rows: [], progress: progressOf([]) })).toContain('This version has no issues yet');
     expect(renderReleasePage(page)).not.toMatch(/<b>R|<b>\s*<\/b>R/);
+  });
+  it('сортировка по колонке: заголовок-кнопка, стрелка, aria-sort', () => {
+    const page: ReleasePage = { ...base, type: 'release', id: '5', name: 'R', released: false, rows: [row, { ...row, key: 'ABC-10' }, { ...row, key: 'ABC-9' }] };
+    const keys = (html: string): string[] => [...html.matchAll(/data-key="([^"]+)"/g)].map((m) => m[1]);
+    expect(keys(renderReleasePage(page))).toEqual(['ABC-1', 'ABC-10', 'ABC-9']);
+    const html = renderReleasePage(page, { col: 'key', desc: false });
+    expect(keys(html)).toEqual(['ABC-1', 'ABC-9', 'ABC-10']);
+    expect(html).toMatch(/aria-sort="ascending"><button class="th-sort on" data-act="sort" data-col="key"/);
+    expect(keys(renderReleasePage(page, { col: 'key', desc: true }))).toEqual(['ABC-10', 'ABC-9', 'ABC-1']);
+  });
+  it('sortRows: приоритет по рангу, пустые в конце в обе стороны, стабильность', () => {
+    const r = (key: string, o: Partial<typeof row> & { priority?: string; assignee?: { id: string; name: string } }) => ({ ...row, key, ...o });
+    const rows = [r('A-1', { priority: 'Low' }), r('A-2', {}), r('A-3', { priority: 'Highest' }), r('A-4', { priority: 'Medium' }), r('A-5', { priority: 'Lowest' })];
+    expect(sortRows(rows, { col: 'priority', desc: true }).map((x) => x.key)).toEqual(['A-3', 'A-4', 'A-1', 'A-5', 'A-2']);
+    expect(sortRows(rows, { col: 'priority', desc: false }).map((x) => x.key)).toEqual(['A-1', 'A-5', 'A-4', 'A-3', 'A-2']);
+    const people = [r('B-1', { assignee: { id: '2', name: 'Борис' } }), r('B-2', {}), r('B-3', { assignee: { id: '1', name: 'Анна' } })];
+    expect(sortRows(people, { col: 'assignee', desc: true }).map((x) => x.key)).toEqual(['B-1', 'B-3', 'B-2']);
+    expect(sortRows(rows, undefined)).toBe(rows);
   });
   it('полоса: ширины через data-w', () => {
     expect(segBar(progressOf(['done', 'new', 'new', 'indeterminate']))).toMatch(/b-done" data-w="25.0".*b-prog" data-w="25.0"/);

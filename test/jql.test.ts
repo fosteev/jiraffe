@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildJql, isIssueKey, luceneEscape, quoteJql, splitOrderBy } from '../src/jql';
+import { buildJql, isIssueKey, isIssueSort, luceneEscape, orderBy, quoteJql, splitOrderBy } from '../src/jql';
 
 describe('buildJql', () => {
   it('на мне', () => {
@@ -72,6 +72,28 @@ describe('luceneEscape', () => {
   it('операторы Lucene и висящий слэш', () => {
     expect(luceneEscape('foo\\')).toBe('foo\\\\');
     expect(luceneEscape('5" (x) {y} ^~/-|&')).toBe(String.raw`5\" \(x\) \{y\} \^\~\/\-\|\&`);
+  });
+});
+
+describe('сортировка', () => {
+  it('orderBy', () => {
+    expect(orderBy({ field: 'key', desc: true })).toBe('ORDER BY key DESC');
+    expect(orderBy({ field: 'created', desc: false })).toBe('ORDER BY created ASC');
+    expect(orderBy({ field: 'priority', desc: true })).toBe('ORDER BY priority DESC, updated DESC');
+  });
+
+  it('явная сортировка заменяет порядок по умолчанию и ORDER BY из JQL', () => {
+    const order = orderBy({ field: 'created', desc: true });
+    expect(buildJql({ mode: 'project', projectKey: 'ABC', order })).toBe('project = ABC ORDER BY created DESC');
+    expect(buildJql({ mode: 'jql', jql: 'status = Open ORDER BY rank', order })).toBe('status = Open ORDER BY created DESC');
+    expect(buildJql({ mode: 'jql', jql: 'status = Open ORDER BY rank' })).toBe('status = Open ORDER BY rank');
+  });
+
+  it('isIssueSort', () => {
+    expect(isIssueSort({ field: 'priority', desc: false })).toBe(true);
+    expect(isIssueSort({ field: 'rank', desc: false })).toBe(false);
+    expect(isIssueSort({ field: 'key' })).toBe(false);
+    expect(isIssueSort(undefined)).toBe(false);
   });
 });
 

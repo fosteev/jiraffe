@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { Instance } from '../jira/types';
-import { buildJql, isIssueKey, type Mode, type QuickFilters } from '../jql';
+import { buildJql, isIssueKey, SORT_FIELDS, type IssueSort, type Mode, type QuickFilters } from '../jql';
 import { instancesApply, projectsApply, type FilterState } from '../state/filters';
 import type { InstanceStore } from '../state/instances';
 import { matchInstancesByKey, unionNames, type InstanceMeta } from '../state/meta';
@@ -9,7 +9,7 @@ import { isIssueRef, type IssuePanelManager } from '../panels/issuePanel';
 import { isIssueKey as isCardKey } from '../panels/protocol';
 import { CATEGORY_LABEL, hostOf } from '../views/format';
 import { savedFilterIdOf, type ApplyFilterArg } from '../views/filtersTree';
-import type { IssueRef, IssuesTree } from '../views/issuesTree';
+import { sortLabel, type IssueRef, type IssuesTree } from '../views/issuesTree';
 import { t } from '../l10n';
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -142,6 +142,32 @@ export function registerFilterCommands(
     const scope = converting ? (snap.mode === 'project' ? snap.project?.instanceId : undefined) : snap.jqlScope;
     // привязка к удалённому инстансу не переживает правку — иначе дерево так и останется пустым
     filters.setJql(jql.trim(), { scope: scope && store.get(scope) ? scope : undefined, baked: converting ? 'categories' : undefined });
+  }
+
+  /** Выбор сортировки «Задач». Повторный выбор текущей — сменить направление. */
+  async function sortIssues(): Promise<void> {
+    const cur = issues.sort;
+    type Item = vscode.QuickPickItem & { sort?: IssueSort };
+    const items: Item[] = [
+      {
+        label: t('Default'),
+        description: t('ORDER BY from the JQL, otherwise by updated date'),
+        iconPath: new vscode.ThemeIcon(cur ? 'blank' : 'check'),
+      },
+      ...SORT_FIELDS.map((field): Item => {
+        const active = cur?.field === field;
+        // Даты и номера — свежие сверху, приоритет — срочные сверху; у текущей — обратное направление.
+        const desc = active ? !cur.desc : true;
+        return {
+          label: sortLabel(field),
+          description: active ? `${cur.desc ? '↓' : '↑'} · ${t('select again to reverse')}` : undefined,
+          iconPath: new vscode.ThemeIcon(active ? 'check' : 'blank'),
+          sort: { field, desc },
+        };
+      }),
+    ];
+    const pick = await vscode.window.showQuickPick(items, { title: t('Sort Issues') });
+    if (pick) issues.setSort(pick.sort);
   }
 
   async function quickFilters(): Promise<void> {
@@ -289,6 +315,7 @@ export function registerFilterCommands(
       const ok = await vscode.window.showWarningMessage(t('Delete filter “{0}”?', f.name), { modal: true }, t('Delete'));
       if (ok === t('Delete')) await filters.deleteFilter(id);
     }),
+    vscode.commands.registerCommand('jiraffe.sortIssues', () => sortIssues()),
     vscode.commands.registerCommand('jiraffe.groupIssues', () => issues.setGrouped(true)),
     vscode.commands.registerCommand('jiraffe.ungroupIssues', () => issues.setGrouped(false)),
     vscode.commands.registerCommand('jiraffe.loadMore', (instanceId: unknown) => (typeof instanceId === 'string' ? issues.loadMore(instanceId) : undefined)),

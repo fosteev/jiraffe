@@ -10,12 +10,13 @@ import { intersectNames, keyPrefix, type InstanceMeta } from './meta';
  * (запрашивать нечего, выдача пуста). Не удалось получить справочник — берём выбор как есть.
  * Текст вида `ABC-123` ищется как ключ, только если проект `ABC` есть на инстансе (иначе `UTF-8` не найти);
  * `opts.textOnly` — принудительно текстом (повтор после 400 «задачи с таким ключом нет» на DC).
+ * `opts.order` — явная сортировка (`ORDER BY …`), перекрывает порядок запроса.
  */
 export async function jqlForInstance(
   snap: FilterSnapshot,
   inst: Instance,
   meta: Pick<InstanceMeta, 'types' | 'priorities' | 'projects'>,
-  opts: { textOnly?: boolean } = {},
+  opts: { textOnly?: boolean; order?: string } = {},
 ): Promise<string | null> {
   const quick = { ...snap.quick };
   const narrow = async (wanted: string[], load: () => Promise<{ name: string }[]>): Promise<string[] | null> => {
@@ -47,5 +48,6 @@ export async function jqlForInstance(
     quick: { ...quick, types, priorities: prios, projects },
     text: snap.text,
     textAsKey,
+    order: opts.order,
   });
 }

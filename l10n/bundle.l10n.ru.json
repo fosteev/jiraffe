@@ -378,5 +378,14 @@
   "{0}m": "{0}м",
   "— leave empty": "— не указывать",
   "— select —": "— выберите —",
-  "“{0}”": "«{0}»"
+  "“{0}”": "«{0}»",
+  "By Key": "По номеру",
+  "By Priority": "По срочности",
+  "By Created Date": "По дате создания",
+  "By Updated Date": "По дате обновления",
+  "Default": "По умолчанию",
+  "ORDER BY from the JQL, otherwise by updated date": "ORDER BY из JQL, иначе по дате обновления",
+  "select again to reverse": "выбрать ещё раз — обратный порядок",
+  "Sort Issues": "Сортировка задач",
+  "Sort by this column": "Сортировать по этой колонке"
 }

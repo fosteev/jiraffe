@@ -20,6 +20,7 @@
   "command.saveFilter": "Jiraffe: Сохранить как фильтр",
   "command.deleteFilter": "Jiraffe: Удалить фильтр",
   "command.applyFilter": "Jiraffe: Применить фильтр",
+  "command.sortIssues": "Jiraffe: Сортировка задач",
   "command.groupIssues": "Jiraffe: Группировать задачи по проектам",
   "command.ungroupIssues": "Jiraffe: Задачи плоским списком",
   "command.loadMore": "Jiraffe: Загрузить ещё",

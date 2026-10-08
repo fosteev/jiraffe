@@ -20,6 +20,7 @@
   "command.saveFilter": "Jiraffe: Save as Filter",
   "command.deleteFilter": "Jiraffe: Delete Filter",
   "command.applyFilter": "Jiraffe: Apply Filter",
+  "command.sortIssues": "Jiraffe: Sort Issues",
   "command.groupIssues": "Jiraffe: Group Issues by Project",
   "command.ungroupIssues": "Jiraffe: Show Issues as a Flat List",
   "command.loadMore": "Jiraffe: Load More",

@@ -3,13 +3,18 @@ import './l10nInit';
 import { t } from '../src/l10n';
 import type { HostToList, ListPage, ListToHost } from '../src/panels/protocol';
 import { esc } from './render';
-import { renderListPage } from './listRender';
+import { LIST_COLS, renderListPage, type ListCol, type ListSort } from './listRender';
 
-declare function acquireVsCodeApi(): { postMessage(m: ListToHost): void };
+declare function acquireVsCodeApi(): { postMessage(m: ListToHost): void; getState(): unknown; setState(s: unknown): void };
 const vscode = acquireVsCodeApi();
 const app = document.getElementById('app') as HTMLElement;
 
 let current: ListPage | undefined;
+/** Сортировка колонки — своя у вкладки; в state webview, чтобы пережить выгрузку скрытой вкладки. */
+let sort: ListSort | undefined = (() => {
+  const s = (vscode.getState() as { sort?: Partial<ListSort> } | undefined)?.sort;
+  return s && LIST_COLS.includes(s.col as ListCol) && typeof s.desc === 'boolean' ? { col: s.col as ListCol, desc: s.desc } : undefined;
+})();
 const idOf = (p: ListPage): string => (p.type === 'epic' ? p.key : p.id);
 
 /** Цвет аватара и ширина сегментов — через CSSOM: inline style="…" запрещён CSP (style-src без unsafe-inline). */
@@ -38,11 +43,27 @@ window.addEventListener('message', (ev: MessageEvent<HostToList>) => {
     note(`${esc(m.message)}<br><button class="btn" data-act="refresh" ${target}>${t('Retry')}</button>`, 'err');
   } else if (m?.type === 'page') {
     current = m.data;
-    app.className = '';
-    app.innerHTML = renderListPage(m.data);
-    paint();
+    render();
   }
 });
+
+function render(): void {
+  if (!current) return;
+  app.className = '';
+  app.innerHTML = renderListPage(current, sort);
+  paint();
+}
+
+/** Клик по заголовку: по возрастанию → по убыванию → исходный порядок. Приоритет — сразу срочные сверху. */
+function toggleSort(col: ListCol): void {
+  const startDesc = col === 'priority';
+  if (sort?.col !== col) sort = { col, desc: startDesc };
+  else if (sort.desc === startDesc) sort = { col, desc: !startDesc };
+  else sort = undefined;
+  vscode.setState({ sort });
+  render();
+  app.querySelector<HTMLElement>(`[data-act="sort"][data-col="${col}"]`)?.focus();
+}
 
 function act(el: HTMLElement): void {
   const d = el.dataset;
@@ -52,6 +73,9 @@ function act(el: HTMLElement): void {
       break;
     case 'browser':
       if (current) vscode.postMessage({ type: 'openInBrowser', instanceId: current.instanceId, kind: current.type, id: idOf(current) });
+      break;
+    case 'sort':
+      if (current && LIST_COLS.includes(d.col as ListCol)) toggleSort(d.col as ListCol);
       break;
     case 'refresh':
       if (current) vscode.postMessage({ type: 'refresh', instanceId: current.instanceId, kind: current.type, id: idOf(current) });
