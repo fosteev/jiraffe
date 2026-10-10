@@ -83,6 +83,11 @@
     },
     "commands": [
       {
+        "command": "jiraffe.openSettings",
+        "title": "%command.openSettings%",
+        "icon": "$(gear)"
+      },
+      {
         "command": "jiraffe.refresh",
         "title": "%command.refresh%",
         "icon": "$(refresh)"
@@ -313,6 +318,11 @@
           "command": "jiraffe.refresh",
           "when": "view == jiraffe.issues || view == jiraffe.filters || view == jiraffe.epics || view == jiraffe.releases",
           "group": "navigation@9"
+        },
+        {
+          "command": "jiraffe.openSettings",
+          "when": "view == jiraffe.issues || view == jiraffe.filters || view == jiraffe.epics || view == jiraffe.releases",
+          "group": "navigation@10"
         },
         {
           "command": "jiraffe.scopeInstances",
