@@ -3,6 +3,7 @@ import type { WorkAttribute } from '../jira/tempo';
 import type { Attachment, IssueDetail, Progress, StatusCategory, UserRef, Worklog } from '../jira/types';
 import type { LogDraft, LogForm, TodayInstance } from '../jira/worklog';
 import { ISSUE_KEY_RE } from '../jql';
+import { isSettingId, parseSetting, type SectionId, type SettingId, type SettingsState, type SettingValue } from './settingsModel';
 
 export type IssueTab = 'desc' | 'att' | 'com' | 'hist' | 'wl';
 export const ISSUE_TABS: readonly IssueTab[] = ['desc', 'att', 'com', 'hist', 'wl'];
@@ -183,3 +184,44 @@ export type ListToHost =
   | { type: 'openIssue'; instanceId: string; key: string }
   | { type: 'openInBrowser'; instanceId: string; kind: ListPage['type']; id: string }
   | { type: 'refresh'; instanceId: string; kind: ListPage['type']; id: string };
+
+// ----- вкладка «Настройки Jiraffe» -----
+
+export type HostToSettings =
+  | { type: 'state'; state: SettingsState }
+  /** Прокрутить к разделу (команда `jiraffe.openSettings(section)`). */
+  | { type: 'scroll'; section: SectionId };
+
+export type SettingsToHost =
+  | { type: 'ready' }
+  /** Новое значение настройки; проверяет хост (`parseSettingsMessage`). Значение зависит от `id`: число, строка, булево или `{field, desc}`. */
+  | { type: 'set'; id: SettingId; value: unknown }
+  | { type: 'reset'; id: SettingId }
+  | { type: 'pickDir' }
+  | { type: 'openJson' };
+
+export type SettingsMessage =
+  | { type: 'ready' }
+  | { type: 'set'; setting: SettingValue }
+  | { type: 'reset'; id: SettingId }
+  | { type: 'pickDir' }
+  | { type: 'openJson' }
+  /** Сообщение неузнаваемо или значение не прошло проверку: хост покажет `error` и перерисует вкладку. */
+  | { type: 'invalid'; error: string };
+
+/** Разбор входящего от webview (недоверенного): тип, id и значение — по спискам и диапазонам из `package.json`. */
+export function parseSettingsMessage(m: unknown): SettingsMessage | undefined {
+  if (!m || typeof m !== 'object') return undefined;
+  const o = m as { type?: unknown; id?: unknown; value?: unknown };
+  switch (o.type) {
+    case 'ready':
+    case 'pickDir':
+    case 'openJson': return { type: o.type };
+    case 'reset': return isSettingId(o.id) ? { type: 'reset', id: o.id } : undefined;
+    case 'set': {
+      const r = parseSetting(o.id, o.value);
+      return r.ok ? { type: 'set', setting: r.value } : { type: 'invalid', error: r.error };
+    }
+    default: return undefined;
+  }
+}

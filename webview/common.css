@@ -258,3 +258,48 @@ table.t th:has(> .th-sort) { padding: 0; }
 .th-sort .arr { min-width: 1ch; }
 table.t tr.click:hover { background: var(--hov); }
 table.t td .ti { vertical-align: middle; }
+
+/* ---- вкладка «Настройки Jiraffe» (webview/settings.ts); раскладка — prototype/index.html, блок settings ---- */
+.st { display: grid; grid-template-columns: 184px minmax(0, 1fr); min-height: 100%; }
+.st-nav { border-right: 1px solid var(--bd); padding: 14px 0; position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; }
+.st-nav button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 5px 16px; color: var(--fg); cursor: pointer; text-align: left; font-size: 12.5px; }
+.st-nav button:hover { background: var(--hov); }
+.st-nav button.on { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground, var(--fg2)); }
+.st-main { padding: 14px 28px 56px; max-width: 880px; min-width: 0; }
+.st-top { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+.st-top .sinp { height: 28px; width: 100%; max-width: 440px; padding: 0 8px; border: 1px solid var(--vscode-input-border, var(--bd)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 3px; }
+.st-top .sinp::placeholder { color: var(--vscode-input-placeholderForeground); }
+.st-top .sinp:focus, .set-c input:focus, .set-c select:focus { outline: 0; border-color: var(--vscode-focusBorder); }
+.st-sec { scroll-margin-top: 8px; }
+.st-sec > h2 { font-size: 15px; font-weight: 600; color: var(--fg2); margin: 22px 0 2px; }
+.st-soon { color: var(--mut); padding: 8px 0 4px; }
+.set { position: relative; padding: 9px 12px 11px; margin: 0 -12px; border-radius: 4px; }
+.set:hover { background: var(--hov); }
+.set.mod::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 11px; width: 2px; background: var(--vscode-settings-modifiedItemIndicator, var(--blue)); border-radius: 1px; }
+.set-t { font-weight: 600; color: var(--fg2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.set-t .cat { font-weight: 400; color: var(--mut); }
+.set-t .key { background: none; padding: 0; font-weight: 400; }
+.set-d { color: var(--mut); font-size: 12.5px; margin: 2px 0 7px; max-width: 76ch; line-height: 1.5; }
+.set-c { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.set-c input.n, .set-c input.t, .set-c select { height: 26px; border: 1px solid var(--vscode-input-border, var(--bd)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 3px; padding: 0 8px; }
+.set-c input.n { width: 84px; font-variant-numeric: tabular-nums; }
+.set-c input.t { width: min(360px, 100%); font-family: var(--mono); font-size: 12px; }
+.set-c select { min-width: 180px; padding: 0 6px; }
+.set-c select:disabled { opacity: .6; }
+.set .rst { visibility: hidden; }
+.set.mod:hover .rst, .set.mod:focus-within .rst { visibility: visible; }
+button.lnk { color: var(--link); background: none; border: 0; padding: 0; cursor: pointer; font-size: 12px; }
+button.lnk:hover { text-decoration: underline; }
+.sw { position: relative; width: 30px; height: 16px; flex: none; border-radius: 8px; background: var(--track); border: 1px solid var(--vscode-input-border, var(--bd)); cursor: pointer; padding: 0; }
+.sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--mut); transition: left .12s; }
+.sw.on { background: var(--acc); border-color: var(--acc); }
+.sw.on::after { left: 16px; background: var(--acc-fg); }
+.where { font-size: 10.5px; color: var(--mut); border: 1px solid var(--bd); border-radius: 3px; padding: 0 5px; font-weight: 400; font-family: var(--mono); }
+.st-empty { color: var(--mut); padding: 24px 0; }
+@media (max-width: 640px) {
+  .st { grid-template-columns: minmax(0, 1fr); }
+  .st-nav { position: static; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--bd); padding: 0; }
+  .st-nav button { width: auto; white-space: nowrap; padding: 8px 12px; }
+  .st-main { padding: 12px 16px 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .sw::after { transition: none; } }

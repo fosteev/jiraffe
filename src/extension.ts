@@ -10,6 +10,8 @@ import { registerTransitionCommand } from './commands/transition';
 import { AttachmentService } from './panels/attachments';
 import { IssuePanelManager } from './panels/issuePanel';
 import { ListPanelManager } from './panels/listPanel';
+import { SettingsPanel } from './panels/settingsPanel';
+import { isSectionId } from './panels/settingsModel';
 import { FilterState } from './state/filters';
 import { InstanceStore } from './state/instances';
 import { InstanceMeta } from './state/meta';
@@ -60,6 +62,7 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
   const filtersTree = new FiltersTree(instances, filters, meta);
   const issuesView = vscode.window.createTreeView('jiraffe.issues', { treeDataProvider: issuesTree });
   issuesTree.attach(issuesView);
+  const settings = new SettingsPanel(context.extensionUri, issuesTree);
   context.subscriptions.push(
     meta,
     attachments,
@@ -68,6 +71,8 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
     filtersTree,
     issuesView,
     lists,
+    settings,
+    vscode.commands.registerCommand('jiraffe.openSettings', (section?: unknown) => settings.open(isSectionId(section) ? section : undefined)),
     epicsTree,
     releasesTree,
     epicsView,
