@@ -62,7 +62,7 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
   const filtersTree = new FiltersTree(instances, filters, meta);
   const issuesView = vscode.window.createTreeView('jiraffe.issues', { treeDataProvider: issuesTree });
   issuesTree.attach(issuesView);
-  const settings = new SettingsPanel(context.extensionUri, issuesTree);
+  const settings = new SettingsPanel(context.extensionUri, issuesTree, instances);
   context.subscriptions.push(
     meta,
     attachments,
