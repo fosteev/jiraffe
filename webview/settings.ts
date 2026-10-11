@@ -3,7 +3,7 @@
 import './l10nInit';
 import { t } from '../src/l10n';
 import type { HostToSettings, InstanceAction, SettingsToHost } from '../src/panels/protocol';
-import type { Control, EpicLink, InstanceCard, Level, SectionId, SettingRow, SettingsState, SortControl } from '../src/panels/settingsModel';
+import type { AgenturaInfo, Control, EpicLink, InstanceCard, LastApiWrite, Level, SectionId, SettingRow, SettingsState, SortControl } from '../src/panels/settingsModel';
 import { esc, fmtDateTime, IC } from './render';
 
 declare function acquireVsCodeApi(): { postMessage(m: SettingsToHost): void; getState(): unknown; setState(s: unknown): void };
@@ -50,7 +50,8 @@ function control(row: SettingRow, c: Control): string {
   }
 }
 
-function renderRow(row: SettingRow): string {
+/** `extra` — разметка под элементом управления (подсказка строки). */
+function renderRow(row: SettingRow, extra = ''): string {
   const hay = `${row.cat} ${row.title} ${row.desc} ${row.key ?? ''}`.toLowerCase();
   const reset = row.modified ? `<button class="lnk rst" data-reset>${esc(t('Reset to {0}', row.resetTo))}</button>` : '';
   return `<div class="set${row.modified ? ' mod' : ''}" data-id="${row.id}" data-q="${esc(hay)}">`
@@ -58,7 +59,7 @@ function renderRow(row: SettingRow): string {
     + `<span class="where" title="${esc(levelTitle(row.level))}">${esc(levelText(row.level))}</span>`
     + (row.key ? `<code class="sm mut key">${esc(row.key)}</code>` : '') + '</div>'
     + `<div class="set-d">${esc(row.desc)}</div>`
-    + `<div class="set-c">${control(row, row.control)}${reset}</div></div>`;
+    + `<div class="set-c">${control(row, row.control)}${reset}</div>${extra}</div>`;
 }
 
 // ----- Подключения -----
@@ -138,12 +139,37 @@ function renderTimeTargets(s: SettingsState): string {
     + `<div class="set-d">${esc(tt.desc)}</div><div class="set-c tt-wrap">${body}</div></div>`;
 }
 
+// ----- Интеграции -----
+
+/** Agentura — не настройка, а статус: найдена или нет (решение 12 roadmap-settings); кнопка в карточке задачи появляется сама. */
+function renderAgentura(a: AgenturaInfo): string {
+  const hay = `Agentura ${a.title} ${a.desc}`.toLowerCase();
+  const status = a.found
+    ? `<span class="ok">${IC.ok}${esc(t('Agentura found'))}</span><span class="mut sm">· ${esc(t('each issue has its own chats'))}</span>`
+    : `<span class="mut">${esc(t('Agentura is not installed'))}</span>`;
+  return `<div class="set" data-q="${esc(hay)}"><div class="set-t"><span><span class="cat">Agentura: </span>${esc(a.title)}</span>`
+    + `<span class="where" title="${esc(levelTitle('auto'))}">${esc(levelText('auto'))}</span></div>`
+    + `<div class="set-d">${esc(a.desc)}</div><div class="set-c">${status}</div></div>`;
+}
+
+function lastWriteHint(w: LastApiWrite | undefined): string {
+  const text = w ? t('Last write via the API: {0} · {1} · {2}', w.label, w.key, fmtDateTime(w.at)) : t('Last write via the API: none yet');
+  return `<div class="hint">${IC.info} ${esc(text)}</div>`;
+}
+
+/** Статус Agentura, затем два переключателя API (второй модель отдаёт, только пока включён первый); «последняя запись» — под вторым. */
+function renderIntegrations(s: SettingsState): string {
+  const rows = s.rows.filter((r) => r.section === 'int').map((r) => renderRow(r, r.id === 'apiAllowWrites' ? lastWriteHint(s.integrations.lastWrite) : ''));
+  return renderAgentura(s.integrations.agentura) + rows.join('');
+}
+
 function renderState(s: SettingsState): string {
   const nav = s.sections.map((x) => `<button class="${x.id === activeSec ? 'on' : ''}" data-sec="${x.id}">${esc(x.title)}`
     + (x.badge ? `<span class="badge" title="${esc(t('There are connection problems'))}">${x.badge}</span>` : '') + '</button>').join('');
   const secs = s.sections.map((x) => {
-    let body = x.soon ? `<div class="st-soon">${esc(t('Coming soon'))}</div>` : s.rows.filter((r) => r.section === x.id).map(renderRow).join('');
+    let body = x.soon ? `<div class="st-soon">${esc(t('Coming soon'))}</div>` : s.rows.filter((r) => r.section === x.id).map((r) => renderRow(r)).join('');
     if (x.id === 'conn') body = renderConnections(s);
+    if (x.id === 'int') body = renderIntegrations(s);
     if (x.id === 'time') body += renderTimeTargets(s);
     const act = x.id === 'conn' ? `<span class="sp"></span><button class="btn sm pri" data-add data-f="add">${IC.plus}${esc(t('Connect Jira'))}</button>` : '';
     return `<section class="st-sec" id="st-${x.id}" data-soon="${x.soon}"><h2>${esc(x.title)}${act}</h2>${x.sub ? `<p class="sub">${esc(x.sub)}</p>` : ''}${body}</section>`;

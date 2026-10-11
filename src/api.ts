@@ -1,6 +1,7 @@
 // Публичный API Jiraffe для других расширений: возвращается из `activate()` (`vscode.extensions.getExtension('fosteev.jiraffe').exports`).
 // Контракт зафиксирован в Agentura (roadmap 19, решение 6): v1 только читает и открывает карточки, v2 добавляет запись
 // (комментарий, переход, ворклог) от имени пользователя. Без vscode (только типы) — тестируется в vitest.
+// Доступ ограничивают настройки `jiraffe.api.enabled` (чтение) и `jiraffe.api.allowWrites` (запись), см. `ApiDeps.access`.
 import type { Event } from 'vscode';
 import type { JiraClient } from './jira/client';
 import { maybeSaved } from './jira/http';
@@ -27,9 +28,15 @@ export interface LogWorkInput {
 }
 export type WriteKind = 'comment' | 'transition' | 'worklog';
 
+/**
+ * Доступ к API из настроек пользователя (`jiraffe.api.enabled`, `jiraffe.api.allowWrites`).
+ * Чтение выключено — `instances()` возвращает `[]`, остальные методы отказывают «Jiraffe: the API is disabled in Jiraffe settings».
+ * Чтение включено, запись выключена — отказывают `addComment`, `transition`, `logWork`: «Jiraffe: writing through the API is disabled
+ * in Jiraffe settings». Отказ приходит до любого обращения к Jira; `apiVersion` и сигнатуры от настроек не зависят.
+ */
 export interface JiraffeApi {
   apiVersion: 2;
-  /** Инстансы в scope воркспейса (`jiraffe.instances`). */
+  /** Инстансы в scope воркспейса (`jiraffe.instances`). Пусто, если API выключен в настройках. */
   instances(): { id: string; name: string; baseUrl: string; kind: InstanceKind }[];
   /**
    * Задача с ворклогами. `descriptionHtml` и `bodyHtml` комментариев санитизированы (http/https/mailto; картинки — плейсхолдер
@@ -52,7 +59,15 @@ export interface JiraffeApi {
   logWork(instanceId: string, key: string, work: LogWorkInput): Promise<{ via: 'tempo' | 'jira'; id?: string }>;
 }
 
+/** Что сейчас разрешено вызывающим расширениям. `write` имеет смысл только при `read` (`enabled && allowWrites`). */
+export interface ApiAccess { read: boolean; write: boolean }
+
 export interface ApiDeps {
+  /**
+   * Доступ из настроек. Читается на КАЖДЫЙ вызов (переключатель на вкладке действует сразу, без перезапуска), не кэшируется.
+   * Закрыто всё, что не строгое `true`: исключение, пустой ответ, не-boolean, запись без чтения.
+   */
+  access(): ApiAccess;
   /** Инстансы воркспейса. */
   list(): Instance[];
   /** Инстанс по id, только из scope воркспейса. */
@@ -70,8 +85,31 @@ const KEY_RE = /^[A-Za-z][A-Za-z0-9_]*-\d+$/;
 /** Как у формы ворклога (`commands/logWork.ts`). */
 const UNSURE_MS = 10 * 60_000;
 
+/** Тексты отказов гейта (после префикса «Jiraffe: » из `fail`). */
+const READ_OFF = 'the API is disabled in Jiraffe settings';
+const WRITE_OFF = 'writing through the API is disabled in Jiraffe settings';
+
 export function createApi(d: ApiDeps): JiraffeApi {
+  /** Отказ самого API (до записи в Jira): после него карточку не обновляем. */
+  class Refused extends Error {}
+  const fail = (msg: string): never => { throw new Refused(`Jiraffe: ${msg}`); };
+  /** Гейт настроек: свежее значение на каждый вызов; ошибка чтения настроек и любой ответ, кроме `true`, — закрыто. */
+  const access = (): ApiAccess => {
+    try {
+      const a = d.access() as Partial<ApiAccess> | undefined;
+      const read = a?.read === true;
+      return { read, write: read && a?.write === true };
+    } catch {
+      return { read: false, write: false };
+    }
+  };
+  /** Ещё раз перед самой отправкой записи: пока API ждал клиента, переходы или форму Tempo, запись могли выключить. */
+  const recheckWrite = (): void => { if (!access().write) fail(WRITE_OFF); };
+  /** То же для чтения: ответ Jira, пришедший уже после выключения API, наружу не отдаём. */
+  const recheckRead = (): void => { if (!access().read) fail(READ_OFF); };
+  // Первым делом, до поиска инстанса и разбора аргументов: при выключенном API по тексту отказа нельзя подбирать id и ключи.
   const inst = (id: unknown): Instance => {
+    if (!access().read) return fail(READ_OFF);
     const i = typeof id === 'string' ? d.visible(id) : undefined;
     if (!i) throw new Error(`Jiraffe: unknown instance "${String(id).slice(0, 50)}"`);
     return i;
@@ -81,9 +119,6 @@ export function createApi(d: ApiDeps): JiraffeApi {
     return k.trim().toUpperCase();
   };
   const clip = (v: unknown, n = 50): string => String(v).slice(0, n);
-  /** Отказ самого API (до записи в Jira): после него карточку не обновляем. */
-  class Refused extends Error {}
-  const fail = (msg: string): never => { throw new Refused(`Jiraffe: ${msg}`); };
   const inFlight = new Set<string>();
   /** Запись оборвалась без ответа («могла сохраниться»): время по ключу записи — первый повтор в течение `UNSURE_MS` отклоняется. */
   const unsure = new Map<string, number>();
@@ -92,6 +127,8 @@ export function createApi(d: ApiDeps): JiraffeApi {
    * Повтор сразу после обрыва/таймаута (Jira могла записать) — первый раз reject, второй проходит — как форма ворклога.
    */
   const guarded = async <T>(kind: WriteKind, i: Instance, k: string, run: () => Promise<T>): Promise<T> => {
+    // Единственная дверь к записи: гейт раньше замка и метки «могла сохраниться» (отказ их не трогает) и до любого вызова клиента.
+    if (!access().write) return fail(WRITE_OFF);
     const id = `${kind}:${i.id}:${k}`;
     if (inFlight.has(id)) return fail(`a ${kind} for ${k} is already being sent`);
     const at = unsure.get(id);
@@ -115,17 +152,20 @@ export function createApi(d: ApiDeps): JiraffeApi {
       }
     }
   };
-  return {
+  // Один объект на всех потребителей `exports`: заморожен, чтобы одно расширение не подменило методы под другим.
+  return Object.freeze({
     apiVersion: 2,
-    instances: () => d.list().map((i) => ({ id: i.id, name: i.name, baseUrl: i.baseUrl, kind: i.kind })),
+    instances: () => (access().read ? d.list().map((i) => ({ id: i.id, name: i.name, baseUrl: i.baseUrl, kind: i.kind })) : []),
     async issue(instanceId, k) {
       const i = inst(instanceId);
       const { issue, worklogs } = await (await d.client(i)).issueDetail(key(k), i);
+      recheckRead();
       return { issue: sanitizeDetail(issue, i.baseUrl), worklogs };
     },
     async myself(instanceId) {
       const i = inst(instanceId);
       const me = await (await d.client(i)).myself();
+      recheckRead();
       // id у MyselfInfo: accountId (Cloud) или имя пользователя (DC). У Cloud имени нет (клиент подставляет туда accountId) —
       // наружу только accountId; у DC — только name. Email не отдаём.
       return i.kind === 'cloud' ? { accountId: me.id, displayName: me.displayName } : { name: me.name, displayName: me.displayName };
@@ -139,11 +179,16 @@ export function createApi(d: ApiDeps): JiraffeApi {
       const kk = key(k);
       if (typeof body !== 'string' || !body.trim()) return fail('comment body must be a non-empty string');
       if (body.length > MAX_ISSUE_COMMENT) return fail(`comment is too long (max ${MAX_ISSUE_COMMENT} characters)`);
-      return guarded('comment', i, kk, async () => (await d.client(i)).addComment(kk, body));
+      return guarded('comment', i, kk, async () => {
+        const c = await d.client(i);
+        recheckWrite();
+        return c.addComment(kk, body);
+      });
     },
     async transitions(instanceId, k) {
       const i = inst(instanceId);
       const list = await (await d.client(i)).transitions(key(k));
+      recheckRead();
       return list.map((t) => ({ id: t.id, name: t.name, to: t.to, requiresFields: t.fields.length > 0 }));
     },
     async transition(instanceId, k, transitionId) {
@@ -155,6 +200,7 @@ export function createApi(d: ApiDeps): JiraffeApi {
         const t = (await c.transitions(kk)).find((x) => x.id === transitionId);
         if (!t) return fail(`transition "${clip(transitionId)}" is not available for ${kk}`);
         if (t.fields.length) return fail(`transition "${clip(t.name, 100)}" requires fields that the API cannot fill`);
+        recheckWrite();
         await c.transition(kk, t.id);
       });
     },
@@ -182,11 +228,13 @@ export function createApi(d: ApiDeps): JiraffeApi {
         if (attrs.length) return fail('Tempo requires work attributes that the API cannot fill');
         const ai = form.attributes.find((a) => a.key === form.aiTokensAttr);
         if (ai?.required && w.aiTokens === undefined) return fail('aiTokens is required by this Tempo instance');
-        return submitWorklog(await d.client(i), kk, form, {
+        const c = await d.client(i);
+        recheckWrite();
+        return submitWorklog(c, kk, form, {
           timeSpentSec: sec, date, comment: (w.comment ?? '').trim(), ...(w.aiTokens !== undefined ? { aiTokens: w.aiTokens } : {}), attributes: {},
         });
       });
     },
     onDidChangeInstances: d.onDidChangeInstances,
-  };
+  } satisfies JiraffeApi);
 }

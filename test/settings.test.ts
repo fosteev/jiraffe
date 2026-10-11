@@ -12,6 +12,7 @@ import { isAbsoluteDir, relativeInside } from '../src/panels/settingsPaths';
 const base: SettingsInput = {
   maxResults: { defaultValue: 50 }, attachmentsDir: { defaultValue: '.jiraffe' }, maxImageMb: { defaultValue: 5 }, workdayHours: { defaultValue: 8 },
   sort: undefined, grouped: false, hasWorkspace: true, canScope: true, instances: [], scopeSet: false,
+  apiEnabled: { defaultValue: true }, apiAllowWrites: { defaultValue: true }, agentura: false, lastApiWrite: undefined,
 };
 
 describe('resolveScalar: уровень значения', () => {
@@ -50,16 +51,16 @@ describe('resolveScalar: значение не того типа в settings.jso
 });
 
 describe('buildSettingsState', () => {
-  it('пять разделов, заглушка только «Интеграции»; все id строк известны', () => {
+  it('пять разделов, заглушек нет; все id строк известны', () => {
     const s = buildSettingsState(base);
-    expect(s.sections.map((x) => [x.id, x.soon])).toEqual([['conn', false], ['list', false], ['att', false], ['time', false], ['int', true]]);
+    expect(s.sections.map((x) => [x.id, x.soon])).toEqual([['conn', false], ['list', false], ['att', false], ['time', false], ['int', false]]);
     expect(s.rows.map((r) => r.id).sort()).toEqual([...SETTING_IDS].sort());
     expect(s.rows.every((r) => !r.modified)).toBe(true);
   });
-  it('строки по разделам: список — 3, вложения — 2, время — 1', () => {
+  it('строки по разделам: список — 3, вложения — 2, время — 1, интеграции — 2 (два переключателя API)', () => {
     const s = buildSettingsState(base);
     const n = (sec: string): number => s.rows.filter((r) => r.section === sec).length;
-    expect([n('list'), n('att'), n('time'), n('conn'), n('int')]).toEqual([3, 2, 1, 0, 0]);
+    expect([n('list'), n('att'), n('time'), n('conn'), n('int')]).toEqual([3, 2, 1, 0, 2]);
   });
   it('значения, метки уровня и изменённость', () => {
     const s = buildSettingsState({
@@ -135,6 +136,17 @@ describe('валидация значений из webview', () => {
     expect(parseSettingsMessage({ type: 'set', id: 'workdayHours', value: 6 })).toEqual({ type: 'set', setting: { id: 'workdayHours', value: 6 } });
     expect(parseSettingsMessage({ type: 'set', id: 'workdayHours', value: 99 })).toMatchObject({ type: 'invalid' });
     expect(parseSettingsMessage({ type: 'set', id: 'instances', value: [] })).toMatchObject({ type: 'invalid' });
+  });
+  it('parseSettingsMessage: переключатели API — только boolean, сброс по id', () => {
+    expect(parseSettingsMessage({ type: 'set', id: 'apiEnabled', value: false })).toEqual({ type: 'set', setting: { id: 'apiEnabled', value: false } });
+    expect(parseSettingsMessage({ type: 'set', id: 'apiAllowWrites', value: true })).toEqual({ type: 'set', setting: { id: 'apiAllowWrites', value: true } });
+    for (const bad of ['true', 1, null, undefined, {}]) {
+      expect(parseSettingsMessage({ type: 'set', id: 'apiEnabled', value: bad })).toMatchObject({ type: 'invalid' });
+      expect(parseSettingsMessage({ type: 'set', id: 'apiAllowWrites', value: bad })).toMatchObject({ type: 'invalid' });
+    }
+    expect(parseSettingsMessage({ type: 'reset', id: 'apiEnabled' })).toEqual({ type: 'reset', id: 'apiEnabled' });
+    expect(parseSettingsMessage({ type: 'reset', id: 'apiAllowWrites' })).toEqual({ type: 'reset', id: 'apiAllowWrites' });
+    expect(parseSettingsMessage({ type: 'set', id: 'jiraffe.api.enabled', value: true })).toMatchObject({ type: 'invalid' });
   });
 });
 
@@ -233,6 +245,64 @@ describe('состояние: подключения и «Куда пишетс�
     expect(parseSettingsMessage({ type: 'scopeMode', mode: 'none' })).toBeUndefined();
     expect(parseSettingsMessage({ type: 'scopeToggle', id: 'jira-a', on: false })).toEqual({ type: 'scopeToggle', id: 'jira-a', on: false });
     expect(parseSettingsMessage({ type: 'scopeToggle', id: 'jira-a', on: 'yes' })).toBeUndefined();
+  });
+});
+
+describe('раздел «Интеграции»: доступ API и Agentura', () => {
+  const row = (s: ReturnType<typeof buildSettingsState>, id: string) => s.rows.find((r) => r.id === id);
+  it('по умолчанию оба переключателя включены, уровень «пользователь», не изменены, ключи настроек видны', () => {
+    const s = buildSettingsState(base);
+    expect(row(s, 'apiEnabled')).toMatchObject({ section: 'int', key: 'jiraffe.api.enabled', level: 'user', modified: false, control: { kind: 'switch', value: true } });
+    expect(row(s, 'apiAllowWrites')).toMatchObject({ section: 'int', key: 'jiraffe.api.allowWrites', level: 'user', modified: false, control: { kind: 'switch', value: true } });
+  });
+  it('доступ выключен: второй переключатель скрыт, у первого есть «Сбросить к вкл»', () => {
+    const s = buildSettingsState({ ...base, apiEnabled: { defaultValue: true, globalValue: false } });
+    expect(row(s, 'apiAllowWrites')).toBeUndefined();
+    expect(row(s, 'apiEnabled')).toMatchObject({ modified: true, resetTo: 'on', control: { kind: 'switch', value: false } });
+  });
+  it('запись выключена: строка есть, выключена и изменена', () => {
+    const s = buildSettingsState({ ...base, apiAllowWrites: { defaultValue: true, globalValue: false } });
+    expect(row(s, 'apiEnabled')).toMatchObject({ control: { value: true } });
+    expect(row(s, 'apiAllowWrites')).toMatchObject({ modified: true, resetTo: 'on', control: { kind: 'switch', value: false } });
+  });
+  it('workspace и папка не показываются как значение: вкладка видит то же, что и гейт', () => {
+    const s = buildSettingsState({
+      ...base,
+      apiEnabled: { defaultValue: true, globalValue: false, workspaceValue: true, workspaceFolderValue: true },
+      apiAllowWrites: { defaultValue: true, globalValue: false, workspaceValue: true },
+    });
+    expect(row(s, 'apiEnabled')).toMatchObject({ level: 'user', control: { value: false } });
+    const s2 = buildSettingsState({ ...base, apiAllowWrites: { defaultValue: true, workspaceValue: false, workspaceFolderValue: false } });
+    expect(row(s2, 'apiAllowWrites')).toMatchObject({ level: 'user', modified: false, control: { value: true } });
+  });
+  it('мусор в пользовательских настройках: переключатель «выкл» (как решает гейт) и есть «Сбросить»', () => {
+    const s = buildSettingsState({ ...base, apiEnabled: { defaultValue: true, globalValue: 'no' } });
+    expect(row(s, 'apiEnabled')).toMatchObject({ modified: true, control: { value: false } });
+  });
+  it('Agentura: найдена / не установлена, тексты заполнены', () => {
+    const none = buildSettingsState(base).integrations.agentura;
+    expect(none.found).toBe(false);
+    expect(none.title).toBeTruthy();
+    expect(none.desc).toMatch(/Agentura/);
+    expect(buildSettingsState({ ...base, agentura: true }).integrations.agentura.found).toBe(true);
+  });
+  it('последняя запись: нет — поля нет; есть — вид, ключ и время ISO', () => {
+    expect(buildSettingsState(base).integrations.lastWrite).toBeUndefined();
+    const at = Date.UTC(2026, 9, 11, 10, 48, 0);
+    const w = buildSettingsState({ ...base, lastApiWrite: { kind: 'comment', key: 'HOME-710', at } }).integrations.lastWrite;
+    expect(w).toMatchObject({ kind: 'comment', key: 'HOME-710', at: '2026-10-11T10:48:00.000Z' });
+    expect(w?.label).toBeTruthy();
+    const labels = (['comment', 'transition', 'worklog'] as const).map((kind) => buildSettingsState({ ...base, lastApiWrite: { kind, key: 'A-1', at } }).integrations.lastWrite?.label);
+    expect(new Set(labels).size).toBe(3);
+  });
+  it('невалидное время записи не ломает сборку состояния — строки просто нет', () => {
+    for (const at of [NaN, Infinity, 8.64e15 + 1]) {
+      expect(buildSettingsState({ ...base, lastApiWrite: { kind: 'comment', key: 'A-1', at } }).integrations.lastWrite).toBeUndefined();
+    }
+  });
+  it('в состоянии нет токенов и почты инстансов', () => {
+    const s = buildSettingsState({ ...base, agentura: true, lastApiWrite: { kind: 'worklog', key: 'A-1', at: 1 }, instances: [{ inst: { ...dc, token: 'SECRET123', email: 'me@x.test' } as Instance, status: undefined, inScope: true }] });
+    expect(JSON.stringify(s.integrations)).not.toMatch(/SECRET123|me@x\.test/);
   });
 });
 

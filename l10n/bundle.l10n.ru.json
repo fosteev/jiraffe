@@ -501,5 +501,20 @@
   "No instances yet. Connect Jira to get started.": "Инстансов пока нет. Подключите Jira, чтобы начать.",
   "No instances in this workspace.": "В этом workspace нет инстансов.",
   "There are connection problems": "Есть проблемы с подключением",
-  "Connect Jira": "Подключить Jira"
+  "Connect Jira": "Подключить Jira",
+  "comment": "комментарий",
+  "status change": "смена статуса",
+  "work log": "журнал работ",
+  "on": "вкл",
+  "Access for other extensions": "Доступ других расширений",
+  "Jiraffe's public API: other extensions (for example, Agentura) see the instances of this workspace, read issues and open the card. Tokens and email are never passed out. Set in user settings only: a project's .vscode/settings.json cannot change it.": "Публичный API Jiraffe: другие расширения (например, Agentura) видят инстансы этого workspace, читают задачи и открывают карточку. Токены и email наружу не отдаются никогда. Задаётся только в пользовательских настройках: .vscode/settings.json проекта изменить это не может.",
+  "Allow writing on your behalf": "Разрешить запись от вашего имени",
+  "API v2: comment, status change, work log. Every action is performed as your Jira account. Off means extensions can only read. Set in user settings only.": "API v2: комментарий, смена статуса, журнал работ. Каждое действие выполняется от вашего аккаунта Jira. Выключено — расширения только читают. Задаётся только в пользовательских настройках.",
+  "AI chat on an issue": "Чат ИИ по задаче",
+  "The \"Open in Agentura\" button in the issue card: a chat about the issue. It appears on its own when the Agentura extension is installed.": "Кнопка «Открыть в Agentura» в карточке задачи: чат по задаче. Появляется сама, когда установлено расширение Agentura.",
+  "Agentura found": "Agentura найдена",
+  "each issue has its own chats": "у каждой задачи свои чаты",
+  "Agentura is not installed": "Agentura не установлена",
+  "Last write via the API: {0} · {1} · {2}": "Последняя запись через API: {0} · {1} · {2}",
+  "Last write via the API: none yet": "Последняя запись через API: пока не было"
 }
