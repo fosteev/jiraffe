@@ -1,8 +1,11 @@
 // Модель вкладки «Настройки Jiraffe»: чистая сборка состояния из простых входов. Без vscode — тестируется напрямую.
 // Хост собирает входы через `getConfiguration('jiraffe').inspect(key)`; webview только рисует `SettingsState`.
+import type { WriteKind } from '../api';
+import { apiFlag, type InspectedFlag } from '../apiAccess';
 import { SORT_FIELDS, type IssueSort, type SortField } from '../jql';
 import type { Instance } from '../jira/types';
 import { t } from '../l10n';
+import type { ApiWrite } from '../state/apiActivity';
 
 export type SectionId = 'conn' | 'list' | 'att' | 'time' | 'int';
 export const SECTION_IDS: readonly SectionId[] = ['conn', 'list', 'att', 'time', 'int'];
@@ -13,9 +16,12 @@ export type Level = 'workspaceFolder' | 'workspace' | 'user' | 'state' | 'auto';
 /** Куда писать скаляр в settings.json. */
 export type WriteTarget = 'workspaceFolder' | 'workspace' | 'global';
 
-/** Идентификаторы настроек, которые вкладка умеет менять. Совпадают с ключами `jiraffe.*`, кроме сортировки и группировки (globalState). */
-export type SettingId = 'maxResults' | 'attachmentsDir' | 'maxImageMb' | 'workdayHours' | 'sort' | 'grouped';
-export const SETTING_IDS: readonly SettingId[] = ['maxResults', 'attachmentsDir', 'maxImageMb', 'workdayHours', 'sort', 'grouped'];
+/**
+ * Идентификаторы настроек, которые вкладка умеет менять. Совпадают с ключами `jiraffe.*`, кроме сортировки и группировки (globalState)
+ * и двух переключателей API (`jiraffe.api.enabled`, `jiraffe.api.allowWrites`: уровень application, пишутся только в Global).
+ */
+export type SettingId = 'maxResults' | 'attachmentsDir' | 'maxImageMb' | 'workdayHours' | 'sort' | 'grouped' | 'apiEnabled' | 'apiAllowWrites';
+export const SETTING_IDS: readonly SettingId[] = ['maxResults', 'attachmentsDir', 'maxImageMb', 'workdayHours', 'sort', 'grouped', 'apiEnabled', 'apiAllowWrites'];
 export const isSettingId = (v: unknown): v is SettingId => typeof v === 'string' && (SETTING_IDS as readonly string[]).includes(v);
 
 /** Диапазоны — как в `package.json` (contributes.configuration). */
@@ -131,11 +137,21 @@ export interface ConnectionsState {
 export interface TimeTarget { id: string; name: string; journal: Journal; label: string; note: string }
 export interface TimeTargets { title: string; desc: string; rows: TimeTarget[] }
 
+// ----- «Интеграции» -----
+
+/** Статус Agentura: только «найдена / не установлена» (решение 12). */
+export interface AgenturaInfo { title: string; desc: string; found: boolean }
+/** Последняя запись через публичный API (память хоста). `at` — ISO-время; форматирует webview. */
+export interface LastApiWrite { kind: WriteKind; label: string; key: string; at: string }
+/** Сами переключатели API — обычные строки `rows` раздела `int`; здесь то, что настройкой не является. */
+export interface IntegrationsState { agentura: AgenturaInfo; lastWrite?: LastApiWrite }
+
 export interface SettingsState {
   sections: SectionInfo[];
   rows: SettingRow[];
   connections: ConnectionsState;
   timeTargets: TimeTargets;
+  integrations: IntegrationsState;
   /** Открыта ли папка: без неё нельзя «Выбрать…» и относительный путь вложений уходит во временный каталог. */
   hasWorkspace: boolean;
 }
@@ -154,6 +170,13 @@ export interface SettingsInput {
   instances: { inst: Instance; status: ConnStatusInput | undefined; inScope: boolean; tokenError?: string }[];
   /** Задан ли набор `jiraffe.instances`. */
   scopeSet: boolean;
+  /** `inspect()` настроек `jiraffe.api.enabled` / `jiraffe.api.allowWrites`: учитываются только пользовательские и стандартные значения. */
+  apiEnabled: InspectedFlag | undefined;
+  apiAllowWrites: InspectedFlag | undefined;
+  /** Установлено ли расширение Agentura. */
+  agentura: boolean;
+  /** Последняя запись через публичный API с запуска окна. */
+  lastApiWrite: ApiWrite | undefined;
 }
 
 export const sortFieldLabel = (f: SortField): string =>
@@ -164,7 +187,7 @@ const sections = (errors: number): SectionInfo[] => [
   { id: 'list', title: t('Issue list'), sub: '', soon: false },
   { id: 'att', title: t('Attachments'), sub: '', soon: false },
   { id: 'time', title: t('Time tracking'), sub: '', soon: false },
-  { id: 'int', title: t('Integrations'), sub: '', soon: true },
+  { id: 'int', title: t('Integrations'), sub: '', soon: false },
 ];
 
 const str = (v: unknown, max = 200): string | undefined => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
@@ -198,6 +221,9 @@ export function buildInstanceCard(inst: Instance, status: ConnStatusInput | unde
     ...(tokenError ? { tokenError } : {}),
   };
 }
+
+const writeKindLabel = (k: WriteKind): string =>
+  k === 'comment' ? t('comment') : k === 'transition' ? t('status change') : t('work log');
 
 const timeTarget = (c: InstanceCard): TimeTarget => ({
   id: c.id, name: c.name, journal: c.journal,
@@ -253,7 +279,25 @@ export function buildSettingsState(i: SettingsInput): SettingsState {
       control: num(wd, 'workdayHours', 0.5, t('hours')),
     },
   ];
+  // Доступ API: уровень всегда «пользователь» (настройки application, workspace их не задаёт); второй переключатель скрыт при выключенном первом.
+  const apiOn = apiFlag(i.apiEnabled);
+  const apiWrite = apiFlag(i.apiAllowWrites);
+  rows.push({
+    id: 'apiEnabled', section: 'int', cat: 'API', title: t('Access for other extensions'), key: 'jiraffe.api.enabled',
+    desc: t('Jiraffe\'s public API: other extensions (for example, Agentura) see the instances of this workspace, read issues and open the card. Tokens and email are never passed out. Set in user settings only: a project\'s .vscode/settings.json cannot change it.'),
+    level: 'user', modified: apiOn.modified, resetTo: apiOn.def ? t('on') : t('off'), control: { kind: 'switch', value: apiOn.value },
+  });
+  if (apiOn.value) {
+    rows.push({
+      id: 'apiAllowWrites', section: 'int', cat: 'API', title: t('Allow writing on your behalf'), key: 'jiraffe.api.allowWrites',
+      desc: t('API v2: comment, status change, work log. Every action is performed as your Jira account. Off means extensions can only read. Set in user settings only.'),
+      level: 'user', modified: apiWrite.modified, resetTo: apiWrite.def ? t('on') : t('off'), control: { kind: 'switch', value: apiWrite.value },
+    });
+  }
   const cards = i.instances.map((x) => buildInstanceCard(x.inst, x.status, x.inScope, x.tokenError));
+  // Время записи — из часов хоста, но `toISOString()` на невалидной дате бросает: лучше без строки, чем пустая вкладка.
+  const lastDate = i.lastApiWrite ? new Date(i.lastApiWrite.at) : undefined;
+  const lastAt = lastDate && !Number.isNaN(lastDate.getTime()) ? lastDate.toISOString() : undefined;
   return {
     sections: sections(cards.filter((c) => c.state === 'error').length), rows, hasWorkspace: i.hasWorkspace,
     connections: { mode: i.scopeSet ? 'some' : 'all', canScope: i.canScope, cards },
@@ -261,6 +305,16 @@ export function buildSettingsState(i: SettingsInput): SettingsState {
       title: t('Where time is logged'),
       desc: t('Chosen per instance: with Tempo, the entry goes to Tempo (with a work type and AI Tokens); without it, to the issue\'s standard Jira work log.'),
       rows: cards.filter((c) => c.inScope).map(timeTarget),
+    },
+    integrations: {
+      agentura: {
+        title: t('AI chat on an issue'),
+        desc: t('The "Open in Agentura" button in the issue card: a chat about the issue. It appears on its own when the Agentura extension is installed.'),
+        found: i.agentura,
+      },
+      ...(lastAt && i.lastApiWrite
+        ? { lastWrite: { kind: i.lastApiWrite.kind, label: writeKindLabel(i.lastApiWrite.kind), key: i.lastApiWrite.key, at: lastAt } }
+        : {}),
     },
   };
 }
@@ -306,7 +360,7 @@ export type SettingValue =
   | { id: NumberId; value: number }
   | { id: 'attachmentsDir'; value: string | undefined }
   | { id: 'sort'; value: IssueSort | undefined }
-  | { id: 'grouped'; value: boolean };
+  | { id: 'grouped' | 'apiEnabled' | 'apiAllowWrites'; value: boolean };
 
 export function parseSetting(id: unknown, v: unknown): Parsed<SettingValue> {
   if (!isSettingId(id)) return { ok: false, error: t('Unknown setting.') };
@@ -317,6 +371,8 @@ export function parseSetting(id: unknown, v: unknown): Parsed<SettingValue> {
     case 'workdayHours': return wrap(parseNumber(id, v), (value) => ({ id, value }));
     case 'attachmentsDir': return wrap(parseDir(v), (value) => ({ id, value }));
     case 'sort': return wrap(parseSort(v), (value) => ({ id, value }));
-    case 'grouped': return wrap(parseSwitch(v), (value) => ({ id, value }));
+    case 'grouped':
+    case 'apiEnabled':
+    case 'apiAllowWrites': return wrap(parseSwitch(v), (value) => ({ id, value }));
   }
 }

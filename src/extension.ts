@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { createApi, type JiraffeApi } from './api';
+import { createApi, type ApiAccess, type JiraffeApi } from './api';
+import { API_ALLOW_WRITES, API_ENABLED, API_SECTION, resolveApiAccess } from './apiAccess';
 import { setL10n } from './l10n';
 import { readScope, registerInstanceCommands } from './commands/instances';
 import { registerFilterCommands } from './commands/filters';
@@ -12,6 +13,7 @@ import { IssuePanelManager } from './panels/issuePanel';
 import { ListPanelManager } from './panels/listPanel';
 import { SettingsPanel } from './panels/settingsPanel';
 import { isSectionId } from './panels/settingsModel';
+import { ApiActivity } from './state/apiActivity';
 import { FilterState } from './state/filters';
 import { InstanceStore } from './state/instances';
 import { InstanceMeta } from './state/meta';
@@ -24,6 +26,12 @@ import { IssuesTree } from './views/issuesTree';
 import { ReleasesTree } from './views/releasesTree';
 import { TodayStatusBar } from './views/statusBar';
 import { TempoViewProvider } from './views/tempoView';
+
+/** Доступ других расширений к API из пользовательских настроек. Вызывается на каждое обращение к API, не кэшируется. */
+function apiAccess(): ApiAccess {
+  const cfg = vscode.workspace.getConfiguration(API_SECTION);
+  return resolveApiAccess(cfg.inspect<unknown>(API_ENABLED), cfg.inspect<unknown>(API_ALLOW_WRITES));
+}
 
 /** Сводку «сегодня» перечитываем, когда окно вернули в фокус (не чаще раза в 5 минут) и раз в 15 минут, пока окно в фокусе. */
 const FOCUS_REFRESH_MS = 5 * 60_000;
@@ -62,7 +70,8 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
   const filtersTree = new FiltersTree(instances, filters, meta);
   const issuesView = vscode.window.createTreeView('jiraffe.issues', { treeDataProvider: issuesTree });
   issuesTree.attach(issuesView);
-  const settings = new SettingsPanel(context.extensionUri, issuesTree, instances);
+  const apiActivity = new ApiActivity();
+  const settings = new SettingsPanel(context.extensionUri, issuesTree, instances, apiActivity);
   context.subscriptions.push(
     meta,
     attachments,
@@ -111,8 +120,14 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
   );
   refreshToday();
   const instancesChanged = new vscode.EventEmitter<void>();
-  context.subscriptions.push(instancesChanged, instances.onDidChange(() => instancesChanged.fire()));
+  context.subscriptions.push(
+    instancesChanged,
+    instances.onDidChange(() => instancesChanged.fire()),
+    // Доступ включили или выключили: `instances()` стал полным или пустым — потребители перечитают список.
+    vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration(`${API_SECTION}.${API_ENABLED}`)) instancesChanged.fire(); }),
+  );
   return createApi({
+    access: apiAccess,
     list: () => instances.list(),
     visible: (id) => (instances.visible(id) ? instances.get(id) : undefined),
     client: (inst) => meta.client(inst),
@@ -120,6 +135,7 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
     onDidChangeInstances: instancesChanged.event,
     logForm: (inst) => worklog.form(inst),
     changed: (kind, instanceId, key) => {
+      apiActivity.record(kind, key); // первым: сбой обновления видов не должен потерять запись
       panels.reload({ instanceId, key });
       if (kind === 'worklog') void today.refresh();
       if (kind === 'transition') {

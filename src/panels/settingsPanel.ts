@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
+import { AGENTURA } from '../agentura';
+import { API_ALLOW_WRITES, API_ENABLED, API_SECTION } from '../apiAccess';
 import { createJiraClient } from '../jira/client';
 import { detectCapabilities } from '../jira/capabilities';
 import type { Instance } from '../jira/types';
 import { getBundle, locale, t } from '../l10n';
 import type { IssueSort } from '../jql';
 import { readScope } from '../commands/instances';
+import type { ApiActivity } from '../state/apiActivity';
 import { inScope, type InstanceStore } from '../state/instances';
 import { ConnectionStatus, connectionErrorText, instanceIdentity, instanceSnapshot, planScopeWrite } from './connectionStatus';
 import { makeNonce, renderShell } from './html';
@@ -50,7 +53,13 @@ export class SettingsPanel implements vscode.Disposable {
    *  обновлённые caps) требует перепроверки, хотя статус у id уже есть. */
   private snaps = new Map<string, string>();
 
-  constructor(private readonly extensionUri: vscode.Uri, private readonly issues: IssueViewSettings, private readonly store: InstanceStore) {
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly issues: IssueViewSettings,
+    private readonly store: InstanceStore,
+    /** «Последняя запись через API»: память хоста, её пишет `changed` публичного API (extension.ts). */
+    private readonly activity: ApiActivity,
+  ) {
     this.status = new ConnectionStatus((id) => this.store.get(id) !== undefined, () => this.render());
     this.snaps = new Map(store.all().map((i) => [i.id, instanceSnapshot(i)]));
     this.subs = [
@@ -71,6 +80,9 @@ export class SettingsPanel implements vscode.Disposable {
       vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration(SECTION)) this.render(); }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.render()),
       issues.onDidChangeView(() => this.render()),
+      // Agentura поставили или удалили; пришла запись через API.
+      vscode.extensions.onDidChange(() => this.render()),
+      activity.onDidChange(() => this.render()),
     ];
   }
 
@@ -132,6 +144,7 @@ export class SettingsPanel implements vscode.Disposable {
 
   private state(): ReturnType<typeof buildSettingsState> {
     const cfg = vscode.workspace.getConfiguration(SECTION);
+    const api = vscode.workspace.getConfiguration(API_SECTION);
     const scope = readScope();
     return buildSettingsState({
       maxResults: cfg.inspect<number>('maxResults'),
@@ -146,6 +159,10 @@ export class SettingsPanel implements vscode.Disposable {
       instances: this.store.all().map((inst) => ({
         inst, status: this.status.get(inst.id), inScope: inScope(inst, scope), tokenError: this.tokenErrors.get(inst.id),
       })),
+      apiEnabled: api.inspect<unknown>(API_ENABLED),
+      apiAllowWrites: api.inspect<unknown>(API_ALLOW_WRITES),
+      agentura: !!vscode.extensions.getExtension(AGENTURA),
+      lastApiWrite: this.activity.get(),
     });
   }
 
@@ -337,6 +354,8 @@ export class SettingsPanel implements vscode.Disposable {
     switch (s.id) {
       case 'sort': this.issues.setSort(s.value); return;
       case 'grouped': this.issues.setGrouped(s.value); return;
+      case 'apiEnabled': await this.writeApi(API_ENABLED, s.value); return;
+      case 'apiAllowWrites': await this.writeApi(API_ALLOW_WRITES, s.value); return;
       case 'attachmentsDir':
         if (s.value === undefined) await this.reset('attachmentsDir');
         else await this.write('attachmentsDir', s.value);
@@ -348,7 +367,21 @@ export class SettingsPanel implements vscode.Disposable {
   private async reset(id: SettingId): Promise<void> {
     if (id === 'sort') this.issues.setSort(undefined);
     else if (id === 'grouped') this.issues.setGrouped(false);
+    else if (id === 'apiEnabled') await this.writeApi(API_ENABLED, undefined);
+    else if (id === 'apiAllowWrites') await this.writeApi(API_ALLOW_WRITES, undefined);
     else await this.write(id, undefined);
+  }
+
+  /**
+   * Переключатели публичного API: настройки уровня application, поэтому только в пользовательские (Global) —
+   * workspace их не принимает, и проект не может включить доступ обратно. `undefined` — сброс к стандартному (включено).
+   */
+  private async writeApi(key: typeof API_ENABLED | typeof API_ALLOW_WRITES, value: boolean | undefined): Promise<void> {
+    try {
+      await vscode.workspace.getConfiguration(API_SECTION).update(key, value, vscode.ConfigurationTarget.Global);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Jiraffe: ${t('Could not save the setting: {0}', errText(e))}`);
+    }
   }
 
   /** Пишет в уровень, откуда сейчас берётся значение (workspaceFolder › workspace), иначе в Global; `undefined` — сброс. */

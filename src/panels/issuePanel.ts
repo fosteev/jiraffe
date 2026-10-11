@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { AGENTURA } from '../agentura';
 import { noticeText } from '../jira/attachments';
 import { localDate } from '../jira/worklog';
 import type { LogWorkPanels, WorklogService } from '../commands/logWork';
@@ -37,8 +38,6 @@ interface Entry {
 const CARD_ACTIONS = new Set<ViewToHost['type']>(['openInBrowser', 'copyKey', 'logWork', 'transition', 'pin', 'switchTab', 'askAi']);
 /** Вложения и картинки: и instanceId, и key должны совпасть с показанной задачей, карточка — загружена. */
 const ATTACHMENT_ACTIONS = new Set<ViewToHost['type']>(['loadImages', 'downloadAttachment', 'downloadAll', 'openAttachment', 'submitWorklog']);
-/** ИИ-чат: расширение Agentura (не на Marketplace — нет его, нет и кнопки). */
-const AGENTURA = 'fosteev.agentura';
 const idOf = (r: IssueRef): string => `${r.instanceId}\n${r.key}`;
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 export const isIssueRef = (v: unknown): v is IssueRef =>

@@ -478,6 +478,18 @@
           "minimum": 1,
           "maximum": 24,
           "description": "%config.workdayHours%"
+        },
+        "jiraffe.api.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.api.enabled%"
+        },
+        "jiraffe.api.allowWrites": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.api.allowWrites%"
         }
       }
     }
