@@ -192,13 +192,25 @@ export type HostToSettings =
   /** Прокрутить к разделу (команда `jiraffe.openSettings(section)`). */
   | { type: 'scroll'; section: SectionId };
 
+/** Id инстанса — slug из адреса (`instanceIdFromUrl`): латиница, цифры, дефис. Что именно за инстанс, хост сверяет со своим списком. */
+export const isInstanceId = (v: unknown): v is string => typeof v === 'string' && /^[a-z0-9][a-z0-9-]{0,199}$/.test(v);
+
+/** Действия над карточкой инстанса: имя/токен вводятся в нативных окнах VS Code, через webview не проходят. */
+export const INSTANCE_ACTIONS = ['check', 'refreshCaps', 'rename', 'setToken', 'remove'] as const;
+export type InstanceAction = (typeof INSTANCE_ACTIONS)[number];
+
 export type SettingsToHost =
   | { type: 'ready' }
   /** Новое значение настройки; проверяет хост (`parseSettingsMessage`). Значение зависит от `id`: число, строка, булево или `{field, desc}`. */
   | { type: 'set'; id: SettingId; value: unknown }
   | { type: 'reset'; id: SettingId }
   | { type: 'pickDir' }
-  | { type: 'openJson' };
+  | { type: 'openJson' }
+  | { type: 'instance'; action: InstanceAction; id: string }
+  | { type: 'addInstance' }
+  /** Набор workspace: «все подключённые» / «только отмеченные». */
+  | { type: 'scopeMode'; mode: 'all' | 'some' }
+  | { type: 'scopeToggle'; id: string; on: boolean };
 
 export type SettingsMessage =
   | { type: 'ready' }
@@ -206,17 +218,27 @@ export type SettingsMessage =
   | { type: 'reset'; id: SettingId }
   | { type: 'pickDir' }
   | { type: 'openJson' }
+  | { type: 'instance'; action: InstanceAction; id: string }
+  | { type: 'addInstance' }
+  | { type: 'scopeMode'; mode: 'all' | 'some' }
+  | { type: 'scopeToggle'; id: string; on: boolean }
   /** Сообщение неузнаваемо или значение не прошло проверку: хост покажет `error` и перерисует вкладку. */
   | { type: 'invalid'; error: string };
 
 /** Разбор входящего от webview (недоверенного): тип, id и значение — по спискам и диапазонам из `package.json`. */
 export function parseSettingsMessage(m: unknown): SettingsMessage | undefined {
   if (!m || typeof m !== 'object') return undefined;
-  const o = m as { type?: unknown; id?: unknown; value?: unknown };
+  const o = m as { type?: unknown; id?: unknown; value?: unknown; action?: unknown; mode?: unknown; on?: unknown };
   switch (o.type) {
     case 'ready':
     case 'pickDir':
+    case 'addInstance':
     case 'openJson': return { type: o.type };
+    case 'instance':
+      return isInstanceId(o.id) && (INSTANCE_ACTIONS as readonly unknown[]).includes(o.action)
+        ? { type: 'instance', action: o.action as InstanceAction, id: o.id } : undefined;
+    case 'scopeMode': return o.mode === 'all' || o.mode === 'some' ? { type: 'scopeMode', mode: o.mode } : undefined;
+    case 'scopeToggle': return isInstanceId(o.id) && typeof o.on === 'boolean' ? { type: 'scopeToggle', id: o.id, on: o.on } : undefined;
     case 'reset': return isSettingId(o.id) ? { type: 'reset', id: o.id } : undefined;
     case 'set': {
       const r = parseSetting(o.id, o.value);

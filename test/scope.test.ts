@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FilterState, SAVED_KEY, STATE_KEY } from '../src/state/filters';
-import { INSTANCES_KEY, InstanceStore, inScope } from '../src/state/instances';
+import { INSTANCES_KEY, InstanceStore, inScope, tokenKey } from '../src/state/instances';
 import { SectionProject } from '../src/state/sectionProject';
 
 const mem = (init: Record<string, unknown> = {}) => {
@@ -60,5 +60,61 @@ describe('набор инстансов workspace', () => {
     sp.set({ instanceId: 'a', key: 'L' });
     expect(sp.get()?.key).toBe('L');
     expect((global.m.get('k') as { key: string }).key).toBe('G');
+  });
+});
+
+describe('InstanceStore: rename и setToken', () => {
+  const fakeSecrets = () => {
+    const m = new Map<string, string>();
+    return { m, get: async (k: string) => m.get(k), store: async (k: string, v: string) => void m.set(k, v), delete: async (k: string) => void m.delete(k) };
+  };
+  const make = () => {
+    const state = mem({ [INSTANCES_KEY]: [{ ...northwind, caps: { tempo: true, epicLinkField: null, checkedAt: 'x' } }, tati] });
+    const sec = fakeSecrets();
+    sec.m.set(tokenKey(northwind.id), 'old');
+    const store = new InstanceStore(state as never, sec as never);
+    let fired = 0;
+    store.onDidChange(() => fired++);
+    return { store, sec, state, fired: () => fired };
+  };
+
+  it('rename: обрезает пробелы, остальное (caps, другие инстансы) не трогает, будит подписчиков', async () => {
+    const { store, fired } = make();
+    expect(await store.rename(northwind.id, '  Работа  ')).toBe(true);
+    expect(store.get(northwind.id)).toMatchObject({ name: 'Работа', baseUrl: northwind.baseUrl, caps: { tempo: true } });
+    expect(store.get(tati.id)?.name).toBe('Initech');
+    expect(fired()).toBe(1);
+  });
+  it('rename: пустое имя и неизвестный id — false, без записи и события', async () => {
+    const { store, fired } = make();
+    expect(await store.rename(northwind.id, '   ')).toBe(false);
+    expect(await store.rename('нет', 'X')).toBe(false);
+    expect(store.get(northwind.id)?.name).toBe('Northwind');
+    expect(fired()).toBe(0);
+  });
+  it('setToken: заменяет токен существующего инстанса, будит подписчиков', async () => {
+    const { store, sec, fired } = make();
+    expect(await store.setToken(northwind.id, ' new ')).toBe(true);
+    expect(await store.getToken(northwind.id)).toBe('new');
+    expect(sec.m.get(tokenKey(tati.id))).toBeUndefined();
+    expect(fired()).toBe(1);
+  });
+  it('setToken: пустой токен и неизвестный id — false, токена-сироты нет', async () => {
+    const { store, sec, fired } = make();
+    expect(await store.setToken(northwind.id, '  ')).toBe(false);
+    expect(await store.setToken('удалён', 'tok')).toBe(false);
+    expect(sec.m.get(tokenKey(northwind.id))).toBe('old');
+    expect(sec.m.has(tokenKey('удалён'))).toBe(false);
+    expect(fired()).toBe(0);
+  });
+  it('setToken: инстанс отключили, пока шла запись токена, — токен убирается, false', async () => {
+    const { store, sec, state } = make();
+    const store0 = sec.store;
+    sec.store = async (k: string, v: string) => {
+      await store0(k, v);
+      await state.update(INSTANCES_KEY, [tati]); // remove из палитры успел между проверкой и записью
+    };
+    expect(await store.setToken(northwind.id, 'new')).toBe(false);
+    expect(sec.m.has(tokenKey(northwind.id))).toBe(false);
   });
 });

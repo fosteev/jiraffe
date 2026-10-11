@@ -1,6 +1,7 @@
 // Модель вкладки «Настройки Jiraffe»: чистая сборка состояния из простых входов. Без vscode — тестируется напрямую.
 // Хост собирает входы через `getConfiguration('jiraffe').inspect(key)`; webview только рисует `SettingsState`.
 import { SORT_FIELDS, type IssueSort, type SortField } from '../jql';
+import type { Instance } from '../jira/types';
 import { t } from '../l10n';
 
 export type SectionId = 'conn' | 'list' | 'att' | 'time' | 'int';
@@ -78,11 +79,63 @@ export interface SettingRow {
   control: Control;
 }
 
-export interface SectionInfo { id: SectionId; title: string; sub: string; /** Раздел-заглушка: строк нет, вместо них «скоро». */ soon: boolean }
+export interface SectionInfo {
+  id: SectionId;
+  title: string;
+  sub: string;
+  /** Раздел-заглушка: строк нет, вместо них «скоро». */
+  soon: boolean;
+  /** Счётчик проблем у пункта меню (подключения с ошибкой). */
+  badge?: number;
+}
+
+// ----- «Подключения» -----
+
+export type ConnState = 'checking' | 'ok' | 'error';
+/** Результат последней проверки `myself()`; в памяти хоста, не персистится. `undefined` — ещё не проверяли. */
+export type ConnStatusInput = { state: 'checking' } | { state: 'ok'; account: string } | { state: 'error'; message: string };
+export type Journal = 'tempo' | 'jira' | 'unknown';
+export type EpicLink = { kind: 'field'; id: string } | { kind: 'parent' } | { kind: 'none' } | { kind: 'unknown' };
+
+export interface InstanceCard {
+  id: string;
+  name: string;
+  baseUrl: string;
+  host: string;
+  kind: 'dc' | 'cloud';
+  /** Что за токен: подпись «Personal Access Token» / «API token + email». Сам токен сюда не попадает никогда. */
+  tokenKind: string;
+  state: ConnState;
+  account?: string;
+  error?: string;
+  serverVersion?: string;
+  /** ISO-время последней проверки возможностей (только если разобралось как дата). */
+  checkedAt?: string;
+  journal: Journal;
+  epic: EpicLink;
+  /** Входит ли в набор workspace (при «все» — всегда да). */
+  inScope: boolean;
+  /** Новый токен не прошёл проверку и не сохранён (старый остаётся). Не то же, что `error`: старый токен может работать. */
+  tokenError?: string;
+}
+
+export interface ConnectionsState {
+  /** `all` — `jiraffe.instances` не задан; `some` — набор задан. */
+  mode: 'all' | 'some';
+  /** Есть ли открытая папка/workspace: набор лежит в его settings.json, без него радио неактивно. */
+  canScope: boolean;
+  cards: InstanceCard[];
+}
+
+/** Таблица «Куда пишется время»: по строке на инстанс набора workspace. */
+export interface TimeTarget { id: string; name: string; journal: Journal; label: string; note: string }
+export interface TimeTargets { title: string; desc: string; rows: TimeTarget[] }
 
 export interface SettingsState {
   sections: SectionInfo[];
   rows: SettingRow[];
+  connections: ConnectionsState;
+  timeTargets: TimeTargets;
   /** Открыта ли папка: без неё нельзя «Выбрать…» и относительный путь вложений уходит во временный каталог. */
   hasWorkspace: boolean;
 }
@@ -95,18 +148,62 @@ export interface SettingsInput {
   sort: IssueSort | undefined;
   grouped: boolean;
   hasWorkspace: boolean;
+  /** Есть ли открытая папка (для набора workspace; в отличие от `hasWorkspace` — любая схема, не только file). */
+  canScope: boolean;
+  /** Все подключённые инстансы с последним известным статусом и принадлежностью набору. */
+  instances: { inst: Instance; status: ConnStatusInput | undefined; inScope: boolean; tokenError?: string }[];
+  /** Задан ли набор `jiraffe.instances`. */
+  scopeSet: boolean;
 }
 
 export const sortFieldLabel = (f: SortField): string =>
   f === 'key' ? t('Key') : f === 'priority' ? t('Priority') : f === 'created' ? t('Created') : t('Updated');
 
-const sections = (): SectionInfo[] => [
-  { id: 'conn', title: t('Connections'), sub: '', soon: true },
+const sections = (errors: number): SectionInfo[] => [
+  { id: 'conn', title: t('Connections'), sub: t('Connections and tokens are shared by all VS Code windows. Here you also choose which of them are visible in this folder.'), soon: false, ...(errors ? { badge: errors } : {}) },
   { id: 'list', title: t('Issue list'), sub: '', soon: false },
   { id: 'att', title: t('Attachments'), sub: '', soon: false },
   { id: 'time', title: t('Time tracking'), sub: '', soon: false },
   { id: 'int', title: t('Integrations'), sub: '', soon: true },
 ];
+
+const str = (v: unknown, max = 200): string | undefined => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+
+/**
+ * Карточка инстанса. Всё из `InstanceStore` (globalState) считается недоверенным: имя, версия, время и caps проверяются по типу,
+ * лишнее отбрасывается. Токена здесь нет — только подпись его вида.
+ */
+export function buildInstanceCard(inst: Instance, status: ConnStatusInput | undefined, inScope: boolean, tokenError?: string): InstanceCard {
+  const id = String(inst.id);
+  const baseUrl = String(inst.baseUrl);
+  let host = baseUrl;
+  try { host = new URL(baseUrl).host; } catch { /* оставляем как есть */ }
+  const kind = inst.kind === 'cloud' ? 'cloud' : 'dc';
+  const caps = inst.caps && typeof inst.caps === 'object' ? inst.caps : undefined;
+  const checked = str(caps?.checkedAt, 40);
+  const epic: EpicLink = !caps ? { kind: 'unknown' }
+    : kind === 'cloud' ? { kind: 'parent' }
+    : typeof caps.epicLinkField === 'string' && caps.epicLinkField ? { kind: 'field', id: caps.epicLinkField.slice(0, 80) }
+    : { kind: 'none' };
+  return {
+    id, name: str(inst.name) ?? id, baseUrl, host, kind,
+    tokenKind: kind === 'cloud' ? t('API token + email') : 'Personal Access Token',
+    state: status?.state ?? 'checking',
+    ...(status?.state === 'ok' ? { account: status.account } : {}),
+    ...(status?.state === 'error' ? { error: status.message } : {}),
+    ...(str(caps?.serverVersion, 40) ? { serverVersion: str(caps?.serverVersion, 40) } : {}),
+    ...(checked && Number.isFinite(Date.parse(checked)) ? { checkedAt: checked } : {}),
+    journal: !caps ? 'unknown' : caps.tempo === true ? 'tempo' : 'jira',
+    epic, inScope,
+    ...(tokenError ? { tokenError } : {}),
+  };
+}
+
+const timeTarget = (c: InstanceCard): TimeTarget => ({
+  id: c.id, name: c.name, journal: c.journal,
+  label: c.journal === 'tempo' ? 'Tempo' : c.journal === 'jira' ? t('Jira work log') : t('Not checked yet'),
+  note: c.journal === 'tempo' ? t('work type and AI Tokens') : c.journal === 'jira' ? t('AI Tokens go to the comment') : '',
+});
 
 const num = (v: Scalar<number>, id: NumberId, step: number, unit: string): NumberControl => ({ kind: 'number', value: v.value, min: RANGES[id].min, max: RANGES[id].max, step, unit });
 
@@ -156,7 +253,16 @@ export function buildSettingsState(i: SettingsInput): SettingsState {
       control: num(wd, 'workdayHours', 0.5, t('hours')),
     },
   ];
-  return { sections: sections(), rows, hasWorkspace: i.hasWorkspace };
+  const cards = i.instances.map((x) => buildInstanceCard(x.inst, x.status, x.inScope, x.tokenError));
+  return {
+    sections: sections(cards.filter((c) => c.state === 'error').length), rows, hasWorkspace: i.hasWorkspace,
+    connections: { mode: i.scopeSet ? 'some' : 'all', canScope: i.canScope, cards },
+    timeTargets: {
+      title: t('Where time is logged'),
+      desc: t('Chosen per instance: with Tempo, the entry goes to Tempo (with a work type and AI Tokens); without it, to the issue\'s standard Jira work log.'),
+      rows: cards.filter((c) => c.inScope).map(timeTarget),
+    },
+  };
 }
 
 // ----- валидация значений из webview (недоверенных) -----

@@ -1,8 +1,14 @@
 import * as vscode from 'vscode';
+import { createJiraClient } from '../jira/client';
+import { detectCapabilities } from '../jira/capabilities';
+import type { Instance } from '../jira/types';
 import { getBundle, locale, t } from '../l10n';
 import type { IssueSort } from '../jql';
+import { readScope } from '../commands/instances';
+import { inScope, type InstanceStore } from '../state/instances';
+import { ConnectionStatus, connectionErrorText, instanceIdentity, instanceSnapshot, planScopeWrite } from './connectionStatus';
 import { makeNonce, renderShell } from './html';
-import { parseSettingsMessage, type HostToSettings, type SettingsMessage } from './protocol';
+import { parseSettingsMessage, type HostToSettings, type InstanceAction, type SettingsMessage } from './protocol';
 import {
   buildSettingsState, type NumberId, type SectionId, type SettingId, type SettingValue, type WriteTarget,
 } from './settingsModel';
@@ -34,8 +40,34 @@ export class SettingsPanel implements vscode.Disposable {
   private entry?: { panel: vscode.WebviewPanel; ready: boolean; section?: SectionId };
   private readonly subs: vscode.Disposable[];
 
-  constructor(private readonly extensionUri: vscode.Uri, private readonly issues: IssueViewSettings) {
+  private readonly status: ConnectionStatus;
+  /** Инстансы, над которыми сейчас идёт диалог/запрос (переименовать, сменить токен, отключить, обновить возможности): повторное действие игнорируем. */
+  private readonly busy = new Set<string>();
+  /** Почему новый токен не сохранён (в памяти, до следующей попытки или замены записи инстанса — повторное «Подключить»). */
+  private readonly tokenErrors = new Map<string, string>();
+  private scopeQueue: Promise<void> = Promise.resolve();
+  /** `instanceSnapshot` по id на момент последнего события store: замена записи под тем же id (повторное «Подключить»,
+   *  обновлённые caps) требует перепроверки, хотя статус у id уже есть. */
+  private snaps = new Map<string, string>();
+
+  constructor(private readonly extensionUri: vscode.Uri, private readonly issues: IssueViewSettings, private readonly store: InstanceStore) {
+    this.status = new ConnectionStatus((id) => this.store.get(id) !== undefined, () => this.render());
+    this.snaps = new Map(store.all().map((i) => [i.id, instanceSnapshot(i)]));
     this.subs = [
+      store.onDidChange(() => {
+        const next = new Map(store.all().map((i) => [i.id, instanceSnapshot(i)]));
+        for (const [id, s] of next) {
+          if (this.snaps.has(id) && this.snaps.get(id) !== s) {
+            this.status.forget(id);
+            this.tokenErrors.delete(id);
+          }
+        }
+        this.snaps = next;
+        this.status.prune();
+        for (const id of [...this.tokenErrors.keys()]) if (!store.get(id)) this.tokenErrors.delete(id);
+        if (this.entry) this.checkMissing();
+        this.render();
+      }),
       vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration(SECTION)) this.render(); }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.render()),
       issues.onDidChangeView(() => this.render()),
@@ -49,6 +81,7 @@ export class SettingsPanel implements vscode.Disposable {
 
   /** Открыть вкладку или показать уже открытую; `section` — прокрутить к разделу. */
   open(section?: SectionId): void {
+    this.checkAll();
     if (this.entry) {
       this.entry.panel.reveal(undefined, false);
       if (section) {
@@ -99,6 +132,7 @@ export class SettingsPanel implements vscode.Disposable {
 
   private state(): ReturnType<typeof buildSettingsState> {
     const cfg = vscode.workspace.getConfiguration(SECTION);
+    const scope = readScope();
     return buildSettingsState({
       maxResults: cfg.inspect<number>('maxResults'),
       attachmentsDir: cfg.inspect<string>('attachmentsDir'),
@@ -107,7 +141,33 @@ export class SettingsPanel implements vscode.Disposable {
       sort: this.issues.sort,
       grouped: this.issues.grouped,
       hasWorkspace: this.workspaceDir() !== undefined,
+      canScope: !!vscode.workspace.workspaceFolders?.length,
+      scopeSet: scope !== undefined,
+      instances: this.store.all().map((inst) => ({
+        inst, status: this.status.get(inst.id), inScope: inScope(inst, scope), tokenError: this.tokenErrors.get(inst.id),
+      })),
     });
+  }
+
+  private async client(inst: Instance, token?: string) {
+    const tk = token ?? (await this.store.getToken(inst.id));
+    if (!tk) throw new Error(t('token not found in SecretStorage — add the instance again'));
+    return createJiraClient(inst, tk);
+  }
+
+  /** `myself()` напрямую клиентом (мимо кэша `InstanceMeta`): статус всегда свежий. */
+  private checkOne(id: string): Promise<void> {
+    const inst = this.store.get(id);
+    if (!inst) return Promise.resolve();
+    return this.status.check(id, async () => (await this.client(inst)).myself());
+  }
+
+  private checkAll(): void {
+    for (const i of this.store.all()) void this.checkOne(i.id);
+  }
+
+  private checkMissing(): void {
+    for (const i of this.store.all()) if (!this.status.has(i.id)) void this.checkOne(i.id);
   }
 
   private workspaceDir(): string | undefined {
@@ -120,6 +180,7 @@ export class SettingsPanel implements vscode.Disposable {
       case 'ready': {
         if (!this.entry) return;
         this.entry.ready = true;
+        this.checkMissing();
         this.render();
         if (this.entry.section) {
           this.post({ type: 'scroll', section: this.entry.section });
@@ -146,6 +207,129 @@ export class SettingsPanel implements vscode.Disposable {
       case 'openJson':
         void vscode.commands.executeCommand('workbench.action.openSettingsJson');
         return;
+      case 'addInstance':
+        void vscode.commands.executeCommand('jiraffe.addInstance');
+        return;
+      case 'instance':
+        await this.instanceAction(m.action, m.id);
+        this.render();
+        return;
+      case 'scopeMode':
+      case 'scopeToggle':
+        await this.enqueueScope(m);
+        this.render();
+        return;
+    }
+  }
+
+  // ----- подключения -----
+
+  private async instanceAction(action: InstanceAction, id: string): Promise<void> {
+    const inst = this.store.get(id);
+    if (!inst) return;
+    if (action === 'check') {
+      void this.checkOne(id);
+      return;
+    }
+    if (this.busy.has(id)) return;
+    this.busy.add(id);
+    try {
+      switch (action) {
+        case 'refreshCaps': await this.refreshCaps(inst); return;
+        case 'rename': await this.rename(inst); return;
+        case 'setToken': await this.changeToken(inst); return;
+        case 'remove': await this.remove(inst); return;
+      }
+    } finally {
+      this.busy.delete(id);
+    }
+  }
+
+  private async refreshCaps(inst: Instance): Promise<void> {
+    try {
+      const client = await this.client(inst);
+      const caps = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t('Jiraffe: “{0}” — detecting capabilities…', inst.name) },
+        () => detectCapabilities(client),
+      );
+      // Пока шёл запрос, инстанс могли отключить или подключить заново с другим адресом/email — чужие caps не пишем.
+      const now = this.store.get(inst.id);
+      if (now && instanceIdentity(now) === instanceIdentity(inst)) await this.store.updateCaps(inst.id, caps);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Jiraffe: «${inst.name}» — ${connectionErrorText(e)}`);
+    }
+  }
+
+  private async rename(inst: Instance): Promise<void> {
+    const name = await vscode.window.showInputBox({
+      title: t('Rename instance'), prompt: t('The name is shown in the tree, the status bar and cards.'), value: inst.name, ignoreFocusOut: true,
+      validateInput: (v) => (v.trim() ? undefined : t('The name is empty')),
+    });
+    if (name === undefined || !name.trim() || name.trim() === inst.name) return;
+    await this.store.rename(inst.id, name);
+  }
+
+  /** Новый токен сохраняется только после успешного `myself()` с ним; при отказе остаётся старый, причина — в карточке. */
+  private async changeToken(inst: Instance): Promise<void> {
+    const token = await vscode.window.showInputBox({
+      title: t('Change token: {0}', inst.name),
+      prompt: inst.kind === 'cloud' ? t('Atlassian API token') : 'Personal Access Token',
+      password: true, ignoreFocusOut: true,
+      validateInput: (v) => (!v.trim() ? t('The token is empty') : /^[\x21-\x7e]+$/.test(v.trim()) ? undefined : t('The token contains spaces or unexpected characters')),
+    });
+    if (!token?.trim()) return;
+    this.tokenErrors.delete(inst.id);
+    try {
+      const client = await this.client(inst, token.trim());
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t('Jiraffe: connecting to {0}…', inst.baseUrl) },
+        () => client.myself(),
+      );
+    } catch (e) {
+      const msg = connectionErrorText(e);
+      if (this.store.get(inst.id)) this.tokenErrors.set(inst.id, msg);
+      void vscode.window.showErrorMessage(`Jiraffe: «${inst.name}» — ${t('the new token was not saved')}: ${msg}`);
+      return;
+    }
+    // Токен проверен на этом адресе/типе/email; если запись за время проверки заменили на другую — не пишем.
+    const now = this.store.get(inst.id);
+    if (!now || instanceIdentity(now) !== instanceIdentity(inst)) return;
+    if (await this.store.setToken(inst.id, token)) void this.checkOne(inst.id);
+  }
+
+  private async remove(inst: Instance): Promise<void> {
+    const ok = await vscode.window.showWarningMessage(t('Remove instance “{0}” and its token?', inst.name), { modal: true }, t('Remove'));
+    if (ok !== t('Remove')) return;
+    await this.store.remove(inst.id);
+    this.status.forget(inst.id);
+    this.tokenErrors.delete(inst.id);
+  }
+
+  // ----- набор workspace (`jiraffe.instances`, только уровень Workspace) -----
+
+  /** Записи набора идут по очереди: два быстрых щелчка не должны прочитать устаревший набор. */
+  private enqueueScope(m: Extract<SettingsMessage, { type: 'scopeMode' | 'scopeToggle' }>): Promise<void> {
+    const run = this.scopeQueue.then(() => this.writeScope(m));
+    this.scopeQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async writeScope(m: Extract<SettingsMessage, { type: 'scopeMode' | 'scopeToggle' }>): Promise<void> {
+    if (!vscode.workspace.workspaceFolders?.length) {
+      void vscode.window.showInformationMessage(t('Jiraffe: open a folder or workspace — the set of instances is stored in its settings'));
+      return;
+    }
+    const g = vscode.workspace.getConfiguration(SECTION).inspect<unknown>('instances')?.globalValue;
+    const plan = planScopeWrite(m, readScope(), g, this.store.all());
+    if (plan.kind === 'skip') return;
+    if (plan.kind === 'empty') {
+      void vscode.window.showWarningMessage(t('Jiraffe: at least one instance is required'));
+      return;
+    }
+    try {
+      await vscode.workspace.getConfiguration(SECTION).update('instances', plan.value, vscode.ConfigurationTarget.Workspace);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Jiraffe: ${t('Could not save the setting: {0}', errText(e))}`);
     }
   }
 
