@@ -179,6 +179,22 @@ export class FilterState {
     this.fire(this.savedListeners);
   }
 
+  /** Сохранённые фильтры этого инстанса удалены одним `update`; фильтры без `instanceId` не трогаем. Вернёт, сколько удалено. */
+  async deleteFiltersOf(instanceId: string): Promise<number> {
+    const all = this.listSaved();
+    const keep = all.filter((f) => f.instanceId !== instanceId);
+    if (keep.length === all.length) return 0;
+    await this.memento.update(SAVED_KEY, keep);
+    this.fire(this.savedListeners);
+    return all.length - keep.length;
+  }
+
+  /** Инстанс отключён: его сохранённые фильтры удаляются, проект режима «Проект» с этим инстансом сбрасывается (останется «выберите проект»). */
+  async forgetInstance(instanceId: string): Promise<void> {
+    if (this.snap.project?.instanceId === instanceId) this.patch({ project: undefined });
+    await this.deleteFiltersOf(instanceId);
+  }
+
   private patch(p: Partial<FilterSnapshot>): void {
     const next = { ...this.snap, ...p } as FilterSnapshot;
     // undefined-поля не должны оставаться ключами (JSON и сравнение)

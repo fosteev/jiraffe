@@ -28,6 +28,13 @@ export const IC = {
   file: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.8h5l3.2 3.2v9.2H4zM9 1.8V5h3.2" ${st}/></svg>`,
   x: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" ${st}/></svg>`,
   tag: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.2V3.2c0-.4.3-.7.7-.7h5l5.3 5.3a.9.9 0 0 1 0 1.2l-4.2 4.2a.9.9 0 0 1-1.2 0z" ${st}/><circle cx="5.6" cy="5.6" r=".9" fill="currentColor"/></svg>`,
+  ok: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" ${st}/><path d="M5.4 8.2l1.8 1.8 3.4-3.6" ${st}/></svg>`,
+  warn: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.4l6 10.6H2z" ${st}/><path d="M8 6.6v3M8 11.3v.1" ${st}/></svg>`,
+  pencil: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 13.4l.7-3L10.8 3a1.2 1.2 0 0 1 1.7 0l.5.5a1.2 1.2 0 0 1 0 1.7L5.6 12.7z" ${st}/></svg>`,
+  key: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="5.5" cy="10.5" r="2.7" ${st}/><path d="M7.5 8.6L13 3.1M11 5.1l1.6 1.6" ${st}/></svg>`,
+  trash: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.2 4.5V3h3.6v1.5M4.3 4.5l.6 8.6h6.2l.6-8.6" ${st}/></svg>`,
+  refresh: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.5A5 5 0 0 0 4 5.2M3 2.8v2.7h2.7M3 8.5A5 5 0 0 0 12 10.8M13 13.2v-2.7h-2.7" ${st}/></svg>`,
+  plus: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" ${st}/></svg>`,
   pin: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5l4 4-2 .8-2 2 .3 3-1 1-2.6-2.6-3.6 3.6M6.2 5.8l1.2-1.2z" ${st}/></svg>`,
 };
 
@@ -272,7 +279,7 @@ export function renderCard(c: IssueCard, tab: IssueTab): string {
       <div class="crumbs">${IC.server} ${esc(c.instanceName)}<span>›</span>${esc(project)}${i.epic ? `<span>›</span><button class="ln" data-act="epic" data-key="${esc(i.epic.key)}">${esc(i.epic.key)}</button>` : ''}<span>›</span>${typeIcon(i.type)}<span class="k">${esc(i.key)}</span></div>
       <h1>${esc(i.summary)}</h1>
       <div class="hrow"><button class="pill pill-btn s-${i.statusCategory}" data-act="transition" title="${t('Change Status')}">${esc(i.status || STATUS_LABEL[i.statusCategory])} ▾</button>${i.priority ? `<span class="prio">${priorityIcon(i.priority)}${esc(i.priority)}</span>` : ''}<span class="mut sm">${esc(i.type)}</span><span class="sp"></span>
-        ${c.ai ? `<button class="btn" data-act="askAi" title="${t('Chat with AI (Agentura) about this issue')}">${IC.ai} ${t('Ask AI')}</button>` : ''}
+        ${c.ai ? `<button class="btn" data-act="askAi" title="${t('Open a chat about this issue in Agentura')}">${IC.ai} ${t('Open in Agentura')} ▾</button>` : ''}
         <button class="btn" data-act="copyKey">${IC.copy} ${t('Key')}</button>
         <button class="btn" data-act="openInBrowser">${IC.ext} ${t('Open in Jira')}</button>
         <button class="btn" data-act="pin"${c.pinned ? ' disabled' : ''}>${IC.pin} ${c.pinned ? t('Pinned') : t('Pin')}</button>

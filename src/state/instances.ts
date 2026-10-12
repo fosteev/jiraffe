@@ -93,9 +93,36 @@ export class InstanceStore {
     this.fire();
   }
 
+  /** Новое имя (в дереве, статус-баре, карточках); пустое или неизвестный id — `false`, ничего не пишем. */
+  async rename(id: string, name: string): Promise<boolean> {
+    const n = name.trim();
+    if (!n || !this.get(id)) return false;
+    await this.state.update(INSTANCES_KEY, this.all().map((i) => (i.id === id ? { ...i, name: n } : i)));
+    this.fire();
+    return true;
+  }
+
+  /**
+   * Новый токен существующего инстанса. Проверять его работоспособность должен вызывающий ДО записи:
+   * здесь только запись. Неизвестный id или пустой токен — `false` (иначе остался бы токен-сирота).
+   */
+  async setToken(id: string, token: string): Promise<boolean> {
+    const tk = token.trim();
+    if (!tk || !this.get(id)) return false;
+    await this.secrets.store(tokenKey(id), tk);
+    // Инстанс могли отключить, пока шла запись (remove из палитры): не оставляем токен-сироту.
+    if (!this.get(id)) {
+      await this.secrets.delete(tokenKey(id));
+      return false;
+    }
+    this.fire();
+    return true;
+  }
+
   async remove(id: string): Promise<void> {
-    await this.secrets.delete(tokenKey(id));
+    // Сначала запись, потом секрет: параллельный `setToken` после своей записи увидит, что инстанса нет, и уберёт токен.
     await this.state.update(INSTANCES_KEY, this.all().filter((i) => i.id !== id));
+    await this.secrets.delete(tokenKey(id));
     this.fire();
   }
 

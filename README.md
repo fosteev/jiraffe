@@ -6,6 +6,8 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 
 > The UI follows the VS Code display language: English or Russian. [Русская версия README](README.ru.md)
 
+> **New in 0.8.** “Open in Agentura ▾” on the issue card: with [Agentura](https://github.com/fosteev/Agentura) 0.9 the issue's AI chats are grouped under it — continue the latest or start a new one, and see the issue's changes beside the chat. Plus a public API for other extensions, now with writing (comment, transition, worklog). See **AI chat** and **API for other extensions** below.
+
 ![Issue card next to the issue tree](docs/screenshots/card.png)
 
 ## Features
@@ -29,6 +31,10 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 ![Log work dialog](docs/screenshots/log-work.png)
 
 **Epics and releases.** Per-project lists with progress. An epic or release opens in a tab with a status breakdown and its issues.
+
+**AI chat.** With the [Agentura](https://github.com/fosteev/Agentura) extension installed, the issue card has an “Open in Agentura ▾” button: the issue goes in as context and its link is typed into the input. If the issue already has chats, a menu offers to continue the latest one, pick another, or start a new chat.
+
+**API for other extensions.** `(await getExtension('fosteev.jiraffe').activate())` returns `{ apiVersion: 2, instances(), issue(instanceId, key), myself(instanceId), openIssue(instanceId, key, beside?), onDidChangeInstances, addComment(instanceId, key, body), transitions(instanceId, key), transition(instanceId, key, transitionId), logWork(instanceId, key, { seconds, started?, comment?, aiTokens? }) }` (in an untrusted workspace Jiraffe does not activate, so there is no API). Limited to this workspace's instances; tokens and emails are never exposed. v2 adds writing as you (comment, transition, worklog): arguments are validated (comment up to 32,000 characters; a transition must be one of `transitions()` and have no required screen fields; worklog 1 s to 24 h, not in the future, Tempo with required attributes is refused; a retry right after a write that ended without a response is refused once, since it may have been saved), and there are no dialogs. Check `apiVersion >= 2`, not `=== 2`: later versions only add methods. Note that any installed extension can call it and read and change your Jira issues with your connections (including comments that mention people) — as with any VS Code extension API, install only extensions you trust.
 
 **Find.** ⌘F / Ctrl+F searches the text of an open issue, epic or release tab. In the sidebar views use VS Code's tree find: focus a view and press ⌥⌘F / Ctrl+Alt+F or just start typing — it looks through the loaded items only.
 
@@ -74,6 +80,8 @@ Mode, project, quick filters and the Epics/Releases project are remembered per w
 
 ## Settings
 
+Open the **Jiraffe Settings** tab with the gear in the title of the Issues, Filters, Epics and Releases views or the *Jiraffe: Open Settings* command. It has sections for connections (status, token change, rename, disconnect, which instances this workspace uses), the issue list, attachments (with a hint and a button when the folder is not in `.gitignore`), time tracking and integrations. Changes apply at once and go to the same settings as below; every setting shows where it is stored, and a changed one has a Reset link. The integrations section has two switches for the public API used by other extensions: access at all, and writing on your behalf. Both are on by default and, being user-level settings, cannot be changed from a project's `.vscode/settings.json`. The switches cover the API object and the `jiraffe.downloadAttachment` command; Jiraffe's other commands work as before and change Jira only after you confirm.
+
 | Setting | Default | |
 |---|---|---|
 | `jiraffe.instances` | all | Instances shown in this workspace (URLs or ids) |
@@ -81,6 +89,8 @@ Mode, project, quick filters and the Epics/Releases project are remembered per w
 | `jiraffe.attachmentsDir` | `.jiraffe` | Where attachments are saved, relative to the first workspace folder |
 | `jiraffe.maxImageMb` | 5 | Max image size for previews |
 | `jiraffe.workdayHours` | 8 | Workday length for the "today" summary |
+| `jiraffe.api.enabled` | on | Let other extensions use Jiraffe's API (user settings only) |
+| `jiraffe.api.allowWrites` | on | Let them comment, change status and log work as you (user settings only) |
 
 ## Not yet
 

@@ -48,6 +48,9 @@ export const sortLabel = (f: SortField): string =>
 export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<Node | undefined>();
   readonly onDidChangeTreeData = this.emitter.event;
+  private readonly viewEmitter = new vscode.EventEmitter<void>();
+  /** Сменились сортировка или группировка (из любого места: кнопка, вкладка настроек). */
+  readonly onDidChangeView = this.viewEmitter.event;
   private readonly states = new Map<string, InstState>();
   private readonly instNodes = new Map<string, Node>();
   private view?: vscode.TreeView<Node>;
@@ -63,6 +66,7 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
     void vscode.commands.executeCommand('setContext', GROUPED_CTX, this.grouped);
     this.subs = [
       this.emitter,
+      this.viewEmitter,
       store.onDidChange(() => this.refresh()),
       filters.onDidChange(() => this.refresh()),
     ];
@@ -86,6 +90,7 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
     void this.memento.update(GROUPED_KEY, v);
     void vscode.commands.executeCommand('setContext', GROUPED_CTX, v);
     this.emitter.fire(undefined);
+    this.viewEmitter.fire();
   }
 
   get sort(): IssueSort | undefined {
@@ -97,6 +102,7 @@ export class IssuesTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
   setSort(v: IssueSort | undefined): void {
     void this.memento.update(SORT_KEY, v);
     this.refresh();
+    this.viewEmitter.fire();
   }
 
   /** В режиме «Проект» проект один — группировать нечего. */

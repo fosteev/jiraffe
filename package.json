@@ -2,7 +2,7 @@
   "name": "jiraffe",
   "displayName": "Jiraffe",
   "description": "%extension.description%",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "publisher": "fosteev",
   "license": "MIT",
   "repository": {
@@ -82,6 +82,11 @@
       ]
     },
     "commands": [
+      {
+        "command": "jiraffe.openSettings",
+        "title": "%command.openSettings%",
+        "icon": "$(gear)"
+      },
       {
         "command": "jiraffe.refresh",
         "title": "%command.refresh%",
@@ -315,6 +320,11 @@
           "group": "navigation@9"
         },
         {
+          "command": "jiraffe.openSettings",
+          "when": "view == jiraffe.issues || view == jiraffe.filters || view == jiraffe.epics || view == jiraffe.releases",
+          "group": "navigation@10"
+        },
+        {
           "command": "jiraffe.scopeInstances",
           "when": "view == jiraffe.issues || view == jiraffe.filters",
           "group": "navigation@8"
@@ -468,6 +478,18 @@
           "minimum": 1,
           "maximum": 24,
           "description": "%config.workdayHours%"
+        },
+        "jiraffe.api.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.api.enabled%"
+        },
+        "jiraffe.api.allowWrites": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.api.allowWrites%"
         }
       }
     }

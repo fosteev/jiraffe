@@ -252,12 +252,74 @@ fieldset.tempo legend{font-size:12px;color:var(--fg2);padding:0 4px;font-weight:
   .iv{grid-template-columns:minmax(0,1fr);padding:16px}
   .wide-pad{padding:16px}
   .g2{grid-template-columns:1fr}
+  .st{grid-template-columns:minmax(0,1fr)}
+  .st-nav{position:static;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--bd);padding:0}
+  .st-nav button{width:auto;white-space:nowrap;padding:8px 12px}
+  .st-main{padding:12px 16px 40px}
+  .ic-b{grid-template-columns:minmax(0,1fr);padding-left:12px}.ic-f,.ic-alert{margin-left:12px;padding-left:12px}
   .sb .opt{display:none}
 }
+
+/* settings */
+.st svg{width:14px;height:14px}
+.st{display:grid;grid-template-columns:184px minmax(0,1fr);min-height:100%}
+.st-nav{border-right:1px solid var(--bd);padding:14px 0;position:sticky;top:0;align-self:start;display:flex;flex-direction:column}
+.st-nav button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:5px 16px;color:var(--fg);cursor:pointer;text-align:left;font-size:12.5px}
+.st-nav button:hover{background:var(--hov)}.st-nav button.on{background:var(--sel);color:var(--fg2)}
+.st-nav button svg{width:15px;height:15px;color:var(--mut)}
+.st-nav .badge{margin-left:auto;background:var(--red);color:#fff}
+.st-main{padding:14px 28px 56px;max-width:880px;min-width:0}
+.st-top{display:flex;gap:12px;align-items:center;margin-bottom:6px}
+.st-top .inp{height:28px;max-width:440px}
+.st-top .sp{flex:1}
+.st-sec{scroll-margin-top:8px}
+.st-sec>h2{font-size:15px;font-weight:600;color:var(--fg2);margin:22px 0 2px;display:flex;align-items:center;gap:10px}
+.st-sec>h2 .sp{flex:1}
+.st-sec>.sub{color:var(--mut);font-size:12px;margin:0 0 6px;max-width:76ch}
+.set{position:relative;padding:9px 12px 11px;margin:0 -12px;border-radius:4px}
+.set:hover{background:var(--hov)}
+.set.mod::before{content:"";position:absolute;left:0;top:9px;bottom:11px;width:2px;background:var(--acc);border-radius:1px}
+.set-t{font-weight:600;color:var(--fg2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.set-t .cat{font-weight:400;color:var(--mut)}
+.set-d{color:var(--mut);font-size:12.5px;margin:2px 0 7px;max-width:76ch;line-height:1.5}
+.set-c{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.set-c input.n{width:84px;height:26px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;padding:0 8px;font-variant-numeric:tabular-nums}
+.set-c input.t{width:min(360px,100%);height:26px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;padding:0 8px;font-family:var(--mono);font-size:12px}
+.set-c select{height:26px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;padding:0 6px;min-width:220px}
+.set-c input:focus,.set-c select:focus{outline:0;border-color:var(--acc)}
+.set .rst{visibility:hidden}.set.mod:hover .rst,.set.mod:focus-within .rst{visibility:visible}
+.sw{position:relative;width:30px;height:16px;flex:none;border-radius:8px;background:var(--track);border:1px solid var(--in-bd);cursor:pointer;padding:0}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:10px;height:10px;border-radius:50%;background:var(--mut);transition:left .12s}
+.sw.on{background:var(--acc);border-color:var(--acc)}.sw.on::after{left:16px;background:#fff}
+.where{font-size:10.5px;color:var(--mut);border:1px solid var(--bd);border-radius:3px;padding:0 5px;font-weight:400;font-family:var(--mono)}
+.new{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--purple);border:1px solid currentColor;border-radius:3px;padding:0 4px}
+.hint{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+.hint svg{width:14px;height:14px}
+.hint.warn{color:var(--warn)}
+.ic{border:1px solid var(--bd);border-radius:6px;margin:10px 0;background:var(--ed)}
+.ic.err{border-color:color-mix(in srgb,var(--red) 55%,var(--bd))}
+.ic.off{opacity:.62}
+.ic-h{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
+.ic-h .nm{font-weight:600;color:var(--fg2);font-size:13.5px}
+.ic-h .host{color:var(--mut);font-family:var(--mono);font-size:12px}
+.ic-h .sp{flex:1}
+.ic-h>svg{width:18px;height:18px;color:var(--mut)}
+.ic-b{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px 12px;padding:2px 12px 10px 40px;font-size:12.5px}
+.ic-b .l{color:var(--mut)}
+.ic-b .v{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.ic-b .v svg{width:14px;height:14px}
+.ic-f{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 10px 40px;border-top:1px solid var(--bd)}
+.ic-f .sp{flex:1}
+.btn.dng{color:var(--red)}
+.ic-alert{margin:0 12px 10px 40px;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,var(--red) 10%,transparent);color:var(--red);font-size:12.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ic-alert svg{width:15px;height:15px}
+.ic-alert .sp{flex:1}
+.cbx{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--fg)}
+.st-empty{color:var(--mut);padding:24px 0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
-<div class="cap"><b>Jiraffe</b><span>прототип расширения VS Code · данные примерные, всё кликается: дерево задач, фильтры, карточка, эпики, релизы, Tempo</span></div>
+<div class="cap"><b>Jiraffe</b><span>прототип расширения VS Code · данные примерные, всё кликается: дерево задач, фильтры, карточка, эпики, релизы, Tempo, настройки (шестерёнка)</span></div>
 
 <div class="win" id="win">
   <div class="titlebar">
@@ -344,6 +406,14 @@ const IC={
   branch:sv(`<circle cx="4.5" cy="3.5" r="1.5" ${st}/><circle cx="4.5" cy="12.5" r="1.5" ${st}/><circle cx="11.5" cy="5" r="1.5" ${st}/><path d="M4.5 5v6M11.5 6.5c0 3-7 2-7 4.5" ${st}/>`),
   bell:sv(`<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3zM6.5 14h3" ${st}/>`),
   cal:sv(`<rect x="2.5" y="3.5" width="11" height="10" rx="1.2" ${st}/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" ${st}/>`,'0 0 16 16','s16'),
+  gear:sv(`<circle cx="8" cy="8" r="2.1" ${st}/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1" ${st}/><circle cx="8" cy="8" r="4.6" ${st}/>`),
+  key:sv(`<circle cx="5.2" cy="10.8" r="2.7" ${st}/><path d="M7.2 8.8l6.3-6.3M11.3 4.7l1.8 1.8M9.6 6.4l1.4 1.4" ${st}/>`),
+  trash:sv(`<path d="M2.8 4.3h10.4M6.3 4.3V2.8h3.4v1.5M4.2 4.3l.6 9h6.4l.6-9" ${st}/>`),
+  folder:sv(`<path d="M1.8 4.2c0-.6.4-1 1-1h3.4l1.4 1.6h5.6c.6 0 1 .4 1 1v6.9c0 .6-.4 1-1 1H2.8c-.6 0-1-.4-1-1z" ${st}/>`),
+  list:sv(`<path d="M5.5 4h8M5.5 8h8M5.5 12h8" ${st}/><circle cx="2.8" cy="4" r=".8" style="fill:currentColor"/><circle cx="2.8" cy="8" r=".8" style="fill:currentColor"/><circle cx="2.8" cy="12" r=".8" style="fill:currentColor"/>`),
+  plug:sv(`<path d="M5.5 1.8v3M10.5 1.8v3M3.8 4.8h8.4v2.4a4.2 4.2 0 0 1-8.4 0zM8 11.4v2.8" ${st}/>`),
+  pencil:sv(`<path d="M10.6 2.6l2.8 2.8-7.6 7.6H3v-2.8z" ${st}/>`),
+  warn:sv(`<path d="M8 2.2l6.2 11H1.8z" ${st}/><path d="M8 6.5v3.2M8 11.4v.1" ${st}/>`),
   giraffe:sv(`<path d="M15.5 3.5l2-1.5M18.5 3.5l1-1.5M14.5 4.5h6.5a1.5 1.5 0 0 1 0 3h-3v12.5a4 4 0 0 1-8 0V17" style="fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"/><circle cx="16" cy="10.5" r="1.1" style="fill:currentColor"/><circle cx="16" cy="15" r="1.1" style="fill:currentColor"/><circle cx="13.2" cy="19.6" r="1.1" style="fill:currentColor"/>`,'0 0 24 24'),
 };
 const AIC={
@@ -374,9 +444,9 @@ const PL={highest:'Наивысший',high:'Высокий',medium:'Средн�
 const ME='af';
 const U={af:['Андрей Фостеев','#2f6fd6'],mk:['Мария Котова','#b4459b'],is:['Илья Сорокин','#b8650f'],dl:['Дарья Лебедева','#1d8a5a'],oc:['Олег Чернов','#c2413b'],vs:['Вера Смирнова','#7a52c7'],np:['Нина Павлова','#3f7f8f']};
 const INST=[
-  {id:'northwind',name:'Northwind',host:'jira.northwind.io',kind:'Server/DC',tempo:true,projects:['HOME','TRK']},
-  {id:'globex',name:'Globex',host:'jira.globex.dev',kind:'Server/DC',tempo:false,projects:['CRM','PORT']},
-  {id:'initech',name:'Initech',host:'tracker.initech.net/jira',kind:'Server/DC',tempo:false,projects:['OPS','DESK']},
+  {id:'northwind',name:'Northwind',host:'jira.northwind.io',kind:'Server/DC',tempo:true,projects:['HOME','TRK'],me:'Андрей Фостеев · fosteev',ver:'Jira 9.12.4',epic:'customfield_10008',chk:'02.10 14:20'},
+  {id:'globex',name:'Globex',host:'jira.globex.dev',kind:'Server/DC',tempo:false,projects:['CRM','PORT'],me:'Андрей Фостеев · a.fosteev',ver:'Jira 8.20.30',epic:'customfield_10100',chk:'02.10 14:20'},
+  {id:'initech',name:'Initech',host:'tracker.initech.net/jira',kind:'Server/DC',tempo:false,projects:['OPS','DESK'],me:'Андрей Фостеев · afosteev',ver:'Jira 9.4.17',epic:'customfield_10008',chk:'29.09 11:05',err:'Токен не принят (401) при обновлении 02.10 09:12 — истёк или отозван.'},
 ];
 const instOf=p=>INST.find(x=>x.projects.includes(p));
 const I={};
@@ -504,7 +574,11 @@ const daysBetween=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
 const S={mode:'mine',proj:'HOME',q:'',f:{status:new Set(),type:new Set(),prio:new Set(),inst:new Set()},
   jql:'assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC',saved:null,
   closedInst:{},collapsed:{},epicProj:'HOME',relProj:'HOME',sub:{},
-  tabs:[{kind:'file',id:'CamCloud.php'},{kind:'issue',id:'HOME-710'}],active:1,ov:null};
+  tabs:[{kind:'file',id:'CamCloud.php'},{kind:'issue',id:'HOME-710'},{kind:'set',id:'main'}],active:2,ov:null,
+  set:{sec:'conn',q:'',scope:'all',ws:{northwind:true,globex:true,initech:true},max:50,sort:'status',grp:true,dir:'.jiraffe',img:5,wd:8,api:true,apiW:true,gi:false}};
+const DEF={max:50,sort:'status',grp:true,dir:'.jiraffe',img:5,wd:8,api:true,apiW:true};
+const visI=()=>INST.filter(x=>S.set.scope=='all'||S.set.ws[x.id]);
+const WDM=()=>S.set.wd*60;
 const cur=()=>S.tabs[S.active];
 
 /* ---------- sidebar ---------- */
@@ -552,7 +626,7 @@ function renderChips(){
 function renderTree(){
   let h='';
   if(S.mode=='mine'){
-    h=INST.map(x=>{
+    h=visI().map(x=>{
       const list=sortI(filt(ALL().filter(i=>i.inst==x.id&&i.asg==ME&&i.status!='done')));
       const open=!S.closedInst[x.id];
       return `<div class="row inst" data-act="inst" data-id="${x.id}" style="padding-left:4px" tabindex="0"><span class="tw${open?' open':''}">${IC.chev}</span>${IC.server}<span class="lbl">${x.name} <span class="desc">${x.host}</span></span>${x.tempo?'<span class="tg">Tempo</span>':''}<span class="badge">${list.length}</span></div>`+
@@ -593,10 +667,10 @@ function renderRels(){
   }).join(''):`<div class="empty">В ${S.relProj} нет версий</div>`);
 }
 function renderTempo(){
-  const t=myDay(TODAY),pct=Math.min(100,t/480*100);
+  const t=myDay(TODAY),pct=Math.min(100,t/WDM()*100);
   const todays=LOG.filter(l=>l.who==ME&&l.date==TODAY);
   $('#tempo').innerHTML=`<div class="tp">
-    <div class="tp-top"><div><div class="sm mut">Сегодня, пт 2 октября</div><div class="big">${fmt(t)}</div></div><div class="sm mut">из 8ч · осталось ${fmt(Math.max(0,480-t))}</div></div>
+    <div class="tp-top"><div><div class="sm mut">Сегодня, пт 2 октября</div><div class="big">${fmt(t)}</div></div><div class="sm mut">из ${S.set.wd}ч · осталось ${fmt(Math.max(0,WDM()-t))}</div></div>
     <div class="bar"><i class="b-acc" style="width:${pct}%"></i></div>
     <div class="wk">${WEEK.map((d,n)=>{const m=myDay(d);return `<div class="${d==TODAY?'today':''}" title="${WD[n]} ${dshort(d)}: ${fmt(m)}"><span>${(m/60).toFixed(m%60?1:0).replace('.',',')}</span><span class="col"><i class="${d==TODAY?'b-acc':m>=480?'b-done':'b-prog'}" style="height:${Math.min(100,m/540*100)}%"></i></span><span>${WD[n]}</span></div>`}).join('')}</div>
     <div class="tl">${todays.map(l=>`<div class="row" data-act="open" data-k="${l.key}" tabindex="0" title="${esc(l.c)}"><span class="k">${l.key}</span><span class="lbl mut">${esc(l.c)}</span><span class="t">${fmt(l.m)}</span></div>`).join('')}</div>
@@ -610,6 +684,7 @@ function tabLabel(t){
   if(t.kind=='epic')return TI.epic+`<span>${t.id}</span>`;
   if(t.kind=='rel')return IC.tag+`<span>${esc(REL.find(r=>r.id==t.id).name)}</span>`;
   if(t.kind=='ts')return IC.cal+`<span>Tempo · неделя</span>`;
+  if(t.kind=='set')return IC.gear.replace('<svg','<svg class="s16"')+`<span>Настройки Jiraffe</span>`;
   return (t.id.endsWith('.php')?IC.php:IC.file)+`<span>${esc(t.id)}</span>`;
 }
 function renderTabs(){
@@ -618,7 +693,7 @@ function renderTabs(){
 function renderPane(){
   const t=cur(),p=$('#pane');
   if(!t){p.innerHTML=`<div class="wide-pad mut">Откройте задачу в дереве слева.</div>`;return}
-  p.innerHTML=t.kind=='issue'?vIssue(t.id):t.kind=='epic'?vEpic(t.id):t.kind=='rel'?vRel(t.id):t.kind=='ts'?vTS():vFile(t.id);
+  p.innerHTML=t.kind=='issue'?vIssue(t.id):t.kind=='epic'?vEpic(t.id):t.kind=='rel'?vRel(t.id):t.kind=='ts'?vTS():t.kind=='set'?vSet():vFile(t.id);
 }
 function vFile(n){
   return `<div class="code">${FILES[n].map(l=>`<div class="${/^\s*\/\//.test(l)?'cmt':''}">${esc(l)||' '}</div>`).join('')}</div>`;
@@ -734,13 +809,13 @@ function vTS(){
 }
 function renderSB(){
   const t=cur(),i=t&&t.kind=='issue'?I[t.id]:null;
-  $('#sb').innerHTML=`<span class="it rem">${IC.giraffe} Jiraffe</span><span class="it opt">${IC.branch} main</span><span class="it opt" data-act="add-inst">${IC.server.replace('class="s16"','')} 3 инстанса</span><span class="sp"></span>
-  ${i?`<span class="it" data-act="sub" data-k="${i.key}" data-s="desc">${TI[i.type]} ${i.key} · ${SL[i.status]}</span>`:''}<span class="it" data-act="ts" title="Tempo: открыть неделю">${IC.clock} Сегодня ${fmt(myDay(TODAY))} / 8ч</span><span class="it opt">${IC.bell}</span>`;
+  $('#sb').innerHTML=`<span class="it rem">${IC.giraffe} Jiraffe</span><span class="it opt">${IC.branch} main</span><span class="it opt" data-act="settings" data-sec="conn" title="Настройки Jiraffe: подключения">${IC.server.replace('class="s16"','')} ${visI().length} ${visI().length==1?'инстанс':'инстанса'}${INST.some(x=>x.err&&visI().includes(x))?' · '+IC.warn.replace('<svg','<svg style="color:var(--warn)"')+' 1':''}</span><span class="sp"></span>
+  ${i?`<span class="it" data-act="sub" data-k="${i.key}" data-s="desc">${TI[i.type]} ${i.key} · ${SL[i.status]}</span>`:''}<span class="it" data-act="ts" title="Tempo: открыть неделю">${IC.clock} Сегодня ${fmt(myDay(TODAY))} / ${S.set.wd}ч</span><span class="it opt">${IC.bell}</span>`;
 }
 function renderStatic(){
   $('#tbs').innerHTML=IC.search+' jiraffe';
   $('#act').innerHTML=`<button title="Проводник">${AIC.files}</button><button title="Поиск">${AIC.search}</button><button title="Git">${AIC.scm}</button><button title="Расширения">${AIC.ext}</button><button class="on" title="Jiraffe">${IC.giraffe}</button>`;
-  $('#side-acts').innerHTML=`<button class="ib" data-act="add-inst" title="Добавить инстанс Jira">${IC.plus}</button><button class="ib" data-act="refresh" title="Обновить">${IC.refresh}</button>`;
+  $('#side-acts').innerHTML=`<button class="ib" data-act="add-inst" title="Добавить инстанс Jira">${IC.plus}</button><button class="ib" data-act="refresh" title="Обновить">${IC.refresh}</button><button class="ib" data-act="settings" title="Настройки Jiraffe">${IC.gear}</button>`;
   $('#issues-acts').innerHTML=`<button class="ib" data-act="qp" title="Фильтры: статус, тип, приоритет, инстанс">${IC.filter}</button><button class="ib" data-act="mode" data-m="jql" title="Поиск по JQL">${IC.search}</button>`;
   $('#q-ic').innerHTML=IC.search;
   document.querySelectorAll('.view-h .tw').forEach(e=>e.innerHTML=IC.chev);
@@ -748,6 +823,80 @@ function renderStatic(){
 function renderViews(){for(const v of ['issues','filters','epics','rel','tempo'])$('#view-'+v).classList.toggle('collapsed',!!S.collapsed[v])}
 function renderSide(){renderChips();renderTree();renderFilters();renderEpics();renderRels();renderTempo()}
 function render(){renderSide();renderTabs();renderPane();renderSB()}
+
+
+/* ---------- settings ---------- */
+const SECS=[['conn','Подключения',IC.server],['list','Список задач',IC.list],['att','Вложения',IC.folder],['time','Учёт времени',IC.clock],['int','Интеграции',IC.plug]];
+const SORTS={status:'Статус → приоритет → ключ',updated:'Обновлены недавно',prio:'Приоритет',key:'Ключ'};
+const where=w=>`<span class="where" title="${w=='ws'?'Пишется в .vscode/settings.json этой папки':w=='user'?'Пишется в пользовательский settings.json':w=='state'?'Хранится в состоянии расширения, не в settings.json':'Определяется по инстансу, менять нечего'}">${w=='ws'?'workspace':w=='user'?'пользователь':w=='state'?'состояние':'авто'}</span>`;
+function setRow(o){
+  const mod=o.k&&o.k in DEF&&S.set[o.k]!==DEF[o.k];
+  return `<div class="set${mod?' mod':''}" data-q="${esc((o.cat+' '+o.t+' '+o.d+' '+(o.id||'')).toLowerCase())}">
+    <div class="set-t"><span><span class="cat">${o.cat}: </span>${o.t}</span>${where(o.w)}${o.isNew?'<span class="new" title="Такой настройки сейчас нет — предлагаю добавить">новое</span>':''}${o.id?`<code class="sm mut" style="background:none;padding:0">${o.id}</code>`:''}</div>
+    <div class="set-d">${o.d}</div>
+    <div class="set-c">${o.c}${mod?`<button class="lnk rst" data-act="set-rst" data-k="${o.k}">Сбросить к ${DEF[o.k]===true?'вкл':DEF[o.k]===false?'выкл':esc(String(o.k=='sort'?SORTS[DEF[o.k]]:DEF[o.k]))}</button>`:''}</div>${o.x||''}</div>`;
+}
+const sw=(k,on,lbl)=>`<button class="sw${on?' on':''}" role="switch" aria-checked="${on}" aria-label="${esc(lbl)}" data-act="set-sw" data-k="${k}"></button><span class="sm">${on?'Вкл':'Выкл'}</span>`;
+function instCard(x){
+  const on=S.set.scope=='all'||S.set.ws[x.id];
+  return `<div class="ic${x.err?' err':''}${on?'':' off'}">
+    <div class="ic-h">${IC.server.replace('class="s16"','')}<span class="nm">${esc(x.name)}</span><button class="ib" data-act="set-toast" data-m="В расширении — поле ввода с текущим именем; имя видно в дереве и статус-баре." title="Переименовать">${IC.pencil}</button><span class="host">${x.host}</span><span class="tg">${x.kind}</span><span class="sp"></span>
+      ${S.set.scope=='some'?`<span class="cbx" role="checkbox" aria-checked="${on}" tabindex="0" data-act="set-ws" data-id="${x.id}"><span class="cb${on?' on':''}">${IC.check}</span>в этом workspace</span>`:''}
+      ${x.err?`<span class="err" style="display:flex;align-items:center;gap:4px">${IC.warn} нет доступа</span>`:`<span class="ok" style="display:flex;align-items:center;gap:4px">${IC.ok} подключено</span>`}</div>
+    ${x.err?`<div class="ic-alert">${IC.warn}<span>${x.err}</span><span class="sp"></span><button class="btn sm pri" data-act="set-tok" data-id="${x.id}">${IC.key} Обновить токен</button></div>`:''}
+    <div class="ic-b">
+      <span class="l">Аккаунт</span><span class="v">${x.me}</span>
+      <span class="l">Токен</span><span class="v"><span class="k">••••••••${x.id=='initech'?'Qx7':'a91'}</span><span class="mut sm">Personal Access Token · SecretStorage VS Code</span></span>
+      <span class="l">Сервер</span><span class="v">${x.ver}<span class="mut sm">· возможности проверены ${x.chk}</span></span>
+      <span class="l">Журнал работ</span><span class="v">${x.tempo?`${IC.ok.replace('class="s16"','style="color:var(--green)"')} Tempo`:`Журнал Jira <span class="mut sm">— Tempo не найден</span>`}</span>
+      <span class="l">Поле Epic Link</span><span class="v"><code>${x.epic}</code><span class="mut sm">найдено автоматически</span></span>
+      <span class="l">Проекты</span><span class="v">${x.projects.map(p=>`<span class="tag">${p}</span>`).join('')}<span class="mut sm">из ваших задач</span></span>
+    </div>
+    <div class="ic-f"><button class="btn sm" data-act="set-check" data-id="${x.id}">${IC.ok.replace('class="s16"','')} Проверить подключение</button><button class="btn sm" data-act="set-caps" data-id="${x.id}">${IC.refresh} Обновить возможности</button>${x.err?'':`<button class="btn sm" data-act="set-tok" data-id="${x.id}">${IC.key} Сменить токен</button>`}<span class="sp"></span><button class="btn sm dng" data-act="set-del" data-id="${x.id}">${IC.trash} Отключить</button></div>
+  </div>`;
+}
+function vSet(){
+  const v=S.set,errs=INST.filter(x=>x.err).length;
+  const sec=(id,t,sub,body,act)=>`<section class="st-sec" id="st-${id}"><h2>${t}<span class="sp"></span>${act||''}</h2>${sub?`<p class="sub">${sub}</p>`:''}${body}</section>`;
+  const conn=sec('conn','Подключения','Подключения и токены общие для всех окон VS Code. Здесь же — какие из них видны в этой папке.',
+    setRow({cat:'Подключения',t:'Инстансы этого workspace',w:'ws',id:'jiraffe.instances',d:'Какие Jira показывать и опрашивать в этой папке. Удобно, когда в одном окне рабочий проект, а в другом — личный.',
+      c:`<div class="radios"><label><input type="radio" name="st-scope" value="all" data-chg="st-scope"${v.scope=='all'?' checked':''}> Все подключённые</label><label><input type="radio" name="st-scope" value="some" data-chg="st-scope"${v.scope=='some'?' checked':''}> Только отмеченные ниже</label></div>`,
+      x:v.scope=='some'?`<div class="hint">${IC.info} Сейчас в .vscode/settings.json: <code>"jiraffe.instances": [${INST.filter(x=>v.ws[x.id]).map(x=>`"${x.id}"`).join(', ')}]</code></div>`:''})
+    +INST.map(instCard).join(''),
+    `<button class="btn sm pri" data-act="add-inst">${IC.plus} Подключить Jira</button>`);
+  const list=sec('list','Список задач','',
+    setRow({cat:'Список',t:'Задач за один запрос',k:'max',w:'user',id:'jiraffe.maxResults',d:'Сколько задач грузить сразу и по «Загрузить ещё». Больше — дольше первый ответ от Jira.',c:`<input class="n" type="number" min="1" max="100" value="${v.max}" data-chg="st-num" data-k="max" aria-label="Задач за один запрос"><span class="mut sm">от 1 до 100</span>`})
+    +setRow({cat:'Список',t:'Сортировка',k:'sort',w:'state',d:'Порядок задач в дереве. То же, что кнопка сортировки в заголовке «Задачи» — меняется и там, и тут.',c:`<select data-chg="st-sel" data-k="sort" aria-label="Сортировка">${Object.entries(SORTS).map(([k,t])=>`<option value="${k}"${v.sort==k?' selected':''}>${t}</option>`).join('')}</select>`})
+    +setRow({cat:'Список',t:'Группировать по проектам',k:'grp',w:'state',d:'Внутри инстанса задачи раскладываются по проектам. Выключено — плоский список.',c:sw('grp',v.grp,'Группировать по проектам')}));
+  const att=sec('att','Вложения','',
+    setRow({cat:'Вложения',t:'Папка для вложений',k:'dir',w:'user',id:'jiraffe.attachmentsDir',d:'Путь относительно первой папки рабочей области; файлы задачи — в подпапке с её ключом. Абсолютный путь — только в пользовательских настройках. Без открытой папки — временный каталог, чистится через неделю.',
+      c:`<input class="t" value="${esc(v.dir)}" data-chg="st-txt" data-k="dir" aria-label="Папка для вложений" spellcheck="false"><button class="btn sm" data-act="set-toast" data-m="В расширении — системный диалог выбора папки внутри рабочей области.">${IC.folder} Выбрать…</button>`,
+      x:`<div class="hint">${IC.folder} Например: <code>~/Projects/jiraffe/${esc(v.dir.replace(/^\.\/|\/$/g,''))}/HOME-710/screen-archive.png</code></div>${v.gi?`<div class="hint ok">${IC.ok} <code>${esc(v.dir)}/</code> в .gitignore</div>`:`<div class="hint warn">${IC.warn} Папки нет в .gitignore — скриншоты из задач могут уехать в коммит. <button class="lnk" data-act="set-gi">Добавить в .gitignore</button><span class="new">новое</span></div>`}`})
+    +setRow({cat:'Вложения',t:'Предел размера картинки',k:'img',w:'user',id:'jiraffe.maxImageMb',d:'Картинки больше — без превью в карточке и в описании, только кнопка «Скачать». Экономит трафик на тяжёлых скриншотах.',c:`<input class="n" type="number" min="1" max="50" value="${v.img}" data-chg="st-num" data-k="img" aria-label="Предел размера картинки, МБ"><span class="mut sm">МБ</span>`}));
+  const time=sec('time','Учёт времени','',
+    setRow({cat:'Время',t:'Длина рабочего дня',k:'wd',w:'user',id:'jiraffe.workdayHours',d:'Норма дня в сводке Tempo и в строке состояния. Дни меньше нормы подсвечиваются в недельной таблице.',c:`<input class="n" type="number" min="1" max="24" step="0.5" value="${v.wd}" data-chg="st-num" data-k="wd" aria-label="Длина рабочего дня, часов"><span class="mut sm">часов · в статус-баре: <b style="color:var(--fg2)">Сегодня ${fmt(myDay(TODAY))} / ${v.wd}ч</b></span>`})
+    +setRow({cat:'Время',t:'Куда пишется время',w:'auto',d:'Выбирается по инстансу: есть Tempo — в Tempo (с типом работы и AI Tokens), нет — в обычный журнал работ Jira.',c:`<div class="tw-wrap" style="width:100%"><table class="t" style="max-width:520px"><tbody>${INST.map(x=>`<tr><td>${x.name}</td><td>${x.tempo?'Tempo':'Журнал Jira'}</td><td class="mut sm">${x.tempo?'тип работы, AI Tokens':'AI Tokens — в комментарий'}</td></tr>`).join('')}</tbody></table></div>`}));
+  const int=sec('int','Интеграции','',
+    setRow({cat:'Agentura',t:'Чат ИИ по задаче',w:'auto',d:'Кнопки «Спросить ИИ» и «Открыть в Agentura ▾» в карточке задачи. Появляются сами, когда установлено расширение Agentura.',c:`<span class="ok" style="display:flex;align-items:center;gap:4px">${IC.ok} Agentura найдена</span><span class="mut sm">· у каждой задачи свои чаты</span>`})
+    +setRow({cat:'API',t:'Доступ других расширений',k:'api',w:'user',isNew:true,d:'Публичный API Jiraffe: другие расширения (например, Agentura) видят инстансы этого workspace, читают задачи и открывают карточку. Токены и email наружу не отдаются никогда.',c:sw('api',v.api,'Доступ других расширений')})
+    +(v.api?setRow({cat:'API',t:'Разрешить запись от вашего имени',k:'apiW',w:'user',isNew:true,d:'API v2: комментарий, смена статуса, журнал работ. Каждое действие — от вашего аккаунта. Выключено — расширения только читают.',c:sw('apiW',v.apiW,'Разрешить запись от вашего имени'),
+      x:`<div class="hint">${IC.info} Последнее обращение: Agentura · комментарий в HOME-710 · сегодня 13:48</div>`}):''));
+  const body=conn+list+att+time+int;
+  return `<div class="st"><nav class="st-nav" aria-label="Разделы настроек">${SECS.map(([id,t,ic])=>`<button class="${v.sec==id?'on':''}" data-act="set-sec" data-sec="${id}">${ic.replace('class="s16"','')}${t}${id=='conn'&&errs?`<span class="badge" title="Есть проблемы с подключением">${errs}</span>`:''}</button>`).join('')}</nav>
+  <div class="st-main"><div class="st-top"><label class="inp" for="st-q">${IC.search}<input id="st-q" placeholder="Найти настройку: токен, вложения, Tempo…" autocomplete="off" value="${esc(v.q)}"></label><span class="sp"></span><button class="lnk" data-act="set-toast" data-m="Откроется settings.json VS Code на секции jiraffe.*">${IC.ext.replace('<svg','<svg style="width:13px;height:13px;vertical-align:-2px"')} settings.json</button></div>
+  <div class="mut sm">Изменения применяются сразу, кнопки «Сохранить» нет — как в настройках VS Code. Синяя черта слева — значение отличается от стандартного.</div>
+  <div id="st-body">${body}</div><div class="st-empty" id="st-none" hidden>Ничего не нашлось. Попробуйте «токен», «папка» или «Tempo».</div></div></div>`;
+}
+function setFilter(){
+  const q=S.set.q.trim().toLowerCase(),b=$('#st-body');if(!b)return;
+  let any=false;
+  b.querySelectorAll('.st-sec').forEach(sec=>{let n=0;
+    sec.querySelectorAll('.set').forEach(r=>{const m=!q||r.dataset.q.includes(q);r.hidden=!m;if(m)n++});
+    sec.querySelectorAll('.ic').forEach(c=>{const m=!q||c.textContent.toLowerCase().includes(q)||'подключение токен инстанс'.includes(q);c.hidden=!m;if(m)n++});
+    sec.hidden=!n;if(n)any=true});
+  $('#st-none').hidden=any;
+}
+function rerenderSet(focusSel){const p=$('#pane'),y=p.scrollTop;renderPane();p.scrollTop=y;setFilter();renderSB();if(focusSel){const f=$(focusSel);if(f)f.focus()}}
 
 /* ---------- overlays ---------- */
 function showOv(h){$('#ovl').innerHTML=`<div class="ov" data-act="ov-bg">${h}</div>`;const f=$('#ovl').querySelector('input,select,textarea,button');if(f)f.focus()}
@@ -837,6 +986,20 @@ const A={
     const c=cur();if(c&&c.kind=='issue'&&c.id==k)S.sub[k]='wl';
     render();toast(`Залогано ${fmt(m)} в ${k} за ${dd(d)}${x.tempo?' · Tempo':' · журнал Jira'}`);
   },
+  settings:t=>{openTab('set','main');setFilter();const s=t.dataset.sec;if(s)A['set-sec']({dataset:{sec:s}})},
+  'set-sec':t=>{S.set.sec=t.dataset.sec;document.querySelectorAll('.st-nav button').forEach(b=>b.classList.toggle('on',b.dataset.sec==S.set.sec));const el=$('#st-'+S.set.sec);if(el)el.scrollIntoView({block:'start'})},
+  'set-sw':t=>{const k=t.dataset.k;S.set[k]=!S.set[k];rerenderSet(`[data-act="set-sw"][data-k="${k}"]`);if(k=='grp')toast(S.set.grp?'Задачи сгруппированы по проектам (в прототипе дерево не меняется).':'Задачи плоским списком (в прототипе дерево не меняется).')},
+  'set-rst':t=>{const k=t.dataset.k;S.set[k]=DEF[k];rerenderSet();render()},
+  'set-ws':t=>{const id=t.dataset.id;S.set.ws[id]=!S.set.ws[id];rerenderSet(`[data-act="set-ws"][data-id="${id}"]`);renderTree()},
+  'set-check':t=>{const x=ins(t.dataset.id);toast(x.err?`${x.name}: 401 — токен не принят. Обновите токен.`:`${x.name}: подключено как ${x.me.split(' · ')[0]}, ${x.ver}.`)},
+  'set-caps':t=>{const x=ins(t.dataset.id);if(x.err){toast(`${x.name}: сначала обновите токен.`);return}x.chk='02.10 '+new Date().toTimeString().slice(0,5);rerenderSet();toast(`${x.name}: возможности обновлены — ${x.tempo?'Tempo есть':'Tempo нет'}, Epic Link ${x.epic}.`)},
+  'set-tok':t=>{const x=ins(t.dataset.id);S.ov='tok';showOv(`<div class="dlg" role="dialog" aria-label="Токен ${esc(x.name)}"><div class="dlg-h">${IC.key.replace('<svg','<svg style="width:16px;height:16px"')} Новый токен · ${esc(x.name)}<button class="ib" data-act="ov-x" aria-label="Закрыть">${IC.x}</button></div>
+    <div class="dlg-b"><div class="fld"><label for="tk-v">Personal Access Token</label><input id="tk-v" type="password" autocomplete="off"><small>Создать: ${x.host} → Профиль → Personal Access Tokens. Старый токен заменится после успешной проверки.</small></div></div>
+    <div class="dlg-f"><button class="btn" data-act="ov-x">Отмена</button><button class="btn pri" data-act="tok-save" data-id="${x.id}">Проверить и сохранить</button></div></div>`)},
+  'tok-save':t=>{const x=ins(t.dataset.id);delete x.err;x.chk='02.10 '+new Date().toTimeString().slice(0,5);closeOv();rerenderSet();toast(`${x.name}: токен проверен и сохранён в SecretStorage.`)},
+  'set-del':t=>{const x=ins(t.dataset.id);toast(`В расширении — модальное подтверждение: «Отключить ${x.name}? Токен удалится из SecretStorage, сохранённые фильтры этого инстанса — тоже».`)},
+  'set-gi':()=>{S.set.gi=true;rerenderSet();toast(`Добавлено в .gitignore: ${S.set.dir}/`)},
+  'set-toast':t=>toast(t.dataset.m),
   'add-inst':()=>{S.ov='ai';showOv(addInstHtml())},
   'ai-check':()=>{const r=$('#ai-res'),u=$('#ai-url').value.trim();r.hidden=false;
     if(!/^https:\/\/[^\s/]+\.[^\s]+/.test(u)){r.className='err';r.textContent='Нужен адрес вида https://jira.company.ru';return}
@@ -859,9 +1022,14 @@ document.addEventListener('change',e=>{
   if(c=='proj'){S.proj=e.target.value;renderTree()}
   if(c=='epicProj'){S.epicProj=e.target.value;renderEpics()}
   if(c=='relProj'){S.relProj=e.target.value;renderRels()}
+  if(c=='st-scope'){S.set.scope=e.target.value;rerenderSet(`input[name="st-scope"][value="${S.set.scope}"]`);renderTree()}
+  if(c=='st-num'){const k=e.target.dataset.k,el=e.target,n=parseFloat(el.value),mn=+el.min,mx=+el.max;S.set[k]=isNaN(n)?DEF[k]:Math.min(mx,Math.max(mn,n));rerenderSet();renderTempo()}
+  if(c=='st-sel'){S.set[e.target.dataset.k]=e.target.value;rerenderSet()}
+  if(c=='st-txt'){const v=e.target.value.trim();S.set.dir=v||DEF.dir;S.set.gi=false;rerenderSet()}
   if(c=='ai-kind'){const cl=e.target.value=='cloud';$('#ai-email-w').hidden=!cl;$('#ai-tok-l').textContent=cl?'API token':'Personal Access Token'}
 });
 $('#q').addEventListener('input',e=>{S.q=e.target.value;renderTree()});
+document.addEventListener('input',e=>{if(e.target.id=='st-q'){S.set.q=e.target.value;setFilter()}});
 
 renderStatic();renderViews();renderExtra();render();
 })();

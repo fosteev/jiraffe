@@ -5,6 +5,7 @@
   "view.filters": "Filters",
   "view.epics": "Epics",
   "view.releases": "Releases",
+  "command.openSettings": "Jiraffe: Open Settings",
   "command.refresh": "Jiraffe: Refresh",
   "command.addInstance": "Jiraffe: Add Instance",
   "command.scopeInstances": "Jiraffe: Workspace Instances",
@@ -40,10 +41,12 @@
   "command.myEpics": "Jiraffe: Only My Epics",
   "command.allEpics": "Jiraffe: All Epics",
   "command.loadMoreEpics": "Jiraffe: Load More Epics",
-  "welcome.noInstances": "No Jira instances for this workspace.\n[Add Instance](command:jiraffe.addInstance)\n[Choose from Connected](command:jiraffe.scopeInstances)",
+  "welcome.noInstances": "No Jira instances for this workspace.\n[Add Instance](command:jiraffe.addInstance)\n[Choose from Connected](command:jiraffe.scopeInstances)\n[Open Settings](command:jiraffe.openSettings)",
   "config.instances": "Which instances to show in this workspace: instance id or URL (`https://jira.example.com`). Unset or empty means all connected instances. Handy in the project folder's `.vscode/settings.json`; to pick with the mouse, use the **Jiraffe: Workspace Instances** command. Connections and tokens are shared across all windows.",
   "config.maxResults": "How many issues to load per request (and per \"Load More\" click).",
   "config.attachmentsDir": "Where to save attachments: a path relative to the first workspace folder (inside it); an issue's attachments go to a <KEY> subfolder. An absolute path is accepted only from user settings. With no folder open, a temporary directory is used (<tmp>/jiraffe, cleaned after a week).",
   "config.maxImageMb": "Maximum size (MB) of an image the card downloads for preview and for showing in the description. Larger images can only be downloaded via \"Download\".",
-  "config.workdayHours": "Workday length in hours: the denominator of the \"Today 3h 15m / 8h\" summary in the Tempo view and the status bar."
+  "config.workdayHours": "Workday length in hours: the denominator of the \"Today 3h 15m / 8h\" summary in the Tempo view and the status bar.",
+  "config.api.enabled": "Lets other VS Code extensions (for example, Agentura) use Jiraffe's public API: see the instances of this workspace, read issues and open issue cards. Jira tokens and your email are never passed out. Can only be set in user settings: a project's `.vscode/settings.json` cannot change it.",
+  "config.api.allowWrites": "Lets other extensions write to Jira through the Jiraffe API on your behalf: add comments, change status, log work. Every action is performed as your Jira account. Off means other extensions can only read. Only matters when **Jiraffe › Api: Enabled** is on. Can only be set in user settings."
 }

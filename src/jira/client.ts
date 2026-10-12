@@ -135,6 +135,12 @@ export class JiraClient {
     return r && r.id !== undefined ? { id: String(r.id) } : {};
   }
 
+  /** Комментарий: `POST /rest/api/2/issue/{key}/comment`, тело — wiki-текст строкой (API v2). */
+  async addComment(key: string, body: string): Promise<{ id?: string }> {
+    const r = await this.http.postJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/comment`, { body });
+    return r && r.id !== undefined ? { id: String(r.id) } : {};
+  }
+
   /** Доступные текущему пользователю переходы задачи (с полями экрана перехода). */
   async transitions(key: string): Promise<Transition[]> {
     return mapTransitions(await this.http.getJson<Raw>(`/rest/api/2/issue/${encodeURIComponent(key)}/transitions`, { expand: 'transitions.fields' }));

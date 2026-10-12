@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { isIssueRef, type IssuePanelManager } from '../panels/issuePanel';
 import type { ListPanelManager } from '../panels/listPanel';
 import { isIssueKey, isVersionId } from '../panels/protocol';
+import { apiAccess } from '../apiAccessHost';
 import { t } from '../l10n';
 
 /**
@@ -19,7 +20,13 @@ export function registerIssueCommands(panels: IssuePanelManager, lists: ListPane
       if (typeof a.instanceId === 'string' && isIssueKey(a.key)) lists.open({ kind: 'epic', instanceId: a.instanceId, id: a.key });
     }),
     // Аргумент — {instanceId, key, id}: вложение задачи, открытой в карточке (метаданные и адреса — из неё).
+    // Внутри расширения команду никто не зовёт (карточка качает через сообщение webview), из палитры она скрыта: это вход для
+    // чужих расширений, поэтому с аргументами она подчиняется `jiraffe.api.enabled`.
     vscode.commands.registerCommand('jiraffe.downloadAttachment', (arg?: unknown) => {
+      if (arg !== undefined && !apiAccess().read) {
+        void vscode.window.showInformationMessage(t('Jiraffe: the API is disabled in Jiraffe settings'));
+        return;
+      }
       const a = (arg && typeof arg === 'object' ? arg : {}) as { instanceId?: unknown; key?: unknown; id?: unknown };
       const ref = { instanceId: a.instanceId, key: a.key };
       if (!isIssueRef(ref) || typeof a.id !== 'string' || !panels.downloadAttachment(ref, a.id)) {
