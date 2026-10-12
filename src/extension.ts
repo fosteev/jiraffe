@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { createApi, type ApiAccess, type JiraffeApi } from './api';
-import { API_ALLOW_WRITES, API_ENABLED, API_SECTION, resolveApiAccess } from './apiAccess';
+import { createApi, type JiraffeApi } from './api';
+import { API_ENABLED, API_SECTION } from './apiAccess';
+import { apiAccess } from './apiAccessHost';
 import { setL10n } from './l10n';
 import { readScope, registerInstanceCommands } from './commands/instances';
 import { registerFilterCommands } from './commands/filters';
@@ -16,6 +17,7 @@ import { isSectionId } from './panels/settingsModel';
 import { ApiActivity } from './state/apiActivity';
 import { FilterState } from './state/filters';
 import { InstanceStore } from './state/instances';
+import { forgetInstance, watchRemovedInstances } from './state/instanceCleanup';
 import { InstanceMeta } from './state/meta';
 import { EPIC_PROJECT_KEY, RELEASE_PROJECT_KEY, SectionProject } from './state/sectionProject';
 import { TodayService } from './state/today';
@@ -26,12 +28,6 @@ import { IssuesTree } from './views/issuesTree';
 import { ReleasesTree } from './views/releasesTree';
 import { TodayStatusBar } from './views/statusBar';
 import { TempoViewProvider } from './views/tempoView';
-
-/** Доступ других расширений к API из пользовательских настроек. Вызывается на каждое обращение к API, не кэшируется. */
-function apiAccess(): ApiAccess {
-  const cfg = vscode.workspace.getConfiguration(API_SECTION);
-  return resolveApiAccess(cfg.inspect<unknown>(API_ENABLED), cfg.inspect<unknown>(API_ALLOW_WRITES));
-}
 
 /** Сводку «сегодня» перечитываем, когда окно вернули в фокус (не чаще раза в 5 минут) и раз в 15 минут, пока окно в фокусе. */
 const FOCUS_REFRESH_MS = 5 * 60_000;
@@ -71,8 +67,11 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
   const issuesView = vscode.window.createTreeView('jiraffe.issues', { treeDataProvider: issuesTree });
   issuesTree.attach(issuesView);
   const apiActivity = new ApiActivity();
+  // Инстанс отключён (команда или вкладка настроек): убираем его фильтры и выбранные проекты.
+  const cleanup = watchRemovedInstances(instances, (id) => void forgetInstance(id, [filters, epicProject, releaseProject]));
   const settings = new SettingsPanel(context.extensionUri, issuesTree, instances, apiActivity);
   context.subscriptions.push(
+    cleanup,
     meta,
     attachments,
     panels,

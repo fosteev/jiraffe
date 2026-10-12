@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+
+- Jiraffe Settings tab (gear in the view titles or *Jiraffe: Open Settings*): connections as cards (account or error, server version, capabilities checked, Tempo or Jira work log, Epic Link field) with check, rename, change token (saved only after it passes `myself()`; never shown), refresh capabilities and disconnect; which instances this workspace uses; issue list, attachments, time tracking and integrations settings with the level each value is stored at and a Reset link; search over settings. The existing commands keep working.
+- Attachments: when the attachments folder is inside a git repository and not ignored, the tab offers to add it to `.gitignore`.
+- Disconnecting an instance (from the tab or *Remove Instance*) now also deletes its saved filters and clears the Epics and Releases project and this workspace's Project-mode project that pointed to it. Filters without an instance are kept.
+- Public API access: `jiraffe.api.enabled` and `jiraffe.api.allowWrites` (user settings only, on by default). With the API off, `instances()` returns an empty list and every other method refuses; with writes off, `addComment`, `transition` and `logWork` refuse. Checked on every call, including right before a write is sent. The tab shows whether Agentura is installed and the last write attempt via the API. The `jiraffe.downloadAttachment` command called with arguments (by other extensions) refuses while the API is off.
+
 ## 0.8.0
 
 - Issue tab: “Ask AI” is now “Open in Agentura ▾”. With a recent [Agentura](https://github.com/fosteev/Agentura) it lists the issue's chats (Continue the latest, other chats, New chat for this issue); an issue without chats opens a new one right away. The issue is passed to Agentura as a task, so its chats are grouped. With an older Agentura the button works as before (one chat per issue).

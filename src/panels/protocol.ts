@@ -206,6 +206,8 @@ export type SettingsToHost =
   | { type: 'reset'; id: SettingId }
   | { type: 'pickDir' }
   | { type: 'openJson' }
+  /** Дописать папку вложений в .gitignore (путь хост берёт сам из настроек, не из сообщения). */
+  | { type: 'addGitignore' }
   | { type: 'instance'; action: InstanceAction; id: string }
   | { type: 'addInstance' }
   /** Набор workspace: «все подключённые» / «только отмеченные». */
@@ -218,6 +220,7 @@ export type SettingsMessage =
   | { type: 'reset'; id: SettingId }
   | { type: 'pickDir' }
   | { type: 'openJson' }
+  | { type: 'addGitignore' }
   | { type: 'instance'; action: InstanceAction; id: string }
   | { type: 'addInstance' }
   | { type: 'scopeMode'; mode: 'all' | 'some' }
@@ -233,6 +236,7 @@ export function parseSettingsMessage(m: unknown): SettingsMessage | undefined {
     case 'ready':
     case 'pickDir':
     case 'addInstance':
+    case 'addGitignore':
     case 'openJson': return { type: o.type };
     case 'instance':
       return isInstanceId(o.id) && (INSTANCE_ACTIONS as readonly unknown[]).includes(o.action)

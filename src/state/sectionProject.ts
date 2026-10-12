@@ -30,6 +30,18 @@ export class SectionProject {
     for (const l of this.listeners) l();
   }
 
+  /** Инстанс отключён: если выбранный проект (в workspace или в глобальном запасном значении) — его, выбор сбрасывается. */
+  async forgetInstance(instanceId: string): Promise<void> {
+    let changed = false;
+    for (const m of [this.memento, this.fallback]) {
+      if (m && sanitizeProjectSel(m.get<unknown>(this.stateKey))?.instanceId === instanceId) {
+        await m.update(this.stateKey, undefined);
+        changed = true;
+      }
+    }
+    if (changed) for (const l of this.listeners) l();
+  }
+
   onDidChange(fn: () => void): { dispose(): void } {
     this.listeners.add(fn);
     return { dispose: () => void this.listeners.delete(fn) };

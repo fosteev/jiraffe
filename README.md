@@ -80,6 +80,8 @@ Mode, project, quick filters and the Epics/Releases project are remembered per w
 
 ## Settings
 
+Open the **Jiraffe Settings** tab with the gear in the title of the Issues, Filters, Epics and Releases views or the *Jiraffe: Open Settings* command. It has sections for connections (status, token change, rename, disconnect, which instances this workspace uses), the issue list, attachments (with a hint and a button when the folder is not in `.gitignore`), time tracking and integrations. Changes apply at once and go to the same settings as below; every setting shows where it is stored, and a changed one has a Reset link. The integrations section has two switches for the public API used by other extensions: access at all, and writing on your behalf. Both are on by default and, being user-level settings, cannot be changed from a project's `.vscode/settings.json`. The switches cover the API object and the `jiraffe.downloadAttachment` command; Jiraffe's other commands work as before and change Jira only after you confirm.
+
 | Setting | Default | |
 |---|---|---|
 | `jiraffe.instances` | all | Instances shown in this workspace (URLs or ids) |
@@ -87,6 +89,8 @@ Mode, project, quick filters and the Epics/Releases project are remembered per w
 | `jiraffe.attachmentsDir` | `.jiraffe` | Where attachments are saved, relative to the first workspace folder |
 | `jiraffe.maxImageMb` | 5 | Max image size for previews |
 | `jiraffe.workdayHours` | 8 | Workday length for the "today" summary |
+| `jiraffe.api.enabled` | on | Let other extensions use Jiraffe's API (user settings only) |
+| `jiraffe.api.allowWrites` | on | Let them comment, change status and log work as you (user settings only) |
 
 ## Not yet
 

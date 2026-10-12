@@ -308,6 +308,8 @@ button.lnk:hover { text-decoration: underline; }
 .radios input, .cbx input { margin: 0; }
 .hint { font-size: 12px; color: var(--mut); display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .hint svg { width: 14px; height: 14px; }
+.hint.ok { color: var(--green); }
+.hint.warn { color: var(--warn); }
 .ic { border: 1px solid var(--bd); border-radius: 6px; margin: 10px 0; background: var(--vscode-editor-background); }
 .ic.err { border-color: color-mix(in srgb, var(--red) 55%, var(--bd)); }
 .ic.off { opacity: .62; }

@@ -15,7 +15,9 @@ import { parseSettingsMessage, type HostToSettings, type InstanceAction, type Se
 import {
   buildSettingsState, type NumberId, type SectionId, type SettingId, type SettingValue, type WriteTarget,
 } from './settingsModel';
-import { isAbsoluteDir, relativeInside } from './settingsPaths';
+import { tmpdir } from 'node:os';
+import { appendIgnore, ignoreLine, isIgnored } from '../state/gitignore';
+import { attachmentsIgnoreTarget, isAbsoluteDir, relativeInside } from './settingsPaths';
 
 /** Что вкладке нужно от дерева задач: сортировка и группировка лежат в его globalState. */
 export interface IssueViewSettings {
@@ -52,6 +54,11 @@ export class SettingsPanel implements vscode.Disposable {
   /** `instanceSnapshot` по id на момент последнего события store: замена записи под тем же id (повторное «Подключить»,
    *  обновлённые caps) требует перепроверки, хотя статус у id уже есть. */
   private snaps = new Map<string, string>();
+  /** Папка вложений (от первой папки workspace), которой нет в .gitignore репо; `undefined` — подсказки нет. Считается асинхронно (git). */
+  private gitTarget: string | undefined;
+  private gitSeq = 0;
+  /** Двойной клик до перерисовки: второй вызов ждёт первый, а не дописывает строку ещё раз (чтение и запись .gitignore не атомарны). */
+  private gitBusy: Promise<void> | undefined;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -77,8 +84,13 @@ export class SettingsPanel implements vscode.Disposable {
         if (this.entry) this.checkMissing();
         this.render();
       }),
-      vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration(SECTION)) this.render(); }),
-      vscode.workspace.onDidChangeWorkspaceFolders(() => this.render()),
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration(SECTION)) {
+          this.render();
+          if (e.affectsConfiguration(`${SECTION}.attachmentsDir`)) void this.checkGitignore();
+        }
+      }),
+      vscode.workspace.onDidChangeWorkspaceFolders(() => { this.render(); void this.checkGitignore(); }),
       issues.onDidChangeView(() => this.render()),
       // Agentura поставили или удалили; пришла запись через API.
       vscode.extensions.onDidChange(() => this.render()),
@@ -94,6 +106,7 @@ export class SettingsPanel implements vscode.Disposable {
   /** Открыть вкладку или показать уже открытую; `section` — прокрутить к разделу. */
   open(section?: SectionId): void {
     this.checkAll();
+    void this.checkGitignore();
     if (this.entry) {
       this.entry.panel.reveal(undefined, false);
       if (section) {
@@ -163,6 +176,7 @@ export class SettingsPanel implements vscode.Disposable {
       apiAllowWrites: api.inspect<unknown>(API_ALLOW_WRITES),
       agentura: !!vscode.extensions.getExtension(AGENTURA),
       lastApiWrite: this.activity.get(),
+      gitignoreLine: this.gitTarget === undefined ? undefined : ignoreLine(this.gitTarget),
     });
   }
 
@@ -185,6 +199,46 @@ export class SettingsPanel implements vscode.Disposable {
 
   private checkMissing(): void {
     for (const i of this.store.all()) if (!this.status.has(i.id)) void this.checkOne(i.id);
+  }
+
+  /** Относительная папка вложений в первой папке workspace (куда реально лягут файлы) или `undefined`. */
+  private attachmentsRel(): string | undefined {
+    const ws = this.workspaceDir();
+    if (!ws) return undefined;
+    const ins = vscode.workspace.getConfiguration(SECTION).inspect<string>('attachmentsDir');
+    const wsVal = ins?.workspaceFolderValue ?? ins?.workspaceValue;
+    const setting = wsVal ?? ins?.globalValue ?? ins?.defaultValue;
+    return attachmentsIgnoreTarget({ setting, fromWorkspace: wsVal !== undefined, workspaceDir: ws, tmpDir: tmpdir() });
+  }
+
+  /** Перепроверить `git check-ignore` для папки вложений и перерисовать, если подсказка появилась или исчезла. */
+  private async checkGitignore(): Promise<void> {
+    const seq = ++this.gitSeq;
+    const ws = this.workspaceDir();
+    const rel = this.attachmentsRel();
+    const ignored = ws && rel ? await isIgnored(ws, rel) : undefined;
+    if (seq !== this.gitSeq) return; // пока ждали git, настройка или папка сменились: актуален более новый вызов
+    const next = rel !== undefined && ignored === false ? rel : undefined;
+    if (next === this.gitTarget) return;
+    this.gitTarget = next;
+    this.render();
+  }
+
+  private addGitignore(): Promise<void> {
+    this.gitBusy ??= this.doAddGitignore().finally(() => { this.gitBusy = undefined; });
+    return this.gitBusy;
+  }
+
+  private async doAddGitignore(): Promise<void> {
+    const ws = this.workspaceDir();
+    const rel = this.attachmentsRel();
+    if (!ws || rel === undefined) return;
+    try {
+      await appendIgnore(ws, rel);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Jiraffe: ${t('Could not update .gitignore: {0}', errText(e))}`);
+    }
+    await this.checkGitignore();
   }
 
   private workspaceDir(): string | undefined {
@@ -220,6 +274,9 @@ export class SettingsPanel implements vscode.Disposable {
       case 'pickDir':
         await this.pickDir();
         this.render();
+        return;
+      case 'addGitignore':
+        await this.addGitignore();
         return;
       case 'openJson':
         void vscode.commands.executeCommand('workbench.action.openSettingsJson');
