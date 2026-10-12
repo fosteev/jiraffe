@@ -515,6 +515,10 @@
   "Agentura found": "Agentura найдена",
   "each issue has its own chats": "у каждой задачи свои чаты",
   "Agentura is not installed": "Agentura не установлена",
-  "Last write via the API: {0} · {1} · {2}": "Последняя запись через API: {0} · {1} · {2}",
-  "Last write via the API: none yet": "Последняя запись через API: пока не было"
+  "Last write attempt via the API: {0} · {1} · {2}": "Последнее обращение на запись через API: {0} · {1} · {2}",
+  "Last write attempt via the API: none yet": "Последнее обращение на запись через API: пока не было",
+  "Jiraffe: the API is disabled in Jiraffe settings": "Jiraffe: API отключён в настройках Jiraffe",
+  "The folder is not in .gitignore: screenshots and files from issues may end up in a commit.": "Папки нет в .gitignore: скриншоты и файлы из задач могут попасть в коммит.",
+  "Add {0} to .gitignore": "Добавить {0} в .gitignore",
+  "Could not update .gitignore: {0}": "Не удалось обновить .gitignore: {0}"
 }

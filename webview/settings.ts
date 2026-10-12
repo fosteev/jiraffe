@@ -153,7 +153,7 @@ function renderAgentura(a: AgenturaInfo): string {
 }
 
 function lastWriteHint(w: LastApiWrite | undefined): string {
-  const text = w ? t('Last write via the API: {0} · {1} · {2}', w.label, w.key, fmtDateTime(w.at)) : t('Last write via the API: none yet');
+  const text = w ? t('Last write attempt via the API: {0} · {1} · {2}', w.label, w.key, fmtDateTime(w.at)) : t('Last write attempt via the API: none yet');
   return `<div class="hint">${IC.info} ${esc(text)}</div>`;
 }
 
@@ -163,11 +163,18 @@ function renderIntegrations(s: SettingsState): string {
   return renderAgentura(s.integrations.agentura) + rows.join('');
 }
 
+/** Подсказка под строкой «Папка вложений»: папки нет в .gitignore. После добавления хост перепроверяет, и она исчезает. */
+function gitignoreHint(g: SettingsState['gitignore']): string {
+  if (!g) return '';
+  return `<div class="hint warn">${IC.warn} ${esc(t('The folder is not in .gitignore: screenshots and files from issues may end up in a commit.'))} `
+    + `<button class="lnk" data-gi>${esc(t('Add {0} to .gitignore', g.line))}</button></div>`;
+}
+
 function renderState(s: SettingsState): string {
   const nav = s.sections.map((x) => `<button class="${x.id === activeSec ? 'on' : ''}" data-sec="${x.id}">${esc(x.title)}`
     + (x.badge ? `<span class="badge" title="${esc(t('There are connection problems'))}">${x.badge}</span>` : '') + '</button>').join('');
   const secs = s.sections.map((x) => {
-    let body = x.soon ? `<div class="st-soon">${esc(t('Coming soon'))}</div>` : s.rows.filter((r) => r.section === x.id).map((r) => renderRow(r)).join('');
+    let body = x.soon ? `<div class="st-soon">${esc(t('Coming soon'))}</div>` : s.rows.filter((r) => r.section === x.id).map((r) => renderRow(r, r.id === 'attachmentsDir' ? gitignoreHint(s.gitignore) : '')).join('');
     if (x.id === 'conn') body = renderConnections(s);
     if (x.id === 'int') body = renderIntegrations(s);
     if (x.id === 'time') body += renderTimeTargets(s);
@@ -244,6 +251,7 @@ app.addEventListener('click', (ev) => {
   if (el.dataset.sec) goTo(el.dataset.sec as SectionId);
   else if (el.dataset.json !== undefined) send({ type: 'openJson' });
   else if (el.dataset.pick !== undefined) send({ type: 'pickDir' });
+  else if (el.dataset.gi !== undefined) send({ type: 'addGitignore' });
   else if (el.dataset.reset !== undefined && id) send({ type: 'reset', id });
   else if (el.dataset.sw !== undefined && id) send({ type: 'set', id, value: el.getAttribute('aria-checked') !== 'true' });
 });

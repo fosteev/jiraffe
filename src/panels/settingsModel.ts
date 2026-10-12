@@ -141,7 +141,7 @@ export interface TimeTargets { title: string; desc: string; rows: TimeTarget[] }
 
 /** Статус Agentura: только «найдена / не установлена» (решение 12). */
 export interface AgenturaInfo { title: string; desc: string; found: boolean }
-/** Последняя запись через публичный API (память хоста). `at` — ISO-время; форматирует webview. */
+/** Последнее обращение на запись через публичный API (память хоста; попытка, не обязательно успешная). `at` — ISO-время; форматирует webview. */
 export interface LastApiWrite { kind: WriteKind; label: string; key: string; at: string }
 /** Сами переключатели API — обычные строки `rows` раздела `int`; здесь то, что настройкой не является. */
 export interface IntegrationsState { agentura: AgenturaInfo; lastWrite?: LastApiWrite }
@@ -152,6 +152,8 @@ export interface SettingsState {
   connections: ConnectionsState;
   timeTargets: TimeTargets;
   integrations: IntegrationsState;
+  /** Папка вложений внутри репозитория не игнорируется git: подсказка с кнопкой «Добавить в .gitignore». `line` — что будет дописано. */
+  gitignore?: { line: string };
   /** Открыта ли папка: без неё нельзя «Выбрать…» и относительный путь вложений уходит во временный каталог. */
   hasWorkspace: boolean;
 }
@@ -177,6 +179,8 @@ export interface SettingsInput {
   agentura: boolean;
   /** Последняя запись через публичный API с запуска окна. */
   lastApiWrite: ApiWrite | undefined;
+  /** Строка для .gitignore, если папка вложений лежит в git-репо и не игнорируется; иначе `undefined` (нет git, не репо, снаружи, уже игнорируется). */
+  gitignoreLine?: string;
 }
 
 export const sortFieldLabel = (f: SortField): string =>
@@ -316,6 +320,7 @@ export function buildSettingsState(i: SettingsInput): SettingsState {
         ? { lastWrite: { kind: i.lastApiWrite.kind, label: writeKindLabel(i.lastApiWrite.kind), key: i.lastApiWrite.key, at: lastAt } }
         : {}),
     },
+    ...(i.gitignoreLine ? { gitignore: { line: i.gitignoreLine } } : {}),
   };
 }
 

@@ -241,6 +241,8 @@ describe('состояние: подключения и «Куда пишетс�
     expect(parseSettingsMessage({ type: 'instance', action: 'remove', id: '../x' })).toBeUndefined();
     expect(parseSettingsMessage({ type: 'instance', action: 'remove', id: 5 })).toBeUndefined();
     expect(parseSettingsMessage({ type: 'addInstance' })).toEqual({ type: 'addInstance' });
+    // путь для .gitignore хост берёт сам: что бы ни прислал webview, в сообщении его нет
+    expect(parseSettingsMessage({ type: 'addGitignore', dir: '../../etc' })).toEqual({ type: 'addGitignore' });
     expect(parseSettingsMessage({ type: 'scopeMode', mode: 'some' })).toEqual({ type: 'scopeMode', mode: 'some' });
     expect(parseSettingsMessage({ type: 'scopeMode', mode: 'none' })).toBeUndefined();
     expect(parseSettingsMessage({ type: 'scopeToggle', id: 'jira-a', on: false })).toEqual({ type: 'scopeToggle', id: 'jira-a', on: false });
@@ -402,5 +404,13 @@ describe('набор workspace: что писать в jiraffe.instances', () =>
     expect(instanceSnapshot(withCaps)).not.toBe(instanceSnapshot(a));
     expect(instanceIdentity(withCaps)).toBe(instanceIdentity(a));
     expect(instanceIdentity({ ...a, kind: 'cloud', email: 'x@y' })).not.toBe(instanceIdentity({ ...a, kind: 'cloud', email: 'z@y' }));
+  });
+});
+
+describe('подсказка .gitignore в модели', () => {
+  it('строки нет — подсказки нет; есть — отдаём её как есть', () => {
+    expect(buildSettingsState(base).gitignore).toBeUndefined();
+    expect(buildSettingsState({ ...base, gitignoreLine: '' }).gitignore).toBeUndefined();
+    expect(buildSettingsState({ ...base, gitignoreLine: '/.jiraffe/' }).gitignore).toEqual({ line: '/.jiraffe/' });
   });
 });
