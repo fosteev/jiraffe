@@ -35,6 +35,9 @@ export const IC = {
   trash: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.2 4.5V3h3.6v1.5M4.3 4.5l.6 8.6h6.2l.6-8.6" ${st}/></svg>`,
   refresh: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.5A5 5 0 0 0 4 5.2M3 2.8v2.7h2.7M3 8.5A5 5 0 0 0 12 10.8M13 13.2v-2.7h-2.7" ${st}/></svg>`,
   plus: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" ${st}/></svg>`,
+  search: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.3" ${st}/><path d="M10.3 10.3L14 14" ${st}/></svg>`,
+  check: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chev: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" ${st}/></svg>`,
   pin: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5l4 4-2 .8-2 2 .3 3-1 1-2.6-2.6-3.6 3.6M6.2 5.8l1.2-1.2z" ${st}/></svg>`,
 };
 

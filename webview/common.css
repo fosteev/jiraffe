@@ -259,6 +259,49 @@ table.t th:has(> .th-sort) { padding: 0; }
 table.t tr.click:hover { background: var(--hov); }
 table.t td .ti { vertical-align: middle; }
 
+/* фильтры внутри релиза (prototype: .rf-*, .chip, .cb, .qp-i); цвета — только --vscode-* */
+.sum button, .legend button { border: 0; background: none; padding: 2px 4px; margin: -2px -4px; border-radius: 4px; cursor: pointer; color: inherit; font: inherit; text-align: left; }
+.sum button { display: flex; flex-direction: column; align-items: flex-start; }
+.sum button:hover, .legend button:hover { background: var(--hov); }
+.sum button.on, .legend button.on { background: var(--sel); outline: 1px solid var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
+.sum button.dim, .legend button.dim { opacity: .45; }
+:root { --sel: var(--vscode-list-inactiveSelectionBackground, var(--vscode-list-hoverBackground)); }
+.rf-bar, .rf-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rf-bar { margin: 0 0 8px; }
+.inp { height: 22px; width: 240px; max-width: 100%; border: 1px solid var(--vscode-input-border, var(--bd)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 3px; padding: 0 6px; display: flex; align-items: center; gap: 6px; }
+.inp input { border: 0; background: none; outline: 0; flex: 1; min-width: 0; font-size: 12.5px; color: inherit; }
+.inp input::placeholder { color: var(--vscode-input-placeholderForeground); }
+.inp svg { width: 14px; height: 14px; color: var(--mut); }
+.inp:focus-within { border-color: var(--vscode-focusBorder); }
+.rf-dd { position: relative; }
+.rf-bar .btn.on { border-color: var(--acc); }
+.rf-cv { display: inline-flex; transform: rotate(90deg); color: var(--mut); }
+.rf-cv svg { width: 11px; height: 11px; }
+.rf-n { min-width: 16px; height: 15px; border-radius: 8px; background: var(--acc); color: var(--acc-fg); font-size: 10.5px; display: inline-grid; place-items: center; padding: 0 4px; }
+.rf-pop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 240px; max-height: 320px; overflow: auto; background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); border: 1px solid var(--vscode-editorWidget-border, var(--bd)); border-radius: 6px; box-shadow: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, .35)); padding: 4px 0; }
+.qp-i { display: flex; align-items: center; gap: 8px; padding: 4px 14px; cursor: pointer; white-space: nowrap; }
+.qp-i:hover { background: var(--hov); }
+.qp-i:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.qp-i.zero { opacity: .45; }
+.qp-i .ti, .rf-pop .ti { width: 14px; height: 14px; }
+.qp-i .desc { margin-left: auto; padding-left: 12px; color: var(--mut); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cb { width: 14px; height: 14px; border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, var(--bd))); border-radius: 3px; display: grid; place-items: center; background: var(--vscode-checkbox-background, var(--vscode-input-background)); flex: none; }
+.cb svg { width: 11px; height: 11px; visibility: hidden; }
+.cb.on { background: var(--acc); border-color: var(--acc); color: var(--acc-fg); }
+.cb.on svg { visibility: visible; }
+.rf-pf { display: flex; gap: 10px; padding: 6px 14px 4px; border-top: 1px solid var(--bd); margin-top: 4px; }
+.rf-chips { min-height: 22px; margin: 0 0 10px; font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 4px 0 7px; border-radius: 10px; background: var(--sel); color: var(--fg2); font-size: 11.5px; border: 1px solid var(--vscode-contrastBorder, transparent); cursor: pointer; }
+.chip:hover { background: var(--hov); }
+.chip svg { width: 12px; height: 12px; }
+.chip b { font-weight: 600; margin-right: 2px; }
+.rf-sel { height: 22px; border: 1px solid var(--vscode-input-border, var(--bd)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 3px; font-size: 12px; padding: 0 4px; }
+table.t tr.rf-gh td { background: var(--hov); font-weight: 600; color: var(--fg2); padding: 5px 8px; }
+.rf-gh .gh { display: flex; align-items: center; gap: 10px; }
+.rf-gh .bar { width: 120px; height: 4px; margin-top: 0; }
+.rf-gh .desc { font-weight: 400; color: var(--mut); font-variant-numeric: tabular-nums; }
+.rf-empty { padding: 28px 0; text-align: center; color: var(--mut); }
+
 /* ---- вкладка «Настройки Jiraffe» (webview/settings.ts); раскладка — prototype/index.html, блок settings ---- */
 .st { display: grid; grid-template-columns: 184px minmax(0, 1fr); min-height: 100%; }
 .st-nav { border-right: 1px solid var(--bd); padding: 14px 0; position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; }
