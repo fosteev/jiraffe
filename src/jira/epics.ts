@@ -42,21 +42,29 @@ export function epicFieldNumber(field: string | null): string | null {
 }
 
 /**
+ * Левая часть условия «эпик задачи»: Cloud — `parent`, DC — `cf[<id>]` по Epic Link. DC без поля Epic Link — `null`
+ * (эпиков у задач нет, условие составить нельзя).
+ */
+export function epicFieldJql(instance: EpicInstance): string | null {
+  if (instance.kind === 'cloud') return 'parent';
+  const n = epicFieldNumber(epicFieldOf(instance));
+  return n ? `cf[${n}]` : null;
+}
+
+/**
  * Условие «задачи эпиков»: DC — `cf[<id>] = KEY` / `in (…)`, Cloud — `parent = KEY` / `in (…)`. DC без поля Epic Link — `null`
  * (эпиков у задач нет, спрашивать нечего). Ключи — только по формату (в JQL они идут без кавычек).
  */
 export function epicChildrenJql(instance: EpicInstance, keys: readonly string[]): string | null {
-  const ks = keys.filter((k) => /^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(k));
+  const ks = keys.filter(isEpicKey);
   if (!ks.length) return null;
-  let lhs: string;
-  if (instance.kind === 'cloud') lhs = 'parent';
-  else {
-    const n = epicFieldNumber(epicFieldOf(instance));
-    if (!n) return null;
-    lhs = `cf[${n}]`;
-  }
+  const lhs = epicFieldJql(instance);
+  if (!lhs) return null;
   return ks.length === 1 ? `${lhs} = ${ks[0]}` : `${lhs} in (${ks.join(', ')})`;
 }
+
+/** Ключ задачи по формату Jira (в JQL идёт без кавычек). */
+export const isEpicKey = (k: string): boolean => /^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(k);
 
 /** Задачи релиза: `fixVersion = <id>`; id — только число. */
 export function releaseIssuesJql(versionId: string): string | null {
