@@ -200,6 +200,8 @@ describe('страницы эпика и релиза', () => {
     expect(p.project).toBe('ABC');
     expect(p.daysLeft).toBe(10);
     expect(p.rows.map((r) => r.extra)).toEqual(['S ABC-9', 'S ABC-9']);
+    expect(p.rows.map((r) => r.epicKey)).toEqual(['ABC-9', 'ABC-9']);
+    expect(p.meId).toBeUndefined(); // `meId` кладёт хост вкладки, не загрузчик
     expect(urls.filter((u) => u.includes('key+in') || u.includes('key%20in')).length).toBe(1);
     expect((await epicNames(c, ['bad key', 'ABC-9'])).get('ABC-9')).toBe('S ABC-9');
   });
@@ -375,6 +377,8 @@ describe('доводка приёмки этапа 7', () => {
     expect(p.project).toBe('ABC');
     const row = listRow({ instanceId: 'i', key: 'ABC-1', summary: 's', type: 'Task', status: 'Open', statusCategory: 'new', updated: '', assignee: { id: 'u', name: 'U', avatarUrl: 'https://h.example/a' } }, undefined);
     expect(row.assignee).toEqual({ id: 'u', name: 'U' });
+    expect(row.epicKey).toBeUndefined();
+    expect(listRow({ instanceId: 'i', key: 'ABC-1', summary: 's', type: 'Task', status: 'Open', statusCategory: 'new', updated: '' }, 'Epic name', 'ABC-9')).toMatchObject({ extra: 'Epic name', epicKey: 'ABC-9' });
   });
 });
 

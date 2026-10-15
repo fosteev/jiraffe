@@ -10,11 +10,12 @@ import type { EpicPage, ListRow, ReleasePage } from './protocol';
 type Raw = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 type PageInstance = Pick<Instance, 'id' | 'name' | 'kind' | 'epicLinkField' | 'caps'>;
 
-export const listRow = (i: ListIssue, extra: string | undefined): ListRow => ({
+export const listRow = (i: ListIssue, extra: string | undefined, epicKey?: string): ListRow => ({
   key: i.key, summary: i.summary, type: i.type, status: i.status, statusCategory: i.statusCategory,
   ...(i.priority ? { priority: i.priority } : {}),
   // Без avatarUrl: адреса Jira в webview не уходят (аватар — инициалы).
   ...(i.assignee ? { assignee: { id: i.assignee.id, name: i.assignee.name } } : {}), ...(extra ? { extra } : {}),
+  ...(epicKey ? { epicKey } : {}),
 });
 
 /** Эпик: заголовок + все задачи (до лимита `MAX_PAGES`). Название эпика/статус — обязательны, задачи — тоже (ошибка — ошибка вкладки). */
@@ -87,7 +88,7 @@ export async function loadReleasePage(
       for (const i of issues) if (i.epicKey && !i.epicName) i.epicName = names.get(i.epicKey);
     }
   }
-  const rows = sortIssues(issues).map((i) => listRow(i, i.epicName ?? i.epicKey));
+  const rows = sortIssues(issues).map((i) => listRow(i, i.epicName ?? i.epicKey, i.epicKey));
   // Ключ проекта: из кэша проектов, иначе `GET /project/{id}` (нужен для крошек и «Открыть в Jira»).
   const project = projectKeyOf(v.projectId) ?? (v.projectId ? await c.projectKey(v.projectId).catch(() => undefined) : undefined) ?? '';
   return {

@@ -125,7 +125,7 @@ export type TempoToHost =
 
 // ----- вкладки эпика и релиза (этап 7) -----
 
-/** Строка таблицы эпика/релиза. `extra` — релиз (в эпике) или название эпика (в релизе). Адресов Jira здесь нет. */
+/** Строка таблицы эпика/релиза. `extra` — релиз (в эпике) или название эпика (в релизе); `epicKey` — ключ эпика (только релиз). Адресов Jira здесь нет. */
 export interface ListRow {
   key: string;
   summary: string;
@@ -135,6 +135,28 @@ export interface ListRow {
   priority?: string;
   assignee?: UserRef;
   extra?: string;
+  /** Релиз: ключ эпика задачи (по нему фасет «Эпик» и JQL); `extra` остаётся названием для показа. */
+  epicKey?: string;
+}
+
+// ----- фильтры внутри релиза -----
+
+export type FilterCat = 'new' | 'indeterminate' | 'done';
+export type FilterGroup = 'none' | 'assignee' | 'epic' | 'status';
+
+/**
+ * Фильтр вкладки релиза. Пустая строка в фасете — «пустое значение»: не назначена / без эпика / без приоритета.
+ * `assignee` — `UserRef.id`, `type`/`priority` — имена как в `ListRow`, `epic` — `epicKey`.
+ */
+export interface ReleaseFilter {
+  q: string;
+  cats: FilterCat[];
+  assignee: string[];
+  type: string[];
+  priority: string[];
+  epic: string[];
+  mine: boolean;
+  group: FilterGroup;
 }
 
 interface ListPageBase {
@@ -169,6 +191,8 @@ export interface ReleasePage extends ListPageBase {
   releaseDate?: string;
   /** Дней до выпуска (не выпущен, дата задана; отрицательное — просрочен). */
   daysLeft?: number;
+  /** Id текущего пользователя (`UserRef.id`); нет — «Только мои» не работает (`myself` не ответил). */
+  meId?: string;
 }
 
 export type ListPage = EpicPage | ReleasePage;
@@ -183,7 +207,9 @@ export type ListToHost =
   | { type: 'ready' }
   | { type: 'openIssue'; instanceId: string; key: string }
   | { type: 'openInBrowser'; instanceId: string; kind: ListPage['type']; id: string }
-  | { type: 'refresh'; instanceId: string; kind: ListPage['type']; id: string };
+  | { type: 'refresh'; instanceId: string; kind: ListPage['type']; id: string }
+  // Релиз: JQL из текущего фильтра — скопировать или сохранить. Хост сверяет вкладку и прогоняет `filter` через `sanitizeFilter`.
+  | { type: 'filterJql'; instanceId: string; kind: 'release'; id: string; action: 'copy' | 'save'; filter: ReleaseFilter };
 
 // ----- вкладка «Настройки Jiraffe» -----
 

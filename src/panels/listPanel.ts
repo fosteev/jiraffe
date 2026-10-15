@@ -26,6 +26,8 @@ interface Entry {
 
 const idOf = (r: ListRef): string => `${r.kind}\n${r.instanceId}\n${r.id}`;
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+/** Сколько ждать `myself` после того, как страница релиза загрузилась. */
+const ME_WAIT_MS = 3000;
 
 /**
  * Вкладки эпика и релиза: по одной на цель (повторное открытие — фокус и перечитывание). Как и карточка, вкладка выгружается
@@ -111,7 +113,18 @@ export class ListPanelManager implements vscode.Disposable {
       } else {
         // Ключ проекта версии — из кэша проектов; не загрузился — вкладка без проекта в крошках.
         const projects = await this.meta.projects(inst).catch(() => []);
+        // Свой id нужен фильтру «Только мои»; не ответил — вкладка без этого фильтра, страница грузится как обычно.
+        const meP = this.meta.myself(inst).then((m) => m.id, () => undefined);
         data = await loadReleasePage(client, inst, ref.id, (pid) => projects.find((p) => p.id === pid)?.key, localDate());
+        // Страница уже есть — ждать `myself` дольше 3 с не стоит (таймаут клиента 30 с): без ответа вкладка просто без «Только мои».
+        const me = await new Promise<string | undefined>((resolve) => {
+          const timer = setTimeout(() => resolve(undefined), ME_WAIT_MS);
+          void meP.then((id) => {
+            clearTimeout(timer);
+            resolve(id);
+          });
+        });
+        if (me) data.meId = me;
       }
       if (e.disposed || e.seq !== seq) return;
       e.data = data;

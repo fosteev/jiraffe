@@ -43,8 +43,8 @@ export const MINE_JQL = 'assignee = currentUser() AND resolution = Unresolved';
 
 /** Id категорий статусов в JQL: не зависят от локализации имён («To Do»/«К выполнению»). */
 // id 1 — «без категории» (undefined): маппер показывает такие статусы как «Открыта», значит и фильтр «Открыта» их берёт.
-const CATEGORY_IDS: Record<StatusCategory, number[]> = { new: [1, 2], done: [3], indeterminate: [4] };
-const CATEGORY_ORDER: StatusCategory[] = ['new', 'indeterminate', 'done'];
+export const CATEGORY_IDS: Record<StatusCategory, number[]> = { new: [1, 2], done: [3], indeterminate: [4] };
+export const CATEGORY_ORDER: StatusCategory[] = ['new', 'indeterminate', 'done'];
 
 /** Нормализованный ключ задачи (как его отдаёт Jira). Ввод пользователя сверяется без учёта регистра и приводится к верхнему. */
 export const ISSUE_KEY_RE = /^[A-Z][A-Z0-9_]+-\d+$/;
