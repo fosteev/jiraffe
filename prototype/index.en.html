@@ -199,6 +199,31 @@ a.ln:hover,button.ln:hover{text-decoration:underline}
 .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
 .wide-pad{padding:18px 28px 48px;max-width:1120px}
 .foot{margin-top:14px;font-size:12px;color:var(--mut)}
+.sum button,.legend button{border:0;background:none;padding:2px 4px;margin:-2px -4px;border-radius:4px;cursor:pointer;color:inherit;font:inherit;text-align:left}
+.sum button{display:flex;flex-direction:column}
+.sum button:hover,.legend button:hover{background:var(--hov)}
+.sum button.on,.legend button.on{background:var(--sel)}
+.sum button.dim,.legend button.dim{opacity:.45}
+.rf-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.rf-bar .inp{width:240px;height:22px}
+.rf-dd{position:relative}
+.rf-bar .btn.on{border-color:var(--acc);background:var(--sel);color:var(--fg2)}
+.rf-cv{display:inline-flex;transform:rotate(90deg);color:var(--mut)}.rf-cv svg{width:11px;height:11px}
+.rf-n{min-width:16px;height:15px;border-radius:8px;background:var(--acc);color:var(--acc-fg);font-size:10.5px;display:inline-grid;place-items:center;padding:0 4px}
+.rf-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:20;min-width:240px;max-height:320px;overflow:auto;background:var(--wid,var(--in));border:1px solid var(--in-bd);border-radius:6px;box-shadow:0 8px 24px var(--shadow);padding:4px 0}
+.rf-pop .qp-i{white-space:nowrap}
+.rf-pop .qp-i.zero{opacity:.45}
+.rf-pop .ti{width:14px;height:14px}
+.rf-pf{display:flex;gap:10px;padding:6px 14px 4px;border-top:1px solid var(--bd);margin-top:4px}
+.rf-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:22px;margin:0 0 10px;font-size:12px}
+.rf-chips .sp{flex:1}
+.rf-chips .chip b{font-weight:600;margin-right:2px}
+.rf-sel{height:22px;border:1px solid var(--in-bd);background:var(--in);border-radius:3px;font-size:12px;padding:0 4px}
+table.t tr.rf-gh td{background:var(--hov);font-weight:600;color:var(--fg2);padding:5px 8px}
+.rf-gh .gh{display:flex;align-items:center;gap:10px}
+.rf-gh .bar{width:120px;height:4px}
+.rf-gh .desc{font-weight:400;color:var(--mut);font-variant-numeric:tabular-nums}
+.rf-empty{padding:28px 0;text-align:center;color:var(--mut)}
 .code{font:12.5px/20px var(--mono);padding:8px 0 40px;white-space:pre;counter-reset:ln;min-width:max-content}
 .code div{padding:0 24px 0 64px;position:relative}
 .code div::before{counter-increment:ln;content:counter(ln);position:absolute;left:0;width:42px;text-align:right;color:var(--mut)}
@@ -483,6 +508,14 @@ mk('HOME-709','bug','done','high','Crash when opening the archive without intern
 mk('HOME-698','bug','prog','high','CamCloud: timeline shifts when the time zone changes','oc',{epic:'HOME-600',fix:'v214',labels:['camcloud'],rep:'mk'});
 mk('HOME-706','story','todo','medium','Camera events in the shared notification feed','vs',{epic:'HOME-655',fix:'v214'});
 mk('HOME-693','story','prog','medium','Home screen: new device cards','vs',{epic:'HOME-640',fix:'v214'});
+mk('HOME-712','bug','todo','high','Thermostat: schedule resets after a firmware update','mk',{epic:'HOME-655',fix:'v214'});
+mk('HOME-716','task','done','medium','Release notes for Google Play and the App Store','dl',{fix:'v214'});
+mk('HOME-718','bug','review','highest','Login loops on Android 15 after a token refresh','is',{fix:'v214'});
+mk('HOME-719','story','done','medium','Camera tiles: offline placeholder','oc',{epic:'HOME-600',fix:'v214'});
+mk('HOME-721','task','prog','low','Analytics events for the new home screen','vs',{epic:'HOME-640',fix:'v214'});
+mk('HOME-723','bug','done','high','Push token is not re-registered after a reinstall','mk',{epic:'HOME-655',fix:'v214'});
+mk('HOME-724','story','todo','medium','Scenes: run a scene from the widget','vs',{epic:'HOME-640',fix:'v214'});
+mk('HOME-726','bug','todo','low','Typo on the camera settings screen','dl',{fix:'v214'});
 mk('HOME-603','story','done','medium','Live camera stream in the device card','is',{epic:'HOME-600',fix:'v2132'});
 mk('HOME-611','task','done','medium','CamCloud OAuth: token refresh','is',{epic:'HOME-600',fix:'v2132'});
 mk('HOME-624','story','done','medium','Camera list with previews','oc',{epic:'HOME-600',fix:'v2132'});
@@ -573,7 +606,7 @@ const daysBetween=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
 /* ---------- state ---------- */
 const S={mode:'mine',proj:'HOME',q:'',f:{status:new Set(),type:new Set(),prio:new Set(),inst:new Set()},
   jql:'assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC',saved:null,
-  closedInst:{},collapsed:{},epicProj:'HOME',relProj:'HOME',sub:{},
+  closedInst:{},collapsed:{},epicProj:'HOME',relProj:'HOME',sub:{},rf:{},rfOpen:null,
   tabs:[{kind:'file',id:'CamCloud.php'},{kind:'issue',id:'HOME-710'}],active:1,ov:null,
   set:{sec:'conn',q:'',scope:'all',ws:{northwind:true,globex:true,initech:true},max:50,sort:'status',grp:true,dir:'.jiraffe',img:5,wd:8,api:true,apiW:true,gi:false}};
 const DEF={max:50,sort:'status',grp:true,dir:'.jiraffe',img:5,wd:8,api:true,apiW:true};
@@ -764,13 +797,25 @@ function vIssue(k){
   </div>`;
 }
 function issueTable(list,o){
-  return `<div class="tw-wrap"><table class="t"><thead><tr><th></th><th>Key</th><th>Issue</th><th>Status</th><th>Priority</th><th>Assignee</th>${o.rel?'<th>Release</th>':''}${o.epic?'<th>Epic</th>':''}</tr></thead><tbody>
+  const row=i=>{const r=i.fix&&REL.find(z=>z.id==i.fix);return `<tr class="click" data-act="open" data-k="${i.key}" tabindex="0"><td>${TI[i.type]}</td><td class="k" style="white-space:nowrap">${i.key}</td><td>${esc(i.sum)}</td><td>${pill(i.status)}</td><td>${PI[i.prio]}</td><td>${person(i.asg)}</td>${o.rel?`<td class="mut" style="white-space:nowrap">${r?esc(r.name):'—'}</td>`:''}${o.epic?`<td class="mut" style="white-space:nowrap">${i.epic?esc(EPICS[i.epic].sum):'—'}</td>`:''}</tr>`};
+  const head=`<div class="tw-wrap"><table class="t"><thead><tr><th></th><th>Key</th><th>Issue</th><th>Status</th><th>Priority</th><th>Assignee</th>${o.rel?'<th>Release</th>':''}${o.epic?'<th>Epic</th>':''}</tr></thead><tbody>`;
+  if(o.grp&&o.grp!='none'){
+    const G=RFG[o.grp],span=6+(o.rel?1:0)+(o.epic?1:0),m=new Map();
+    for(const i of sortI(list)){const k=G.key(i);if(!m.has(k))m.set(k,[]);m.get(k).push(i)}
+    return head+[...m.entries()].sort((a,b)=>G.ord(a,b)).map(([k,l])=>{const s=stats(l);return `<tr class="rf-gh"><td colspan="${span}"><div class="gh">${G.lab(k)}<span class="desc">${s.done}/${s.total} done</span>${segBar(s)}</div></td></tr>`+l.map(row).join('')}).join('')+'</tbody></table></div>';
+  }
+  return head+`
   ${sortI(list).map(i=>{const r=i.fix&&REL.find(z=>z.id==i.fix);return `<tr class="click" data-act="open" data-k="${i.key}" tabindex="0"><td>${TI[i.type]}</td><td class="k" style="white-space:nowrap">${i.key}</td><td>${esc(i.sum)}</td><td>${pill(i.status)}</td><td>${PI[i.prio]}</td><td>${person(i.asg)}</td>${o.rel?`<td class="mut" style="white-space:nowrap">${r?esc(r.name):'—'}</td>`:''}${o.epic?`<td class="mut" style="white-space:nowrap">${i.epic?esc(EPICS[i.epic].sum):'—'}</td>`:''}</tr>`}).join('')}</tbody></table></div>`;
 }
-function progressBlock(s){
+function progressBlock(s,st){
   const pct=s.total?Math.round(s.done/s.total*100):0;
-  return `<div class="sum"><div><b>${s.done} of ${s.total}</b><span>done · ${pct}%</span></div><div><b>${s.prog+s.rev}</b><span>in progress</span></div><div><b>${s.todo}</b><span>not started</span></div></div>
+  if(!st)return `<div class="sum"><div><b>${s.done} of ${s.total}</b><span>done · ${pct}%</span></div><div><b>${s.prog+s.rev}</b><span>in progress</span></div><div><b>${s.todo}</b><span>not started</span></div></div>
   ${segBar(s)}<div class="legend"><span><i class="b-done"></i>Done ${s.done}</span><span><i class="b-rev"></i>In Review ${s.rev}</span><span><i class="b-prog"></i>In Progress ${s.prog}</span><span><i style="background:var(--track)"></i>To Do ${s.todo}</span></div>`;
+  // release: the tiles and the legend toggle the status filter
+  const cls=vs=>{const on=vs.every(v=>st.has(v));return on?' on':st.size?' dim':''};
+  const b=(vs,inner,t)=>`<button class="${cls(vs).trim()}" data-act="rf-st" data-v="${vs.join(',')}" aria-pressed="${vs.every(v=>st.has(v))}" title="${t}">${inner}</button>`;
+  return `<div class="sum">${b(['done'],`<b>${s.done} of ${s.total}</b><span>done · ${pct}%</span>`,'Show only Done')}${b(['prog','review'],`<b>${s.prog+s.rev}</b><span>in progress</span>`,'Show In Progress and In Review')}${b(['todo'],`<b>${s.todo}</b><span>not started</span>`,'Show only To Do')}</div>
+  ${segBar(s)}<div class="legend">${[['done','b-done','Done',s.done],['review','b-rev','In Review',s.rev],['prog','b-prog','In Progress',s.prog],['todo','','To Do',s.todo]].map(([v,c,l,n])=>b([v],`<i class="${c}"${c?'':' style="background:var(--track)"'}></i>${l} ${n}`,`Filter: ${l}`)).join('')}</div>`;
 }
 function vEpic(k){
   const e=EPICS[k],p=k.split('-')[0],x=instOf(p),kids=ALL().filter(i=>i.epic==k);
@@ -788,7 +833,69 @@ function vRel(id){
   <div class="hrow" style="margin-bottom:16px">${r.released?'<span class="pill s-done">Released</span>':'<span class="pill s-prog">Unreleased</span>'}
     <span class="sm">${r.start?`Start ${dd(r.start)}`:'No start date'} · ${r.date?`${r.released?'Released':'Release'} ${dd(r.date)}`:'no release date'}${left!=null?` · <b>${left} d left</b>`:''}</span>
     ${r.desc?`<span class="mut sm">${esc(r.desc)}</span>`:''}<span class="sp"></span><button class="btn" data-act="refresh">Refresh</button><a class="btn" href="https://${x.host}/projects/${r.proj}?selectedItem=com.atlassian.jira.jira-projects-plugin:release-page" target="_blank" rel="noopener">${IC.ext} Open in Jira</a></div>
-  ${kids.length?progressBlock(stats(kids))+issueTable(kids,{epic:1}):'<p class="mut">This version has no issues yet.</p>'}</div>`;
+  ${kids.length?relBody(r,kids):'<p class="mut">This version has no issues yet.</p>'}</div>`;
+}
+// ── release filters (prototype): status from the progress block, search, facets, "only mine", grouping
+const RF0=()=>({q:'',st:new Set(),asg:new Set(),type:new Set(),prio:new Set(),epic:new Set(),mine:false,grp:'none'});
+const rfOf=id=>S.rf[id]||(S.rf[id]=RF0());
+const RFF={
+  asg:{t:'Assignee',get:i=>i.asg,lab:v=>person(v),chip:v=>U[v][0],jql:v=>`"${U[v][0]}"`,f:'assignee'},
+  type:{t:'Type',get:i=>i.type,lab:v=>TI[v]+TL[v],chip:v=>TL[v],jql:v=>TL[v],f:'issuetype'},
+  prio:{t:'Priority',get:i=>i.prio,lab:v=>PI[v]+PL[v],chip:v=>PL[v],jql:v=>PL[v],f:'priority'},
+  epic:{t:'Epic',get:i=>i.epic||'none',lab:v=>v=='none'?'<span class="mut">No epic</span>':TI.epic+esc(EPICS[v].sum),chip:v=>v=='none'?'No epic':EPICS[v].sum,jql:v=>v,f:'"Epic Link"'},
+};
+const RFG={
+  asg:{key:i=>i.asg,lab:k=>person(k),ord:(a,b)=>(a[0]==ME?-1:b[0]==ME?1:U[a[0]][0].localeCompare(U[b[0]][0]))},
+  epic:{key:i=>i.epic||'none',lab:k=>RFF.epic.lab(k),ord:(a,b)=>(a[0]=='none')-(b[0]=='none')||a[0].localeCompare(b[0])},
+  status:{key:i=>i.status,lab:k=>pill(k),ord:(a,b)=>ORD[a[0]]-ORD[b[0]]},
+};
+function rfApply(list,f,skip){
+  const q=f.q.trim().toLowerCase();
+  return list.filter(i=>(!q||i.key.toLowerCase().includes(q)||i.sum.toLowerCase().includes(q))
+    &&(skip=='st'||!f.st.size||f.st.has(i.status))
+    &&Object.keys(RFF).every(g=>g==skip||!f[g].size||f[g].has(RFF[g].get(i)))
+    &&(!f.mine||i.asg==ME));
+}
+function rfJql(r,f){
+  const p=[`project = ${r.proj}`,`fixVersion = "${r.name}"`];
+  if(f.st.size)p.push(`status in (${[...f.st].map(v=>`"${SL[v]}"`).join(', ')})`);
+  for(const g in RFF)if(f[g].size){const F=RFF[g],v=[...f[g]],n=v.filter(x=>x!='none');
+    p.push(g=='epic'&&v.includes('none')?(n.length?`(${F.f} in (${n.join(', ')}) OR ${F.f} is EMPTY)`:`${F.f} is EMPTY`):`${F.f} in (${v.map(F.jql).join(', ')})`)}
+  if(f.mine)p.push('assignee = currentUser()');
+  if(f.q.trim())p.push(`text ~ "${f.q.trim()}"`);
+  return p.join(' AND ')+' ORDER BY status, priority';
+}
+function rfPop(g,kids,f){
+  const F=RFF[g],base=rfApply(kids,f,g),vals=[...new Set(kids.map(F.get))];
+  const cnt=v=>base.filter(i=>F.get(i)==v).length;
+  vals.sort(g=='prio'?(a,b)=>PORD[a]-PORD[b]:(a,b)=>cnt(b)-cnt(a)||String(a).localeCompare(b));
+  return `<div class="rf-pop" role="group" aria-label="${F.t}">${vals.map(v=>{const on=f[g].has(v),c=cnt(v);
+    return `<div class="qp-i${c||on?'':' zero'}" data-act="rf-t" data-g="${g}" data-v="${v}" role="checkbox" aria-checked="${on}" tabindex="0"><span class="cb${on?' on':''}">${IC.check}</span>${F.lab(v)}<span class="desc">${c}</span></div>`}).join('')}
+    <div class="rf-pf"><button class="lnk" data-act="rf-only" data-g="${g}">Select all</button>${f[g].size?`<button class="lnk" data-act="rf-clr" data-g="${g}">Clear</button>`:''}</div></div>`;
+}
+function relBody(r,kids){
+  const f=rfOf(r.id),list=rfApply(kids,f),dd=IC.chev.replace('<svg','<svg aria-hidden="true"');
+  const ddBtn=g=>{const F=RFF[g],n=f[g].size,one=n==1?F.chip([...f[g]][0]):'';
+    return `<div class="rf-dd"><button class="btn sm${n?' on':''}" data-act="rf-dd" data-g="${g}" aria-expanded="${S.rfOpen==g}">${F.t}${one?`: ${esc(one)}`:n?` <span class="rf-n">${n}</span>`:''}<span class="rf-cv">${dd}</span></button>${S.rfOpen==g?rfPop(g,kids,f):''}</div>`};
+  const chips=[];
+  if(f.st.size)chips.push(...[...f.st].map(v=>`<button class="chip" data-act="rf-x" data-g="st" data-v="${v}" title="Remove"><b>Status</b>${SL[v]}${IC.x}</button>`));
+  for(const g in RFF)for(const v of f[g])chips.push(`<button class="chip" data-act="rf-x" data-g="${g}" data-v="${v}" title="Remove"><b>${RFF[g].t}</b>${esc(RFF[g].chip(v))}${IC.x}</button>`);
+  if(f.mine)chips.push(`<button class="chip" data-act="rf-mine" title="Remove"><b>Only mine</b>${IC.x}</button>`);
+  if(f.q.trim())chips.push(`<button class="chip" data-act="rf-qx" title="Remove"><b>Text</b>“${esc(f.q.trim())}”${IC.x}</button>`);
+  const act=chips.length>0;
+  return progressBlock(stats(kids),f.st)+`
+  <div class="rf-bar">
+    <label class="inp">${IC.search}<input id="rf-q" data-id="${r.id}" placeholder="Filter by key or summary" value="${esc(f.q)}" autocomplete="off"></label>
+    ${Object.keys(RFF).map(ddBtn).join('')}
+    <button class="btn sm${f.mine?' on':''}" data-act="rf-mine" aria-pressed="${f.mine}">${av(ME,14)} Only mine</button>
+    <span class="sp" style="flex:1"></span>
+    <span class="mut sm">Group by</span><select class="rf-sel" data-chg="rf-grp" data-id="${r.id}">${[['none','None'],['asg','Assignee'],['epic','Epic'],['status','Status']].map(([v,l])=>`<option value="${v}"${f.grp==v?' selected':''}>${l}</option>`).join('')}</select>
+  </div>
+  <div class="rf-chips">${chips.join('')}${act?'<button class="lnk" data-act="rf-reset">Reset</button>':''}<span class="sp"></span>
+    <span class="mut">${act?`Showing <b>${list.length}</b> of ${kids.length}`:`${kids.length} issues`}</span>
+    ${act?'<button class="lnk" data-act="rf-jql">Copy JQL</button><button class="lnk" data-act="rf-save">Save as filter…</button>':''}</div>
+  ${list.length?issueTable(list,{epic:f.grp!='epic',grp:f.grp}):`<div class="rf-empty">No issues in ${esc(r.name)} match the filters. <button class="lnk" data-act="rf-reset">Reset filters</button></div>`}
+  <p class="foot">Filters run locally over the issues of this version that are already loaded, no extra requests. They are kept per version until VS Code restarts.</p>`;
 }
 function vTS(){
   const mine=LOG.filter(l=>l.who==ME&&WEEK.includes(l.date));
@@ -828,6 +935,7 @@ function render(){renderSide();renderTabs();renderPane();renderSB()}
 function showOv(h){$('#ovl').innerHTML=`<div class="ov" data-act="ov-bg">${h}</div>`;const f=$('#ovl').querySelector('input,select,textarea,button');if(f)f.focus()}
 function closeOv(){S.ov=null;$('#ovl').innerHTML=''}
 let tt;
+function rfRender(focus){renderPane();if(focus){const el=$('#pane '+focus);if(el)el.focus()}}
 function toast(m){const t=$('#toast');t.innerHTML=IC.info+`<span>${m}</span>`;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3600)}
 function qpHtml(){
   const G=[['status','Status',SL],['type','Type',{bug:TL.bug,story:TL.story,task:TL.task}],['prio','Priority',PL],['inst','Instance',Object.fromEntries(INST.map(x=>[x.id,x.name]))]];
@@ -1016,11 +1124,23 @@ const A={
   'ai-add':()=>{closeOv();toast('The prototype does not save the instance. In the extension it appears in the Issues tree.')},
   refresh:()=>toast(`Refreshed: ${INST.length} instances, ${ALL().filter(i=>i.asg==ME&&i.status!='done').length} open issues assigned to you.`),
   'ov-x':()=>closeOv(),
+  'rf-dd':t=>{const g=t.dataset.g;S.rfOpen=S.rfOpen==g?null:g;rfRender()},
+  'rf-t':t=>{const f=rfOf(cur().id),s=f[t.dataset.g],v=t.dataset.v;s.has(v)?s.delete(v):s.add(v);rfRender(`.rf-pop [data-v="${v}"]`)},
+  'rf-only':t=>{const g=t.dataset.g,f=rfOf(cur().id),kids=ALL().filter(i=>i.fix==cur().id);f[g]=new Set(kids.map(RFF[g].get));rfRender()},
+  'rf-clr':t=>{rfOf(cur().id)[t.dataset.g].clear();rfRender()},
+  'rf-st':t=>{const s=rfOf(cur().id).st,vs=t.dataset.v.split(','),on=vs.every(v=>s.has(v));vs.forEach(v=>on?s.delete(v):s.add(v));rfRender()},
+  'rf-x':t=>{rfOf(cur().id)[t.dataset.g].delete(t.dataset.v);rfRender()},
+  'rf-mine':()=>{const f=rfOf(cur().id);f.mine=!f.mine;rfRender()},
+  'rf-qx':()=>{rfOf(cur().id).q='';rfRender()},
+  'rf-reset':()=>{const g=rfOf(cur().id).grp;S.rf[cur().id]=Object.assign(RF0(),{grp:g});S.rfOpen=null;rfRender()},
+  'rf-jql':()=>{const r=REL.find(z=>z.id==cur().id);toast(`Copied: <code>${esc(rfJql(r,rfOf(r.id)))}</code>`)},
+  'rf-save':()=>{const r=REL.find(z=>z.id==cur().id);toast(`Saved filter “${esc(r.proj)}: ${esc(r.name)} (filtered)” added to Filters in the Issues view. JQL: <code>${esc(rfJql(r,rfOf(r.id)))}</code>`)},
   'ov-bg':(t,e)=>{if(e.target===t)closeOv()},
 };
-document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t)return;const f=A[t.dataset.act];if(f){if(t.tagName=='A')return;f(t,e)}});
+document.addEventListener('click',e=>{if(S.rfOpen&&!e.target.closest('.rf-dd')){S.rfOpen=null;renderPane()}const t=e.target.closest('[data-act]');if(!t)return;const f=A[t.dataset.act];if(f){if(t.tagName=='A')return;f(t,e)}});
 document.addEventListener('keydown',e=>{
   if(e.key=='Escape'&&S.ov){closeOv();return}
+  if(e.key=='Escape'&&S.rfOpen){const g=S.rfOpen;S.rfOpen=null;renderPane();const b=$(`#pane [data-act="rf-dd"][data-g="${g}"]`);if(b)b.focus();return}
   if((e.key=='Enter'||e.key==' ')&&e.target.matches('[data-act][tabindex]')&&e.target.tagName!='BUTTON'){e.preventDefault();e.target.click()}
   if(e.key=='Enter'&&e.target.id=='lg-dur'){e.preventDefault();const b=$('[data-act="log-save"]');if(b)b.click()}
   if(e.key=='Enter'&&(e.metaKey||e.ctrlKey)&&e.target.id=='jql'){A['run-jql']()}
@@ -1030,6 +1150,7 @@ document.addEventListener('change',e=>{
   if(c=='proj'){S.proj=e.target.value;renderTree()}
   if(c=='epicProj'){S.epicProj=e.target.value;renderEpics()}
   if(c=='relProj'){S.relProj=e.target.value;renderRels()}
+  if(c=='rf-grp'){rfOf(e.target.dataset.id).grp=e.target.value;renderPane()}
   if(c=='st-scope'){S.set.scope=e.target.value;rerenderSet(`input[name="st-scope"][value="${S.set.scope}"]`);renderTree()}
   if(c=='st-num'){const k=e.target.dataset.k,el=e.target,n=parseFloat(el.value),mn=+el.min,mx=+el.max;S.set[k]=isNaN(n)?DEF[k]:Math.min(mx,Math.max(mn,n));rerenderSet();renderTempo()}
   if(c=='st-sel'){S.set[e.target.dataset.k]=e.target.value;rerenderSet()}
@@ -1037,7 +1158,8 @@ document.addEventListener('change',e=>{
   if(c=='ai-kind'){const cl=e.target.value=='cloud';$('#ai-email-w').hidden=!cl;$('#ai-tok-l').textContent=cl?'API token':'Personal Access Token'}
 });
 $('#q').addEventListener('input',e=>{S.q=e.target.value;renderTree()});
-document.addEventListener('input',e=>{if(e.target.id=='st-q'){S.set.q=e.target.value;setFilter()}});
+document.addEventListener('input',e=>{if(e.target.id=='st-q'){S.set.q=e.target.value;setFilter()}
+  if(e.target.id=='rf-q'){const pos=e.target.selectionStart;rfOf(e.target.dataset.id).q=e.target.value;renderPane();const el=$('#rf-q');el.focus();el.setSelectionRange(pos,pos)}});
 
 renderStatic();renderViews();renderExtra();render();
 window.__proto={S,A,openTab,render,showOv,closeOv,logHtml,qpHtml,cur,TODAY};
