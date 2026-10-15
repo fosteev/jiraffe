@@ -542,5 +542,13 @@
   "No issues in {0} match the filters.": "В {0} нет задач под эти фильтры.",
   "Reset filters": "Сбросить фильтры",
   "{0}/{1} done": "готово {0}/{1}",
-  "Filters work on the issues already loaded in this tab, without extra requests, and are kept until the tab is closed.": "Фильтры работают по уже загруженным задачам вкладки, без лишних запросов, и сохраняются до закрытия вкладки."
+  "Filters work on the issues already loaded in this tab, without extra requests, and are kept until the tab is closed.": "Фильтры работают по уже загруженным задачам вкладки, без лишних запросов, и сохраняются до закрытия вкладки.",
+  "JQL copied: {0}": "JQL скопирован: {0}",
+  "The epic condition was left out: Epic Link field is unknown on this instance.": "Условие по эпику не вошло в JQL: на этом инстансе неизвестно поле Epic Link.",
+  "The epic condition was left out: none of the selected epic keys is valid.": "Условие по эпику не вошло в JQL: ни один выбранный ключ эпика не подходит по формату.",
+  "Sub-tasks without an epic are not included in the JQL.": "Подзадачи без эпика в JQL не входят.",
+  "{0} (filtered)": "{0} (с фильтрами)",
+  "Saved filter {0}.": "Фильтр «{0}» сохранён.",
+  "Apply": "Применить",
+  "Filter name": "Имя фильтра"
 }

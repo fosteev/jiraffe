@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+
+- Releases: filters inside the release tab. The progress tiles and the legend pick a status category (done, in progress, to do); below them a search by key or summary, Assignee / Type / Priority / Epic lists with counts, Only mine and grouping by assignee, epic or status (each group shows its own progress), with chips, a reset and “Showing N of M”. *Copy JQL* and *Save as filter* turn the current selection into JQL (the saved one appears in Filters, with an Apply button). The selection is kept until the tab is closed and works on the loaded issues, without extra requests.
+
 ## 0.10.0
 
 - Releases: follow several projects, across instances too. The project button in the view title is now a list with checkboxes; with more than one project the view groups releases by project, and the × on a project stops following it. The project chosen before stays selected.

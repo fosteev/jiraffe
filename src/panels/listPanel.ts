@@ -2,11 +2,13 @@ import * as vscode from 'vscode';
 import { noticeText } from '../jira/attachments';
 import { localDate } from '../jira/worklog';
 import type { InstanceStore } from '../state/instances';
+import type { FilterState } from '../state/filters';
 import type { InstanceMeta } from '../state/meta';
 import { browseUrl } from './card';
 import { getBundle, locale, t } from '../l10n';
 import { makeNonce, renderShell } from './html';
 import { loadEpicPage, loadReleasePage, releaseUrl } from './list';
+import { copiedMessage, defaultFilterName, releaseFilterRequest, savedMessage } from './releaseFilterHost';
 import { isIssueKey, isVersionId, type HostToList, type ListPage, type ListToHost } from './protocol';
 
 export type ListKind = ListPage['type'];
@@ -40,6 +42,7 @@ export class ListPanelManager implements vscode.Disposable {
     private readonly extensionUri: vscode.Uri,
     private readonly store: InstanceStore,
     private readonly meta: InstanceMeta,
+    private readonly filters: FilterState,
   ) {}
 
   dispose(): void {
@@ -164,7 +167,37 @@ export class ListPanelManager implements vscode.Disposable {
       case 'openInBrowser':
         if (sameTarget(m)) this.openInBrowser(e);
         break;
+      case 'filterJql':
+        if (sameTarget(m) && m.kind === 'release' && (m.action === 'copy' || m.action === 'save')) {
+          void this.filterJql(e, m.action, m.filter).catch((err: unknown) => vscode.window.showErrorMessage(`Jiraffe: ${noticeText(errText(err))}`));
+        }
+        break;
     }
+  }
+
+  /** «Копировать JQL» / «Сохранить как фильтр» текущего фильтра релиза. Фильтр недоверенный: форма проверяется, JQL собирает хост. */
+  private async filterJql(e: Entry, action: 'copy' | 'save', raw: unknown): Promise<void> {
+    const inst = this.store.get(e.ref.instanceId);
+    if (!inst) return;
+    const req = releaseFilterRequest(inst, e.ref.id, raw, e.data);
+    if (!req) return;
+    if (action === 'copy') {
+      await vscode.env.clipboard.writeText(req.jql);
+      void vscode.window.showInformationMessage(copiedMessage(req.jql, req.notes));
+      return;
+    }
+    const d = e.data?.type === 'release' ? e.data : undefined;
+    const name = await vscode.window.showInputBox({
+      title: t('Save as Filter'),
+      prompt: t('Filter name'),
+      value: defaultFilterName(d?.project ?? '', d?.name ?? e.ref.id),
+      validateInput: (v) => (v.trim() ? undefined : t('The name is empty')),
+    });
+    if (!name?.trim()) return;
+    const saved = await this.filters.saveFilter(name.trim(), req.jql, inst.id);
+    const apply = t('Apply');
+    const pick = await vscode.window.showInformationMessage(savedMessage(saved.name, req.notes), apply);
+    if (pick === apply) await vscode.commands.executeCommand('jiraffe.applyFilter', { name: saved.name, jql: saved.jql, instanceId: inst.id });
   }
 
   private openInBrowser(e: Entry): void {
