@@ -30,7 +30,7 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 
 ![Log work dialog](docs/screenshots/log-work.png)
 
-**Epics and releases.** Per-project lists with progress. Releases can follow several projects at once: tick them in the project picker in the view title, the × on a project stops following it. An epic or release opens in a tab with a status breakdown and its issues.
+**Epics and releases.** Per-project lists with progress. Releases can follow several projects at once: tick them in the project picker in the view title, the × on a project stops following it. An epic or release opens in a tab with a status breakdown and its issues. A release tab filters its issues without leaving the editor: click the progress tiles or the legend to pick a status category, search by key or summary, narrow by Assignee, Type, Priority and Epic (with counts), Only mine, group by assignee, epic or status; *Copy JQL* and *Save as filter* turn the current selection into JQL for the Filters tab.
 
 **AI chat.** With the [Agentura](https://github.com/fosteev/Agentura) extension installed, the issue card has an “Open in Agentura ▾” button: the issue goes in as context and its link is typed into the input. If the issue already has chats, a menu offers to continue the latest one, pick another, or start a new chat.
 

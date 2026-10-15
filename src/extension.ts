@@ -44,7 +44,7 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
   const worklog = new WorklogService(instances, meta);
   const today = new TodayService(instances, meta);
   const panels = new IssuePanelManager(context.extensionUri, instances, meta, attachments, worklog);
-  const lists = new ListPanelManager(context.extensionUri, instances, meta);
+  const lists = new ListPanelManager(context.extensionUri, instances, meta, filters);
   const epicProject = new SectionProject(context.workspaceState, EPIC_PROJECT_KEY, context.globalState);
   const releaseProject = new SectionProjects(context.workspaceState, RELEASE_PROJECT_KEY, context.globalState);
   const epicsTree = new EpicsTree(instances, epicProject, meta, context.globalState);

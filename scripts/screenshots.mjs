@@ -27,7 +27,15 @@ const frames = {
   },
   'change-status': async (p) => { await p.click('#pane [data-act="status"]'); },
   epic: async (p) => { await p.click('#pane .crumbs [data-act="epic"]'); },
-  release: async (p) => { await p.evaluate(() => window.__proto.openTab('rel', 'v214')); },
+  release: async (p) => {
+    await p.evaluate(() => window.__proto.openTab('rel', 'v214'));
+    // Панель фильтров: открыт список «Assignee» с отмеченным исполнителем (кадр без панели — если прототип её не нарисовал).
+    const facet = p.locator('#pane [data-act="rf-dd"][data-g="asg"]');
+    if (await facet.count()) {
+      await facet.click();
+      await p.locator('#pane .rf-pop [data-act="rf-t"]').first().click();
+    }
+  },
   tempo: async (p) => {
     for (const v of ['issues', 'filters', 'epics', 'rel']) await p.click(`.view-h[data-v="${v}"]`);
   },
