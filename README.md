@@ -30,7 +30,7 @@ It covers the daily routine, not all of Jira. Creating and editing issues is not
 
 ![Log work dialog](docs/screenshots/log-work.png)
 
-**Epics and releases.** Per-project lists with progress. An epic or release opens in a tab with a status breakdown and its issues.
+**Epics and releases.** Per-project lists with progress. Releases can follow several projects at once: tick them in the project picker in the view title, the × on a project stops following it. An epic or release opens in a tab with a status breakdown and its issues.
 
 **AI chat.** With the [Agentura](https://github.com/fosteev/Agentura) extension installed, the issue card has an “Open in Agentura ▾” button: the issue goes in as context and its link is typed into the input. If the issue already has chats, a menu offers to continue the latest one, pick another, or start a new chat.
 
@@ -76,7 +76,7 @@ Connections are shared across windows, but each workspace can show only some of 
 { "jiraffe.instances": ["https://jira.example.com"] }
 ```
 
-Mode, project, quick filters and the Epics/Releases project are remembered per workspace too.
+Mode, project, quick filters, the Epics project and the Releases projects are remembered per workspace too.
 
 ## Settings
 

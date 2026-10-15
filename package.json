@@ -2,7 +2,7 @@
   "name": "jiraffe",
   "displayName": "Jiraffe",
   "description": "%extension.description%",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "publisher": "fosteev",
   "license": "MIT",
   "repository": {
@@ -244,6 +244,11 @@
         "icon": "$(project)"
       },
       {
+        "command": "jiraffe.unfollowReleaseProject",
+        "title": "%command.unfollowReleaseProject%",
+        "icon": "$(close)"
+      },
+      {
         "command": "jiraffe.loadMoreEpics",
         "title": "%command.loadMoreEpics%"
       }
@@ -264,6 +269,10 @@
         },
         {
           "command": "jiraffe.deleteFilter",
+          "when": "false"
+        },
+        {
+          "command": "jiraffe.unfollowReleaseProject",
           "when": "false"
         },
         {
@@ -406,6 +415,16 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "jiraffe.unfollowReleaseProject",
+          "when": "view == jiraffe.releases && viewItem == releaseProject",
+          "group": "inline"
+        },
+        {
+          "command": "jiraffe.unfollowReleaseProject",
+          "when": "view == jiraffe.releases && viewItem == releaseProject",
+          "group": "1_edit"
+        },
         {
           "command": "jiraffe.deleteFilter",
           "when": "view == jiraffe.filters && viewItem == localFilter",

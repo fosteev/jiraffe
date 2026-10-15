@@ -19,7 +19,7 @@ import { FilterState } from './state/filters';
 import { InstanceStore } from './state/instances';
 import { forgetInstance, watchRemovedInstances } from './state/instanceCleanup';
 import { InstanceMeta } from './state/meta';
-import { EPIC_PROJECT_KEY, RELEASE_PROJECT_KEY, SectionProject } from './state/sectionProject';
+import { EPIC_PROJECT_KEY, RELEASE_PROJECT_KEY, SectionProject, SectionProjects } from './state/sectionProject';
 import { TodayService } from './state/today';
 import { localDate } from './jira/worklog';
 import { EpicsTree } from './views/epicsTree';
@@ -46,7 +46,7 @@ export function activate(context: vscode.ExtensionContext): JiraffeApi {
   const panels = new IssuePanelManager(context.extensionUri, instances, meta, attachments, worklog);
   const lists = new ListPanelManager(context.extensionUri, instances, meta);
   const epicProject = new SectionProject(context.workspaceState, EPIC_PROJECT_KEY, context.globalState);
-  const releaseProject = new SectionProject(context.workspaceState, RELEASE_PROJECT_KEY, context.globalState);
+  const releaseProject = new SectionProjects(context.workspaceState, RELEASE_PROJECT_KEY, context.globalState);
   const epicsTree = new EpicsTree(instances, epicProject, meta, context.globalState);
   const releasesTree = new ReleasesTree(instances, releaseProject, meta);
   const epicsView = vscode.window.createTreeView('jiraffe.epics', { treeDataProvider: epicsTree });

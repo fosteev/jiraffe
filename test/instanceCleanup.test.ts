@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FilterState, SAVED_KEY, STATE_KEY } from '../src/state/filters';
 import { INSTANCES_KEY, InstanceStore } from '../src/state/instances';
 import { forgetInstance, watchRemovedInstances } from '../src/state/instanceCleanup';
-import { SectionProject } from '../src/state/sectionProject';
+import { SectionProject, SectionProjects } from '../src/state/sectionProject';
 
 const mem = (init: Record<string, unknown> = {}) => {
   const m = new Map(Object.entries(init));
@@ -84,6 +84,45 @@ describe('отключение инстанса: проекты', () => {
   });
 });
 
+describe('SectionProjects (несколько проектов «Релизов»)', () => {
+  it('старое одиночное значение читается как список из одного; мусор и дубли отбрасываются', () => {
+    expect(new SectionProjects(mem({ k: { instanceId: 'a', key: 'ABC' } }) as never, 'k').get()).toEqual([{ instanceId: 'a', key: 'ABC' }]);
+    const sp = new SectionProjects(mem({ k: [{ instanceId: 'a', key: 'X' }, { instanceId: 'a', key: 'X' }, { key: 'Y' }, 7] }) as never, 'k');
+    expect(sp.get()).toEqual([{ instanceId: 'a', key: 'X' }]);
+  });
+
+  it('пустой список workspace не откатывается на глобальный запасной', () => {
+    const sp = new SectionProjects(mem({ k: [] }) as never, 'k', mem({ k: { instanceId: 'a', key: 'OLD' } }) as never);
+    expect(sp.get()).toEqual([]);
+  });
+
+  it('set / remove пишут массив и зовут подписчиков', async () => {
+    const local = mem();
+    const sp = new SectionProjects(local as never, 'k', mem({ k: { instanceId: 'a', key: 'OLD' } }) as never);
+    let fired = 0;
+    sp.onDidChange(() => fired++);
+    sp.set([{ instanceId: 'a', key: 'A' }, { instanceId: 'b', key: 'B' }]);
+    sp.remove({ instanceId: 'a', key: 'A' });
+    await Promise.resolve();
+    expect(local.m.get('k')).toEqual([{ instanceId: 'b', key: 'B' }]);
+    expect(fired).toBe(2);
+  });
+
+  it('forgetInstance убирает проекты инстанса и в workspace, и в запасном; без изменений подписчиков не зовёт', async () => {
+    const local = mem({ k: [{ instanceId: 'a', key: 'A' }, { instanceId: 'b', key: 'B' }] });
+    const global = mem({ k: { instanceId: 'a', key: 'OLD' } });
+    const sp = new SectionProjects(local as never, 'k', global as never);
+    let fired = 0;
+    sp.onDidChange(() => fired++);
+    await sp.forgetInstance('c');
+    expect(fired).toBe(0);
+    await sp.forgetInstance('a');
+    expect(sp.get()).toEqual([{ instanceId: 'b', key: 'B' }]);
+    expect(global.m.get('k')).toEqual([]);
+    expect(fired).toBe(1);
+  });
+});
+
 describe('watchRemovedInstances + forgetInstance на настоящем InstanceStore', () => {
   const setup = async () => {
     const st = mem({ [INSTANCES_KEY]: [a, b] });
@@ -94,7 +133,7 @@ describe('watchRemovedInstances + forgetInstance на настоящем Instanc
     const filters = new FilterState(g as never, mem() as never);
     filters.setProject({ instanceId: 'a', key: 'ABC' });
     const epic = new SectionProject(mem({ e: { instanceId: 'a', key: 'E' } }) as never, 'e');
-    const rel = new SectionProject(mem({ r: { instanceId: 'b', key: 'R' } }) as never, 'r');
+    const rel = new SectionProjects(mem({ r: [{ instanceId: 'a', key: 'RA' }, { instanceId: 'b', key: 'R' }] }) as never, 'r');
     const removed: string[] = [];
     const sub = watchRemovedInstances(store, (id) => { removed.push(id); void forgetInstance(id, [filters, epic, rel]); });
     return { store, filters, epic, rel, removed, sub };
@@ -109,7 +148,7 @@ describe('watchRemovedInstances + forgetInstance на настоящем Instanc
     expect(filters.listSaved().map((f) => f.id)).toEqual(['2', '3']);
     expect(filters.snapshot.project).toBeUndefined();
     expect(epic.get()).toBeUndefined();
-    expect(rel.get()).toEqual({ instanceId: 'b', key: 'R' });
+    expect(rel.get()).toEqual([{ instanceId: 'b', key: 'R' }]);
   });
 
   it('смена набора workspace и обновление caps удалением не считаются', async () => {

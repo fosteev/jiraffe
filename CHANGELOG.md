@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- Releases: follow several projects, across instances too. The project button in the view title is now a list with checkboxes; with more than one project the view groups releases by project, and the × on a project stops following it. The project chosen before stays selected.
+
 ## 0.9.0
 
 - Jiraffe Settings tab (gear in the view titles or *Jiraffe: Open Settings*): connections as cards (account or error, server version, capabilities checked, Tempo or Jira work log, Epic Link field) with check, rename, change token (saved only after it passes `myself()`; never shown), refresh capabilities and disconnect; which instances this workspace uses; issue list, attachments, time tracking and integrations settings with the level each value is stored at and a Reset link; search over settings. The existing commands keep working.
