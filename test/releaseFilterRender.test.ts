@@ -51,6 +51,21 @@ describe('разметка фильтров релиза', () => {
     expect(html).toMatch(/<button class="chip" data-act="f-cat" data-v="done"/);
   });
 
+  it('фасет статуса: первый в панели, плашки по категории с экранированием, чипы статуса и категории различаются', () => {
+    const r = [...rows, row('ABC-5', { status: 'QA <"x">', statusCategory: 'indeterminate' })];
+    const closed = renderReleasePage(page({ rows: r }));
+    expect(closed.indexOf('data-facet="status"')).toBeLessThan(closed.indexOf('data-facet="assignee"'));
+    const html = renderReleasePage(page({ rows: r }), undefined, f({ status: ['QA <"x">'], cats: ['indeterminate'] }), { open: 'status' });
+    expect(html).toContain('<span class="pill s-indeterminate">QA &lt;&quot;x&quot;&gt;</span>');
+    expect(html).toContain('<span class="pill s-done">Done</span>');
+    expect(html).toContain('data-act="f-val" data-facet="status" data-v="QA &lt;&quot;x&quot;&gt;"');
+    expect(html).not.toContain('QA <"x">');
+    expect(html).toContain('<b>Status category</b>');
+    expect(html).toMatch(/<b>Status<\/b>QA &lt;/);
+    expect(keys(html)).toEqual(['ABC-5']);
+    expect(html).not.toMatch(/ style=/);
+  });
+
   it('«из загруженных» только при обрезке и активном фильтре', () => {
     expect(renderReleasePage(page({ truncated: true }), undefined, f({ cats: ['new'] }))).toContain(', loaded only');
     expect(renderReleasePage(page({ truncated: true }))).not.toContain(', loaded only');
@@ -125,7 +140,7 @@ describe('разметка фильтров релиза', () => {
   it('эпик: фасет и группировка скрыты, если ни у одной строки нет эпика', () => {
     const noEpics = rows.map((r) => ({ ...r, epicKey: undefined, extra: undefined }));
     expect(hasEpics(noEpics)).toBe(false);
-    expect(visibleFacets(noEpics, emptyFilter())).toEqual(['assignee', 'type', 'priority']);
+    expect(visibleFacets(noEpics, emptyFilter())).toEqual(['status', 'assignee', 'type', 'priority']);
     expect(visibleFacets(noEpics, f({ epic: ['X-1'] }))).toContain('epic');
     const html = renderReleasePage(page({ rows: noEpics }));
     expect(html).not.toContain('data-facet="epic"');

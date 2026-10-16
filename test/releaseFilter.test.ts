@@ -100,6 +100,32 @@ describe('facetValues', () => {
   });
 });
 
+describe('фасет статуса', () => {
+  const st: ListRow[] = [
+    row('S-1', { status: 'Done', statusCategory: 'done' }),
+    row('S-2', { status: 'Testing', statusCategory: 'indeterminate' }),
+    row('S-3', { status: 'В работе', statusCategory: 'indeterminate' }),
+    row('S-4', { status: 'Testing', statusCategory: 'indeterminate' }),
+    row('S-5', { status: 'Open', statusCategory: 'new' }),
+  ];
+  it('фильтр по конкретным статусам; вместе с категорией — пересечение', () => {
+    expect(keys(applyFilter(st, F({ status: ['Testing'] }), ME))).toEqual(['S-2', 'S-4']);
+    expect(keys(applyFilter(st, F({ status: ['Testing', 'Open'] }), ME))).toEqual(['S-2', 'S-4', 'S-5']);
+    expect(keys(applyFilter(st, F({ status: ['Testing', 'Open'], cats: ['new'] }), ME))).toEqual(['S-5']);
+    expect(isActive(F({ status: ['Open'] }))).toBe(true);
+  });
+  it('варианты: по категории (new, indeterminate, done), внутри — по счётчику; у каждого категория', () => {
+    const v = facetValues(st, emptyFilter(), ME, 'status');
+    expect(v.map((x) => [x.value, x.count, x.cat])).toEqual([
+      ['Open', 1, 'new'], ['Testing', 2, 'indeterminate'], ['В работе', 1, 'indeterminate'], ['Done', 1, 'done'],
+    ]);
+    // категория сужает счётчики статусов, а выбранный статус без строк — в конце, без категории
+    const w = facetValues(st, F({ cats: ['done'], status: ['Gone'] }), ME, 'status');
+    expect(w.map((x) => [x.value, x.count])).toEqual([['Open', 0], ['Testing', 0], ['В работе', 0], ['Done', 1], ['Gone', 0]]);
+    expect(w.at(-1)?.cat).toBeUndefined();
+  });
+});
+
 describe('groupRows', () => {
   it('none — одна группа; пусто — ни одной', () => {
     const g = groupRows(rows, 'none');
@@ -153,10 +179,10 @@ describe('sanitizeFilter', () => {
   });
   it('лишнее выбрасывается, неверные типы → дефолт', () => {
     const f = sanitizeFilter({
-      q: 5, cats: ['done', 'bogus', 'done', 'new', 7], assignee: ['a', 'a', '', 3, null], type: ['Bug', ''], priority: 'High', epic: [''], mine: 'yes',
+      q: 5, cats: ['done', 'bogus', 'done', 'new', 7], status: ['', '  ', 4], assignee: ['a', 'a', '', 3, null], type: ['Bug', ''], priority: 'High', epic: [''], mine: 'yes',
       group: 'nope', extra: 1,
     });
-    expect(f).toEqual({ q: '', cats: ['new', 'done'], assignee: ['a', ''], type: ['Bug'], priority: [], epic: [''], mine: false, group: 'none' });
+    expect(f).toEqual({ q: '', cats: ['new', 'done'], status: [], assignee: ['a', ''], type: ['Bug'], priority: [], epic: [''], mine: false, group: 'none' });
   });
   it('корректный фильтр проходит как есть; длинные значения и огромные списки режутся', () => {
     const ok = F({ q: 'abc', cats: ['indeterminate'], assignee: ['ivan', ''], type: ['Bug'], priority: ['High'], epic: ['ABC-1'], mine: true, group: 'status' });
@@ -192,14 +218,14 @@ describe('releaseFilterJql', () => {
   });
   it('все условия в стабильном порядке — DC', () => {
     const f = F({
-      q: 'login', cats: ['done'], assignee: ['ivan', ''], type: ['Bug'], priority: ['High', ''], epic: ['ABC-90', 'ABC-91'], mine: true, group: 'epic',
+      q: 'login', cats: ['done'], status: ['Testing', 'В работе'], assignee: ['ivan', ''], type: ['Bug'], priority: ['High', ''], epic: ['ABC-90', 'ABC-91'], mine: true, group: 'epic',
     });
-    const want = 'fixVersion = 5 AND statusCategory in (3) AND (assignee in ("ivan") OR assignee is EMPTY) AND issuetype in ("Bug")'
+    const want = 'fixVersion = 5 AND statusCategory in (3) AND status in ("Testing", "В работе") AND (assignee in ("ivan") OR assignee is EMPTY) AND issuetype in ("Bug")'
       + ' AND (priority in ("High") OR priority is EMPTY) AND cf[10100] in (ABC-90, ABC-91) AND assignee = currentUser()'
       + ` AND summary ~ "login"${ORDER}`;
     expect(releaseFilterJql(dc, '5', f)).toEqual({ jql: want, epicSkipped: false });
     // порядок условий не зависит от порядка полей в объекте и значений в статусах
-    const shuffled = { group: f.group, mine: f.mine, epic: f.epic, priority: f.priority, type: f.type, assignee: f.assignee, cats: f.cats, q: f.q };
+    const shuffled = { group: f.group, mine: f.mine, epic: f.epic, priority: f.priority, type: f.type, assignee: f.assignee, status: f.status, cats: f.cats, q: f.q };
     expect(releaseFilterJql(dc, '5', shuffled).jql).toBe(want);
     expect(releaseFilterJql(dc, '5', F({ cats: ['done', 'new'] })).jql).toBe(releaseFilterJql(dc, '5', F({ cats: ['new', 'done'] })).jql);
   });

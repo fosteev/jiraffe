@@ -146,11 +146,13 @@ export type FilterGroup = 'none' | 'assignee' | 'epic' | 'status';
 
 /**
  * Фильтр вкладки релиза. Пустая строка в фасете — «пустое значение»: не назначена / без эпика / без приоритета.
- * `assignee` — `UserRef.id`, `type`/`priority` — имена как в `ListRow`, `epic` — `epicKey`.
+ * `assignee` — `UserRef.id`, `status`/`type`/`priority` — имена как в `ListRow`, `epic` — `epicKey`.
+ * `cats` — категории статуса (плитки прогресса), `status` — конкретные статусы (фасет); действуют вместе.
  */
 export interface ReleaseFilter {
   q: string;
   cats: FilterCat[];
+  status: string[];
   assignee: string[];
   type: string[];
   priority: string[];

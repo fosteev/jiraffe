@@ -33,7 +33,7 @@ export interface ReleaseFilterJqlOpts {
 }
 
 /**
- * Условия по порядку: релиз, статус (по id категорий), исполнитель, тип, приоритет, эпик, «Только мои», поиск, затем `ORDER BY status, priority`.
+ * Условия по порядку: релиз, категория статуса (по id), статус (по имени), исполнитель, тип, приоритет, эпик, «Только мои», поиск, затем `ORDER BY status, priority`.
  * Значения — в кавычках (`quoteJql`), ключи эпиков — только по формату. Неверный `versionId` — пустой `jql`.
  */
 export function releaseFilterJql(instance: JqlInstance, versionId: string, f: ReleaseFilter, opts: ReleaseFilterJqlOpts = {}): ReleaseFilterJql {
@@ -46,6 +46,7 @@ export function releaseFilterJql(instance: JqlInstance, versionId: string, f: Re
 
   const cats = CATEGORY_ORDER.filter((c) => f.cats.includes(c));
   if (cats.length) clauses.push(`statusCategory in (${cats.flatMap((c) => CATEGORY_IDS[c]).join(', ')})`);
+  add(listClause('status', f.status.filter(Boolean), quoteJql));
   add(listClause('assignee', f.assignee, quoteJql));
   add(listClause('issuetype', f.type.filter(Boolean), quoteJql));
   add(listClause('priority', f.priority, quoteJql));

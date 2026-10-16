@@ -4,9 +4,9 @@ import { priorityRank, progressOf } from '../src/jira/epics';
 import type { Progress } from '../src/jira/types';
 import type { FilterCat, FilterGroup, ListRow, ReleaseFilter } from '../src/panels/protocol';
 
-/** Фасеты-списки. Статус (`cats`) — отдельно: это плитки прогресса, а не выпадающий список. */
-export type FacetId = 'assignee' | 'type' | 'priority' | 'epic';
-export const FACETS: readonly FacetId[] = ['assignee', 'type', 'priority', 'epic'];
+/** Фасеты-списки. Категория статуса (`cats`) — отдельно: это плитки прогресса; `status` — конкретные статусы списком. */
+export type FacetId = 'status' | 'assignee' | 'type' | 'priority' | 'epic';
+export const FACETS: readonly FacetId[] = ['status', 'assignee', 'type', 'priority', 'epic'];
 export type SkipId = FacetId | 'cats';
 
 export const FILTER_CATS: readonly FilterCat[] = ['new', 'indeterminate', 'done'];
@@ -18,7 +18,7 @@ const MAX_LEN = 300;
 /** Сколько элементов массива вообще просматриваем (дальше не читаем, даже если годных меньше `MAX_VALUES`). */
 const MAX_SCAN = 1000;
 
-export const emptyFilter = (): ReleaseFilter => ({ q: '', cats: [], assignee: [], type: [], priority: [], epic: [], mine: false, group: 'none' });
+export const emptyFilter = (): ReleaseFilter => ({ q: '', cats: [], status: [], assignee: [], type: [], priority: [], epic: [], mine: false, group: 'none' });
 
 /** Что-то сужает выборку. Группировка — не фильтр, на «активность» не влияет. */
 export const isActive = (f: ReleaseFilter): boolean =>
@@ -27,6 +27,7 @@ export const isActive = (f: ReleaseFilter): boolean =>
 /** Значение фасета у строки; пустая строка — «пусто» (не назначена / без эпика / без приоритета). */
 export function rowValue(row: ListRow, facet: FacetId): string {
   switch (facet) {
+    case 'status': return row.status;
     case 'assignee': return row.assignee?.id ?? '';
     case 'type': return row.type;
     case 'priority': return row.priority ?? '';
@@ -57,17 +58,22 @@ export interface FacetValue {
   /** Сколько строк дал бы вариант при остальных активных фильтрах (свой фасет не учитывается). */
   count: number;
   on: boolean;
+  /** Только у фасета статуса: категория (цвет плашки и порядок). */
+  cat?: FilterCat;
 }
 
 /**
  * Варианты фасета: все значения из `rows` (не только отфильтрованных) + выбранные, которых в `rows` нет (счётчик 0).
- * Порядок: приоритет — по `priorityRank`, остальные — счётчик по убыванию, затем подпись; пустое значение всегда последним.
+ * Порядок: статус — по категории (new, indeterminate, done), приоритет — по `priorityRank`, затем (и у остальных) счётчик по убыванию,
+ * затем подпись; пустое значение всегда последним.
  */
 export function facetValues(rows: readonly ListRow[], f: ReleaseFilter, meId: string | undefined, facet: FacetId): FacetValue[] {
   const labels = new Map<string, string>();
+  const cats = new Map<string, FilterCat>();
   for (const r of rows) {
     const v = rowValue(r, facet);
     if (labels.has(v)) continue;
+    if (facet === 'status') cats.set(v, r.statusCategory);
     labels.set(v, facet === 'assignee' ? (r.assignee?.name ?? v) : facet === 'epic' ? (r.extra ?? v) : v);
   }
   for (const v of f[facet]) if (!labels.has(v)) labels.set(v, v);
@@ -76,11 +82,13 @@ export function facetValues(rows: readonly ListRow[], f: ReleaseFilter, meId: st
     const v = rowValue(r, facet);
     counts.set(v, (counts.get(v) ?? 0) + 1);
   }
-  const out: FacetValue[] = [...labels].map(([value, label]) => ({ value, label, count: counts.get(value) ?? 0, on: f[facet].includes(value) }));
+  const out: FacetValue[] = [...labels].map(([value, label]) => ({ value, label, count: counts.get(value) ?? 0, on: f[facet].includes(value), ...(cats.has(value) ? { cat: cats.get(value) } : {}) }));
   const byName = (a: FacetValue, b: FacetValue): number => a.label.localeCompare(b.label) || a.value.localeCompare(b.value);
   return out.sort((a, b) => {
     if (!a.value !== !b.value) return a.value ? -1 : 1; // '' — в конец
     if (facet === 'priority') return priorityRank(a.value) - priorityRank(b.value) || byName(a, b);
+    // Статус без строк (остался только в фильтре) — после известных.
+    if (facet === 'status') return (a.cat ? CAT_RANK[a.cat] : 3) - (b.cat ? CAT_RANK[b.cat] : 3) || b.count - a.count || byName(a, b);
     return b.count - a.count || byName(a, b);
   });
 }
@@ -173,6 +181,8 @@ export function sanitizeFilter(x: unknown): ReleaseFilter {
   return {
     q: typeof o.q === 'string' ? o.q.slice(0, MAX_LEN) : '',
     cats: FILTER_CATS.filter((c) => cats.includes(c)),
+    // У задачи статус есть всегда: пустое значение — мусор.
+    status: strings(o.status, false),
     assignee: strings(o.assignee, true),
     // У задачи тип есть всегда: пустое значение для типа — мусор.
     type: strings(o.type, false),

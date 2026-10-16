@@ -20,7 +20,7 @@ export const visibleFacets = (rows: readonly ListRow[], f: ReleaseFilter): Facet
 export const effectiveGroup = (rows: readonly ListRow[], f: ReleaseFilter): FilterGroup =>
   f.group === 'epic' && !hasEpics(rows) ? 'none' : f.group;
 
-const facetTitle = (id: FacetId): string => ({ assignee: t('Assignee'), type: t('Type'), priority: t('Priority'), epic: t('Epic') })[id];
+const facetTitle = (id: FacetId): string => ({ status: t('Status'), assignee: t('Assignee'), type: t('Type'), priority: t('Priority'), epic: t('Epic') })[id];
 const groupTitle = (g: FilterGroup): string => ({ none: t('None'), assignee: t('Assignee'), epic: t('Epic'), status: t('Status') })[g];
 
 /** Подпись пустого значения фасета. */
@@ -32,6 +32,7 @@ const valueText = (id: FacetId, v: FacetValue): string => (v.value === '' ? empt
 function valueHtml(id: FacetId, v: FacetValue, users: ReadonlyMap<string, UserRef>): string {
   if (v.value === '') return `<span class="mut">${esc(emptyLabel(id))}</span>`;
   switch (id) {
+    case 'status': return `<span class="pill s-${v.cat ?? 'new'}">${esc(v.label)}</span>`;
     case 'assignee': { const u = users.get(v.value); return u ? person(u) : esc(v.label); }
     case 'type': return `${typeIcon(v.label)}${esc(v.label)}`;
     case 'priority': return `${priorityIcon(v.label)}${esc(v.label)}`;
@@ -79,7 +80,7 @@ export function filterPanel(rows: readonly ListRow[], f: ReleaseFilter, meId: st
     + `<span class="sp"></span><label class="mut sm" for="rf-grp">${t('Group by')}</label><select id="rf-grp" class="rf-sel">${groups}</select></div>`;
 
   const chips: string[] = [];
-  for (const c of f.cats) chips.push(chip(`data-act="f-cat" data-v="${c}"`, t('Status'), esc(STATUS_LABEL[c])));
+  for (const c of f.cats) chips.push(chip(`data-act="f-cat" data-v="${c}"`, t('Status category'), esc(STATUS_LABEL[c])));
   for (const id of FACETS) {
     const all = vals.get(id);
     for (const v of f[id]) {
