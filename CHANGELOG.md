@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.11.1
+
+- Releases: a Status list in the release tab filters by the workflow statuses themselves (Testing, In Progress, …), next to the status category tiles; both apply together, and Copy JQL / Save as filter add `status in (…)`. The chip of a tile now reads “Status category”.
+
 ## 0.11.0
 
-- Releases: filters inside the release tab. The progress tiles and the legend pick a status category (done, in progress, to do); below them a search by key or summary, Status / Assignee / Type / Priority / Epic lists with counts (Status lists the workflow statuses themselves, e.g. Testing), Only mine and grouping by assignee, epic or status (each group shows its own progress), with chips, a reset and “Showing N of M”. *Copy JQL* and *Save as filter* turn the current selection into JQL (the saved one appears in Filters, with an Apply button). The selection is kept until the tab is closed and works on the loaded issues, without extra requests.
+- Releases: filters inside the release tab. The progress tiles and the legend pick a status category (done, in progress, to do); below them a search by key or summary, Assignee / Type / Priority / Epic lists with counts, Only mine and grouping by assignee, epic or status (each group shows its own progress), with chips, a reset and “Showing N of M”. *Copy JQL* and *Save as filter* turn the current selection into JQL (the saved one appears in Filters, with an Apply button). The selection is kept until the tab is closed and works on the loaded issues, without extra requests.
 
 ## 0.10.0
 
